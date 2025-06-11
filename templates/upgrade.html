@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade to Premium - FoodFixr</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .price {
+            font-size: 3em;
+            color: #ff3cac;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #ff3cac;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.2em;
+            cursor: pointer;
+            width: 80%;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background: #e6359a;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .features {
+            text-align: left;
+            margin: 20px 0;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #loading { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔓 Upgrade to Premium</h1>
+        <p>Your free trial has expired. Continue with unlimited scanning!</p>
+        
+        <div class="price">$2.99</div>
+        <p style="color: #666;">per month • Cancel anytime</p>
+        
+        <div class="features">
+            <h3>Premium Benefits:</h3>
+            <p>✅ Unlimited scans<br>
+            🚀 Priority processing<br>
+            📊 Scan history<br>
+            💡 Advanced insights<br>
+            ❌ Cancel anytime</p>
+        </div>
+        
+        <button id="checkout-button" class="btn">
+            <span id="button-text">🚀 Start Premium ($2.99/month)</span>
+            <span id="loading">Processing...</span>
+        </button>
+        
+        <p style="color: #666; font-size: 0.9em; margin-top: 20px;">
+            💰 30-day money-back guarantee<br>
+            🔒 Secure payment by Stripe
+        </p>
+    </div>
+
+    <script>
+        const stripe = Stripe('{{ stripe_publishable_key }}');
+        const checkoutButton = document.getElementById('checkout-button');
+        
+        checkoutButton.addEventListener('click', function() {
+            checkoutButton.disabled = true;
+            document.getElementById('button-text').style.display = 'none';
+            document.getElementById('loading').style.display = 'inline';
+            
+            fetch('/create-checkout-session', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(session => {
+                if (session.error) {
+                    alert('Error: ' + session.error);
+                    checkoutButton.disabled = false;
+                    document.getElementById('button-text').style.display = 'inline';
+                    document.getElementById('loading').style.display = 'none';
+                } else {
+                    return stripe.redirectToCheckout({ sessionId: session.id });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Something went wrong. Please try again.');
+                checkoutButton.disabled = false;
+                document.getElementById('button-text').style.display = 'inline';
+                document.getElementById('loading').style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>

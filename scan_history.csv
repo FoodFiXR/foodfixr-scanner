@@ -1,0 +1,610 @@
+timestamp,filename,rating,corn,trans_fat,excitotoxins
+2025-05-19 18:47:33,00028400516464_1.jpeg,✅ Yay! Safe!,None,None,None
+2025-05-19 18:47:41,shopping.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 18:47:48,Vegan-Southwest-Salad_-done.png,✅ Yay! Safe!,None,None,None
+2025-05-19 18:47:56,Cobb-Salad-main.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 18:48:03,Cobb-Salad-main.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 18:48:11,1_RHbR_c2muM7J_W7pwEA0cQ.jpg,✅ Yay! Safe!,None,None,None
+2025-05-19 18:48:42,shopping_1.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 18:49:26,label.jpg,🚨 Oh NOOOO! Danger!,"corn, corn syrup, dextrose",None,natural flavors
+2025-05-19 18:49:31,cereal.webp,⚠️ Proceed carefully,"corn, milled corn",None,None
+2025-05-19 19:00:34,dangerous-label.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-05-19 19:00:53,label.jpg,🚨 Oh NOOOO! Danger!,"corn, corn syrup, dextrose",None,natural flavors
+2025-05-19 19:00:59,cereal.webp,⚠️ Proceed carefully,"corn, milled corn",None,None
+2025-05-19 19:01:07,Vegan-Southwest-Salad_-done.png,✅ Yay! Safe!,None,None,None
+2025-05-19 19:02:31,0002840072029_B.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 19:04:33,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-19 19:18:32,0002840072029_B.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 19:18:40,dangerous-label.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-05-19 19:18:46,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-19 20:47:17,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-19 20:47:23,0002840072029_B.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 20:47:29,dangerous-label.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-05-19 20:53:17,0002840072029_B.webp,✅ Yay! Safe!,None,None,None
+2025-05-19 20:53:30,dangerous-label.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-05-19 20:53:49,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-20 12:06:09,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-20 12:18:17,ingredients_en.6.full.jpg,🚨 Oh NOOOO! Danger!,"corn, dextrose, maltodextrin, corn flour, corn oil",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-05-20 12:23:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 12:27:31,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 12:27:52,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 12:33:35,00028400516464_1.jpeg,✅ Yay! Safe!,None,None,None
+2025-05-20 13:34:03,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 14:00:28,captured.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 14:01:00,captured.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 15:15:31,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 15:15:37,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:20:47,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:20:47,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:20:56,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:22:55,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:24:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:24:36,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:24:47,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:24:53,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:25:29,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:47:18,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:55:18,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:56:19,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 19:56:43,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:01:09,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:05:10,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:21:17,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:21:35,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:24:38,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:24:51,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-20 20:46:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 10:51:13,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 10:52:37,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 10:52:57,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 11:02:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 11:03:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 11:11:11,image.jpg,🚨 Oh NOOO! Danger!,"corn, corn syrup",None,citric acid
+2025-05-21 11:20:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 11:20:35,image.jpg,🚨 Oh NOOO! Danger!,"corn, corn syrup",None,citric acid
+2025-05-21 11:21:41,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 11:22:13,image.jpg,🚨 Oh NOOO! Danger!,"corn, corn maltodextrin, modified corn starch, corn starch",None,citric acid
+2025-05-21 11:26:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 12:42:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 12:42:56,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 12:43:43,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 12:45:40,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-21 12:45:59,image.jpg,🚨 Oh NOOO! Danger!,"corn, corn syrup",None,citric acid
+2025-05-21 13:10:32,image.jpg,🚨 Oh NOOO! Danger!,"corn, corn syrup",None,citric acid
+2025-05-22 13:34:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-22 13:37:50,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 12:49:09,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 13:31:24,capture.jpg,❌ Error,None,None,None
+2025-05-23 13:43:37,capture.jpg,❌ Error,None,None,None
+2025-05-23 13:45:45,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 14:03:38,capture.jpg,❌ Error,None,None,None
+2025-05-23 14:03:53,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 14:54:40,capture.jpg,❌ Error,None,None,None
+2025-05-23 14:55:59,capture.jpg,❌ Error,None,None,None
+2025-05-23 16:42:53,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 22:19:05,capture.jpg,❌ Error,None,None,None
+2025-05-23 22:19:36,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-23 22:33:12,capture.jpg,❌ Error,None,None,None
+2025-05-23 22:34:18,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:05:11,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:05:20,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-24 00:06:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-24 00:15:08,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:20:57,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:21:21,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-24 00:22:01,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:27:07,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:28:17,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:34:36,capture.jpg,❌ Error,None,None,None
+2025-05-24 00:34:43,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-24 16:12:06,capture.jpg,❌ Error,None,None,None
+2025-05-24 16:12:13,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-26 10:31:31,capture.jpg,❌ Error,None,None,None
+2025-05-26 10:53:43,capture.jpg,❌ Error,None,None,None
+2025-05-26 23:47:00,capture.jpg,❌ Error,None,None,None
+2025-05-26 23:47:16,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 11:24:10,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 11:28:16,capture.jpg,❌ Error,None,None,None
+2025-05-27 11:28:24,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 11:32:38,capture.jpg,❌ Error,None,None,None
+2025-05-27 11:33:55,capture.jpg,❌ Error,None,None,None
+2025-05-27 11:38:07,capture.jpg,❌ Error,None,None,None
+2025-05-27 11:38:21,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 11:55:38,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 11:56:19,capture.jpg,❌ Error,None,None,None
+2025-05-27 11:56:35,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 12:00:32,capture.jpg,❌ Error,None,None,None
+2025-05-27 12:00:44,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 12:04:52,capture.jpg,❌ Error,None,None,None
+2025-05-27 12:05:08,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-27 12:37:16,capture.jpg,❌ Error,None,None,None
+2025-05-27 14:49:25,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-28 17:11:32,capture.jpg,❌ Error,None,None,None
+2025-05-28 17:38:00,capture.jpg,❌ Error,None,None,None
+2025-05-28 17:47:40,capture.jpg,❌ Error,None,None,None
+2025-05-28 17:48:59,capture.jpg,❌ Error,None,None,None
+2025-05-28 17:50:43,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-28 23:14:02,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:14:11,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-28 23:18:38,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:19:31,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:20:03,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:50:52,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:53:30,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:53:42,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:54:13,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:57:11,capture.jpg,❌ Error,None,None,None
+2025-05-28 23:59:53,capture.jpg,❌ Error,None,None,None
+2025-05-29 00:00:12,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:36:54,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:42:57,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:43:26,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:43:39,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:44:12,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:44:43,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:45:46,capture.jpg,❌ Error,None,None,None
+2025-05-29 13:47:08,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-29 20:15:58,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:05:48,capture.jpg,❌ Error,None,None,None
+2025-05-30 11:09:32,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:10:57,image.jpg,🚨 Oh NOOO! Danger!,None,None,None
+2025-05-30 11:15:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:15:44,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:16:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:19:19,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 11:22:02,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:15:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:15:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:16:14,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:16:50,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 13:38:15,capture.jpg,❌ Error,None,None,None
+2025-05-30 13:39:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:40:14,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:40:44,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:54:57,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:58:07,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 13:59:20,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 13:59:33,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 13:59:53,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:00:15,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 14:08:26,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 14:09:40,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:09:58,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:10:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:13:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:13:44,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:14:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:18:48,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:19:01,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:19:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:19:58,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 14:20:14,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 14:21:41,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:21:58,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:23:05,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:23:27,image.jpg,⚠️ Proceed carefully,"corn, corn syrup, corn starch",None,None
+2025-05-30 14:25:06,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:25:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:26:27,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 14:26:57,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:28:09,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:28:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:31:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:31:45,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:32:03,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:32:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:33:03,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:33:22,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:33:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:34:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:37:01,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:43:22,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:43:49,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:44:16,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:44:37,image.jpg,⚠️ Proceed carefully,"corn, corn starch, modified corn starch, maltodextrin",None,None
+2025-05-30 14:45:02,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:45:22,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:45:38,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 14:45:57,image.jpg,⚠️ Proceed carefully,"corn, maltodextrin",None,None
+2025-05-30 14:46:28,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:47:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 14:47:34,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,"yeast extract, natural flavoring"
+2025-05-30 14:48:01,image.jpg,⚠️ Proceed carefully,"corn, corn starch, modified corn starch, maltodextrin",None,None
+2025-05-30 14:49:07,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 14:49:24,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 14:49:41,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:02:02,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:02:42,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:03:04,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:03:21,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:08:45,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:21:11,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:21:36,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:24:01,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:24:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:24:36,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,"yeast extract, natural flavoring"
+2025-05-30 15:25:22,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 15:25:39,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 15:25:58,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 15:26:13,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:26:42,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 15:27:02,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:27:14,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:27:37,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:27:53,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,natural flavoring
+2025-05-30 15:28:26,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,"yeast extract, natural flavoring"
+2025-05-30 15:28:53,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:29:06,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:29:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:30:04,image.jpg,🚨 Oh NOOOO! Danger!,"corn, maltodextrin",None,"monosodium glutamate, yeast extract, disodium guanylate, natural flavors"
+2025-05-30 15:30:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:35:03,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:35:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:35:30,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:37:04,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:37:43,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:45:32,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:45:59,image.jpg,🚨 Oh NOOOO! Danger!,"corn, corn starch, modified corn starch, maltodextrin",None,citric acid
+2025-05-30 15:46:50,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-05-30 15:47:10,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,"yeast extract, natural flavoring"
+2025-05-30 15:47:33,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:47:54,image.jpg,🚨 Oh NOOOO! Danger!,"corn, maltodextrin",None,citric acid
+2025-05-30 15:48:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:48:37,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:48:54,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:49:09,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:49:31,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:51:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:52:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:52:56,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:53:59,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 15:54:57,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 16:01:13,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 16:01:47,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 16:02:04,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-05-30 16:03:04,image.jpg,🚨 Oh NOOOO! Danger!,"corn, cornstarch",None,yeast extract
+2025-05-30 16:03:44,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-05-30 16:04:14,image.jpg,✅ Yay! Safe!,None,None,None
+2025-05-30 16:04:35,image.jpg,⚠️ Proceed carefully,"corn, maltodextrin, dextrose",None,None
+2025-05-30 16:10:41,image.jpg,🚨 Oh NOOOO! Danger!,corn,None,disodium inosinate
+2025-05-30 16:15:43,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-05-30 16:16:29,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-05-30 16:19:56,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-05-30 16:20:12,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-05-30 16:20:51,image.jpg,🚨 Oh NOOOO! Danger!,"corn, maltodextrin, modified corn starch, dextrose",None,artificial flavors
+2025-05-30 22:36:40,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 14:32:27,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 14:34:07,image.jpg,🚨 Oh NOOOO! Danger!,"corn, maltodextrin, corn flour, corn oil, dextrose, monosodium glutamate",None,"monosodium glutamate, red 40"
+2025-06-01 14:37:37,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 14:46:57,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 14:47:17,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 14:51:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 14:51:50,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 15:04:48,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:05:35,image.jpg,🚨 Oh NOOOO! Danger!,None,None,\bnatural\ flavors\b
+2025-06-01 15:05:46,image.jpg,🚨 Oh NOOOO! Danger!,None,None,\bnatural\ flavors\b
+2025-06-01 15:06:25,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 15:06:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:06:53,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-01 15:18:16,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:20:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:20:36,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:21:07,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 15:22:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:50:31,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:50:51,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:51:12,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:52:17,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:52:34,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:53:35,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:54:26,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:55:02,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-06-01 22:55:36,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:56:02,image.jpg,⚠️ Proceed carefully,"corn, maltodextrin, modified corn starch, dextrose",None,None
+2025-06-01 22:56:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:56:49,image.jpg,🚨 Oh NOOOO! Danger!,"corn, cornstarch",None,yeast extract
+2025-06-01 22:57:19,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:57:53,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 22:58:30,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:06:05,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:07:08,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:08:33,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:08:40,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:08:44,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:09:00,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-06-01 23:09:27,image.jpg,🚨 Oh NOOOO! Danger!,"corn, cornstarch",None,yeast extract
+2025-06-01 23:09:47,image.jpg,⚠️ Proceed carefully,corn,None,None
+2025-06-01 23:10:18,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:10:42,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:21:08,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:22:05,image.jpg,⚠️ Proceed carefully,"corn, cornstarch",None,None
+2025-06-01 23:22:28,image.jpg,🚨 Oh NOOOO! Danger!,"corn, cornstarch",None,yeast extract
+2025-06-01 23:23:13,image.jpg,🚨 Oh NOOOO! Danger!,"corn, maltodextrin, corn oil, dextrose",None,"red 40, yellow 5, yellow 6"
+2025-06-01 23:23:49,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:24:29,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:38:44,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:39:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:39:42,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:40:02,image.jpg,🚨 Oh NOOOO! Danger!,5,None,stock
+2025-06-01 23:40:39,image.jpg,⚠️ Proceed carefully,"2, 4, 5, corn oil, lactose, maltodextrin",None,None
+2025-06-01 23:41:30,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-06-01 23:44:08,image.jpg,⚠️ Proceed carefully,"1, 2, 4, 5, 6, corn flour, corn oil, dextrose, maltodextrin",None,None
+2025-06-01 23:52:04,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:52:27,image.jpg,🚨 Oh NOOOO! Danger!,"corn oil, corn flour, dextrose, maltodextrin",None,monosodium glutamate
+2025-06-01 23:52:40,image.jpg,🚨 Oh NOOOO! Danger!,"corn oil, corn flour, dextrose, maltodextrin",None,monosodium glutamate
+2025-06-01 23:53:42,image.jpg,⚠️ Proceed carefully,"corn flour, dextrose, maltodextrin, citric acid",None,None
+2025-06-01 23:54:38,image.jpg,⚠️ Proceed carefully,"corn flour, dextrose",None,None
+2025-06-01 23:55:09,image.jpg,🚨 Oh NOOOO! Danger!,"corn oil, corn flour, dextrose, maltodextrin",None,monosodium glutamate
+2025-06-01 23:55:51,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-06-01 23:56:26,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-01 23:58:35,image.jpg,⚠️ Proceed carefully,"maltodextrin, citric acid",None,None
+2025-06-02 00:03:44,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid",None,"monosodium glutamate, yeast extract, disodium inosinate"
+2025-06-02 00:04:40,image.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-06-02 00:12:59,image.jpg,🚨 Oh NOOOO! Danger!,dextrose,None,natural flavors
+2025-06-02 00:14:02,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:14:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:15:19,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:15:37,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:15:55,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-06-02 00:16:57,image.jpg,⚠️ Proceed carefully,cornstarch,None,None
+2025-06-02 00:17:25,image.jpg,🚨 Oh NOOOO! Danger!,cornstarch,None,yeast extract
+2025-06-02 00:18:03,image.jpg,🚨 Oh NOOOO! Danger!,"corn syrup, dextrose",None,natural flavors
+2025-06-02 00:24:31,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:25:02,image.jpg,🚨 Oh NOOOO! Danger!,"corn syrup, dextrose",None,natural flavors
+2025-06-02 00:25:24,image.jpg,⚠️ Proceed carefully,cornstarch,None,None
+2025-06-02 00:25:49,image.jpg,🚨 Oh NOOOO! Danger!,cornstarch,None,yeast extract
+2025-06-02 00:31:31,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:31:52,image.jpg,🚨 Oh NOOOO! Danger!,cornstarch,None,"natural flavoring, yeast extract"
+2025-06-02 00:32:07,image.jpg,🚨 Oh NOOOO! Danger!,cornstarch,None,"natural flavoring, yeast extract"
+2025-06-02 00:36:46,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:37:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:37:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:40:48,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:41:10,image.jpg,⚠️ Proceed carefully,modified food starch,None,None
+2025-06-02 00:41:28,image.jpg,🚨 Oh NOOOO! Danger!,None,None,"monosodium glutamate, natural flavoring"
+2025-06-02 00:42:14,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid",None,"monosodium glutamate, natural flavoring, autolyzed yeast extract, yeast extract, disodium inosinate"
+2025-06-02 00:43:09,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:43:33,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:43:54,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:45:25,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 00:45:40,image.jpg,⚠️ Proceed carefully,corn syrup,None,None
+2025-06-02 09:47:36,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:48:18,image.jpg,⚠️ Proceed carefully,corn syrup,None,None
+2025-06-02 09:48:50,image.jpg,🚨 Oh NOOOO! Danger!,modified food starch,None,"monosodium glutamate, natural flavoring, autolyzed yeast extract, yeast extract"
+2025-06-02 09:55:13,image.jpg,🚨 Oh NOOOO! Danger!,modified food starch,None,"monosodium glutamate, natural flavoring, autolyzed yeast extract, yeast extract"
+2025-06-02 09:55:44,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid",None,"monosodium glutamate, natural flavoring, autolyzed yeast extract, yeast extract, disodium inosinate, disodium guanylate"
+2025-06-02 09:56:10,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:56:32,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:57:12,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:57:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:57:53,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:58:35,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 09:59:20,image.jpg,🚨 Oh NOOOO! Danger!,"corn flour, dextrose, citric acid",None,"monosodium glutamate, disodium inosinate, disodium guanylate"
+2025-06-02 10:04:12,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 10:04:47,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 10:05:16,image.jpg,🚨 Oh NOOOO! Danger!,None,None,"monosodium glutamate, natural flavoring, autolyzed yeast extract, yeast extract"
+2025-06-02 18:17:28,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 22:42:31,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-02 22:51:30,image.jpg,⚠️ Proceed carefully,"cornstarch, vegetable oil, natural flavor",vegetable oil,stock
+2025-06-02 22:52:07,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, stock"
+2025-06-03 12:20:41,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 12:29:33,image.jpg,⚠️ Proceed carefully,"cornstarch, vegetable oil, natural flavor",vegetable oil,stock
+2025-06-03 12:30:26,image.jpg,🚨 Oh NOOOO! Danger!,"natural flavor, yeast extract",None,yeast extract
+2025-06-03 12:37:54,image.jpg,⚠️ Proceed carefully,"cornstarch, vegetable oil, natural flavor",vegetable oil,stock
+2025-06-03 12:38:28,image.jpg,⚠️ Proceed carefully,"cornstarch, vegetable oil",vegetable oil,stock
+2025-06-03 12:38:47,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 12:39:12,image.jpg,🚨 Oh NOOOO! Danger!,"natural flavor, enzymes",None,disodium inosinate
+2025-06-03 13:55:03,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, stock"
+2025-06-03 14:15:29,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:15:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:15:49,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:15:59,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:16:57,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:17:53,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:22:09,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, vegetable oil, natural flavor, enzymes, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-03 14:22:31,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 14:26:28,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:27:06,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:28:15,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:28:48,image.jpg,⚠️ Proceed carefully,cornstarch,None,None
+2025-06-03 14:29:50,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:30:18,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:30:52,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 14:32:16,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 15:56:45,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor",vegetable oil,"monosodium glutamate, natural flavor, natural flavoring, stock"
+2025-06-03 15:57:36,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 16:14:02,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 16:14:51,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 16:15:17,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 16:15:55,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"monosodium glutamate, natural flavor, natural flavoring, stock"
+2025-06-03 16:16:17,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, natural flavor, yeast extract",None,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 16:16:38,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 16:17:06,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, vegetable oil, natural flavor, enzymes, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-03 16:17:30,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-03 16:17:49,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"monosodium glutamate, natural flavor, natural flavoring"
+2025-06-03 16:20:20,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 17:00:42,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 17:01:34,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 17:02:09,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 17:02:37,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 17:04:26,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 17:05:09,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 17:05:36,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:40:26,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:40:56,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:41:13,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:41:31,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:46:30,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:46:47,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:47:20,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:47:29,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:47:50,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:48:07,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, natural flavor, yeast extract",None,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:48:26,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:49:00,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, vegetable oil, enzymes, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate"
+2025-06-03 23:53:01,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, vegetable oil, natural flavor, enzymes, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-03 23:54:32,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-03 23:54:54,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-03 23:55:22,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:55:39,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-03 23:56:22,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-04 12:24:55,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-04 12:25:18,image.jpg,⚠️ Proceed carefully,vegetable oil,vegetable oil,None
+2025-06-04 12:25:37,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-04 12:26:03,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"monosodium glutamate, natural flavor, natural flavoring, stock"
+2025-06-04 12:28:40,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:30:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:31:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:31:32,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:31:56,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:32:11,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 12:32:35,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 13:18:48,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 13:20:54,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 13:21:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-04 13:22:11,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-04 13:22:34,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-04 13:23:12,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring, stock"
+2025-06-04 13:24:01,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-04 13:24:33,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-04 13:25:02,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, natural flavor, enzymes, yeast extract",None,"monosodium glutamate, yeast extract, natural flavor"
+2025-06-04 13:25:27,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, natural flavor, enzymes, yeast extract",None,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-05 10:24:01,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:24:50,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:25:09,image.jpg,🚨 Oh NOOOO! Danger!,None,None,monosodium glutamate
+2025-06-05 10:25:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:25:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:29:52,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:30:10,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:30:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:31:28,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:33:19,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:34:17,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, natural flavor, enzymes, yeast extract",None,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-05 10:34:36,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:34:53,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:35:07,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:35:54,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:36:22,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:36:41,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:38:08,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:40:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:40:52,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:41:10,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:42:17,image.jpg,⚠️ Proceed carefully,cornstarch,None,None
+2025-06-05 10:42:42,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:42:54,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:43:06,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:43:20,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:43:35,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:44:50,image.jpg,🚨 Oh NOOOO! Danger!,None,None,disodium guanylate
+2025-06-05 10:45:05,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:45:21,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:45:48,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-06-05 10:46:35,image.jpg,🚨 Oh NOOOO! Danger!,natural flavor,None,"natural flavor, natural flavoring, stock"
+2025-06-05 10:47:30,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:47:58,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor, natural flavoring"
+2025-06-05 10:49:01,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:49:46,image.jpg,🚨 Oh NOOOO! Danger!,"natural flavor, yeast extract",None,"yeast extract, natural flavor"
+2025-06-05 10:50:35,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric acid, natural flavor, enzymes, yeast extract",None,"monosodium glutamate, yeast extract, disodium inosinate, disodium guanylate, natural flavor"
+2025-06-05 10:50:57,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring"
+2025-06-05 10:51:35,image.jpg,⚠️ Proceed carefully,"cornstarch, vegetable oil",vegetable oil,stock
+2025-06-05 10:52:14,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:52:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 10:54:14,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"yeast extract, natural flavor"
+2025-06-05 11:06:48,image.jpg,⚠️ Proceed carefully,None,None,stock
+2025-06-05 11:09:02,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor",vegetable oil,"natural flavor, natural flavoring, stock"
+2025-06-05 11:09:03,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 11:10:31,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil, natural flavor, yeast extract",vegetable oil,"monosodium glutamate, yeast extract, natural flavor, natural flavoring, stock"
+2025-06-05 11:11:23,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 12:31:25,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 12:32:12,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable starch, vegetable oil, corn oil, corn starch, cornstarch, corn flour","butter, vegetable oil","yeast extract, whey protein, natural flavor, natural flavoring, stock"
+2025-06-05 12:32:20,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable starch, vegetable oil, corn oil, corn starch, cornstarch, corn flour","butter, vegetable oil","monosodium glutamate, yeast extract, whey protein, mono sodium glutamate, natural flavor, natural flavoring, stock"
+2025-06-05 12:33:08,image.jpg,🚨 Oh NOOOO! Danger!,"citric acid, vegetable oil, enzymes, citric, corn oil, maltodextrin, dextrin, corn meal","butter, vegetable oil","monosodium glutamate, yeast extract, disodium inosinate, artificial flavor, whey protein, mono sodium glutamate, natural flavor, disodium guanylate"
+2025-06-05 13:04:01,image.jpg,🚨 Oh NOOOO! Danger!,"citric acid, vegetable oil, enzymes, citric, corn oil, maltodextrin, dextrin, corn meal","butter, vegetable oil","monosodium glutamate, yeast extract, disodium inosinate, artificial flavor, whey protein, mono sodium glutamate, natural flavor, disodium guanylate"
+2025-06-05 15:45:27,image.jpg,🚨 Oh NOOOO! Danger!,"citric acid, vegetable oil, enzymes, citric, corn oil, maltodextrin, dextrin, corn meal","butter, vegetable oil","monosodium glutamate, yeast extract, disodium inosinate, artificial flavor, whey protein, mono sodium glutamate, natural flavor, disodium guanylate"
+2025-06-05 15:45:53,image.jpg,🚨 Oh NOOOO! Danger!,"citric acid, vegetable oil, enzymes, citric, corn oil, maltodextrin, dextrin, corn meal","butter, vegetable oil","monosodium glutamate, yeast extract, disodium inosinate, artificial flavor, whey protein, mono sodium glutamate, natural flavor, disodium guanylate"
+2025-06-05 15:46:01,image.jpg,🚨 Oh NOOOO! Danger!,"citric acid, vegetable oil, enzymes, citric, corn oil, maltodextrin, dextrin, corn meal","butter, vegetable oil","monosodium glutamate, yeast extract, disodium inosinate, artificial flavor, whey protein, mono sodium glutamate, natural flavor, disodium guanylate"
+2025-06-05 15:48:37,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 15:48:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 15:49:12,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 15:49:58,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable starch, vegetable oil, corn oil, corn starch, cornstarch, corn flour","butter, vegetable oil","monosodium glutamate, yeast extract, whey protein, mono sodium glutamate, natural flavor, natural flavoring, stock"
+2025-06-05 15:57:14,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","vegetable oil, butter","yeast extract, monosodium glutamate, stock, natural flavoring"
+2025-06-05 16:00:08,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","vegetable oil, butter","soy protein isolate, stock, protein isolate, natural flavoring"
+2025-06-05 16:02:11,image.jpg,🚨 Oh NOOOO! Danger!,"enzymes, maltodextrin, corn meal, citric, vegetable oil, citric acid",vegetable oil,"whey protein, natural flavor, yeast extract, disodium guanylate, monosodium glutamate, disodium inosinate"
+2025-06-05 16:04:21,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:11:07,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:11:22,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:14:59,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:16:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:17:28,image.jpg,🚨 Oh NOOOO! Danger!,"enzymes, maltodextrin, corn meal, citric, vegetable oil, citric acid",vegetable oil,"whey protein, natural flavor, yeast extract, disodium guanylate, monosodium glutamate, disodium inosinate"
+2025-06-05 16:24:33,image.jpg,⚠️ Proceed carefully,None,None,None
+2025-06-05 16:27:51,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:29:20,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:30:07,capture.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:31:19,image.jpg,⚠️ Proceed carefully,corn starch,None,None
+2025-06-05 16:31:52,image.jpg,🚨 Oh NOOOO! Danger!,"enzymes, maltodextrin, corn meal, citric, vegetable oil, citric acid",vegetable oil,"whey protein, natural flavor, yeast extract, disodium guanylate, monosodium glutamate, disodium inosinate"
+2025-06-05 16:33:05,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","vegetable oil, butter","whey protein, natural flavoring, yeast extract, stock, monosodium glutamate"
+2025-06-05 16:45:05,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 16:52:04,image.jpg,⚠️ Proceed carefully,None,butter,None
+2025-06-05 20:31:23,image.jpg,⚠️ Proceed carefully,"vegetable oil, fructose",vegetable oil,None
+2025-06-05 20:34:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 20:39:27,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 20:41:59,image.jpg,⚠️ Proceed carefully,None,ghee,None
+2025-06-05 20:47:26,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 20:48:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 20:49:06,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil","vegetable oil, butter","monosodium glutamate, natural flavoring, stock"
+2025-06-05 20:51:37,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil","vegetable oil, butter","stock, monosodium glutamate, natural flavoring, whey protein, yeast extract"
+2025-06-05 20:52:40,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate, stock, whey protein"
+2025-06-05 20:55:37,image.jpg,🚨 Oh NOOOO! Danger!,"citric, maltodextrin, enzymes, vegetable oil, corn meal, citric acid",vegetable oil,"whey protein, disodium inosinate, monosodium glutamate, natural flavor, disodium guanylate, yeast extract"
+2025-06-05 20:58:03,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 20:59:07,image.jpg,⚠️ Proceed carefully,maltodextrin,None,None
+2025-06-05 21:04:20,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","yeast extract, natural flavoring, monosodium glutamate, stock"
+2025-06-05 21:06:11,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, enzymes, corn meal, vegetable oil, citric, citric acid",vegetable oil,"disodium guanylate, yeast extract, monosodium glutamate, whey protein, disodium inosinate, natural flavor"
+2025-06-05 21:07:27,image.jpg,🚨 Oh NOOOO! Danger!,maltodextrin,None,natural flavor
+2025-06-05 21:15:28,image.jpg,🚨 Oh NOOOO! Danger!,maltodextrin,None,"natural flavor, BHT"
+2025-06-05 21:19:39,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 21:20:30,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 21:22:47,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 21:27:46,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 21:33:30,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, maltodextrin, corn oil, enzymes, corn flour, dextrose",vegetable oil,"artificial flavor, disodium inosinate, whey protein"
+2025-06-05 22:19:07,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:21:17,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:21:42,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:21:45,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:25:02,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:26:18,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-05 22:26:51,image.jpg,🚨 Oh NOOOO! Danger!,"corn syrup, corn oil, corn starch, milled corn, dextrose",None,"gelatin, natural flavors"
+2025-06-06 10:45:05,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","stock, yeast extract, natural flavoring"
+2025-06-06 10:46:06,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","monosodium glutamate, whey protein, natural flavoring, stock, natural flavor, yeast extract"
+2025-06-06 10:47:01,image.jpg,⚠️ Proceed carefully,"dextrose, citric, maltodextrin, corn starch, citric acid",None,None
+2025-06-06 10:47:47,image.jpg,🚨 Oh NOOOO! Danger!,"dextrose, citric, maltodextrin, corn starch, vegetable oil, citric acid",vegetable oil,"natural flavors, artificial flavors, seasoning"
+2025-06-06 11:01:37,image.jpg,🚨 Oh NOOOO! Danger!,enzymes,None,natural flavors
+2025-06-06 11:02:02,image.jpg,🚨 Oh NOOOO! Danger!,"ascorbic, enzymes, maltodextrin",None,"natural flavors, yeast extract"
+2025-06-06 11:04:51,image.jpg,🚨 Oh NOOOO! Danger!,"corn syrup, ascorbic, xanthan gum, citric, vitamin c, ascorbic acid, fructose, maltodextrin, corn starch, citric acid","palm oil, monoglycerides","natural flavor, artificial flavor"
+2025-06-06 11:08:13,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-06 11:10:06,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-06 11:10:40,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-06 11:11:39,image.jpg,⚠️ Proceed carefully,"cornmeal, lecithin",monoglycerides,None
+2025-06-06 11:12:24,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-06 23:06:04,image.jpg,❓ Error processing image,None,None,None
+2025-06-06 23:06:48,image.jpg,❓ Error processing image,None,None,None
+2025-06-06 23:19:26,image.jpg,🚨 Oh NOOOO! Danger!,"cornstarch, vegetable oil","butter, vegetable oil","monosodium glutamate, natural flavoring, stock, yeast extract"
+2025-06-06 23:22:07,image.jpg,🚨 Oh NOOOO! Danger!,"maltodextrin, citric, citric acid",None,"whey protein, natural flavor, disodium inosinate, monosodium glutamate, yeast extract"
+2025-06-07 13:03:20,image.jpg,🚨 Oh NOOOO! Danger!,"dextrin, maltodextrin, modified food starch, enzymes","palm oil, butter","modified food starch, artificial flavor, yeast extract"
+2025-06-07 13:04:35,image.jpg,⚠️ Proceed carefully,xanthan gum,None,None
+2025-06-07 13:06:22,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-07 13:07:34,image.jpg,✅ Yay! Safe!,None,None,None
+2025-06-07 13:08:31,image.jpg,🚨 Oh NOOOO! Danger!,None,None,natural flavors
+2025-06-08 14:23:49,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate, yeast extract, stock"
+2025-06-08 14:24:37,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch",vegetable oil,"natural flavoring, whey protein, yeast extract, monosodium glutamate, stock"
+2025-06-08 14:25:58,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate, stock"
+2025-06-08 14:26:43,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate, yeast extract, stock"
+2025-06-10 11:54:50,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, whey protein, monosodium glutamate, stock"
+2025-06-10 12:35:22,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate"
+2025-06-10 12:35:57,image.jpg,🚨 Oh NOOOO! Danger!,"ascorbic acid, ascorbic",monoglycerides,None
+2025-06-10 12:37:19,image.jpg,🚨 Oh NOOOO! Danger!,"enzymes, maltodextrin",None,"natural flavor, yeast extract"
+2025-06-10 12:44:07,image.jpg,🚨 Oh NOOOO! Danger!,"corn starch, citric acid, citric",None,msg
+2025-06-10 12:46:12,image.jpg,🚨 Oh NOOOO! Danger!,"corn starch, citric acid, citric",None,None
+2025-06-10 12:47:40,image.jpg,🚨 Oh NOOOO! Danger!,None,None,"natural flavor, broth, natural flavors"
+2025-06-10 12:49:38,image.jpg,🚨 Oh NOOOO! Danger!,"vegetable oil, cornstarch","butter, vegetable oil","natural flavoring, monosodium glutamate, stock"
+2025-06-10 12:52:12,image.jpg,✅ Yay! Safe!,None,None,None
