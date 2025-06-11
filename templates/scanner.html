@@ -499,6 +499,10 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Badge and Fun Tip -->
+        <div class="badge" id="scanBadge" style="display: none;"></div>
+        <p id="funTip" style="display: none;"></p>
         {% endif %}
     </div>
     {% endif %}
@@ -508,6 +512,115 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
+
+        // Confetti shower function
+        function showerEmoji(imgSrc) {
+            for (let i = 0; i < 45; i++) {
+                let img = document.createElement("img");
+                img.src = imgSrc;
+                img.className = "shower";
+
+                const zoneWidth = window.innerWidth / 5;
+                const zone = i % 5;
+                const xPosition = (zone * zoneWidth) + (Math.random() * zoneWidth * 0.8);
+
+                img.style.left = Math.min(xPosition, window.innerWidth - 60) + "px";
+                img.style.animationDelay = (Math.random() * 4).toFixed(2) + "s";
+                img.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                const duration = 7 + (Math.random() * 2);
+                img.style.animationDuration = duration + "s";
+
+                document.body.appendChild(img);
+
+                setTimeout(() => {
+                    if (img && img.parentNode) {
+                        img.remove();
+                    }
+                }, (duration + 1) * 1000);
+            }
+        }
+
+        // Streak tracking
+        let safeStreak = parseInt(localStorage.getItem('safeStreak')) || 0;
+        let dangerCount = parseInt(localStorage.getItem('dangerCount')) || 0;
+
+        // Generate fun facts
+        function generateFunFact(result) {
+            const ingredients = result.matched_ingredients;
+
+            {% if 'TRY AGAIN' in result.rating or 'Error' in result.rating %}
+                return "💡 Tip: Hold your camera steady and ensure good lighting for best results!";
+            {% elif 'Danger' in result.rating %}
+                if (ingredients.trans_fat && ingredients.trans_fat.length > 0) {
+                    const transFatFacts = [
+                        `🚨 ${ingredients.trans_fat[0]} raises LDL (bad) cholesterol while lowering HDL (good) cholesterol!`,
+                        `⚠️ Trans fats like ${ingredients.trans_fat[0]} cause inflammation in blood vessels!`,
+                        `💔 Just 2 grams daily of ${ingredients.trans_fat[0]} increases heart attack risk by 23%!`
+                    ];
+                    return transFatFacts[Math.floor(Math.random() * transFatFacts.length)];
+                }
+                if (ingredients.excitotoxins && ingredients.excitotoxins.length > 0) {
+                    const excitotoxinFacts = [
+                        `🧠 ${ingredients.excitotoxins[0]} can overstimulate brain neurons, potentially causing headaches!`,
+                        `⚡ Excitotoxins like ${ingredients.excitotoxins[0]} may trigger migraines in sensitive individuals!`
+                    ];
+                    return excitotoxinFacts[Math.floor(Math.random() * excitotoxinFacts.length)];
+                }
+                return "🚨 High-risk ingredients can disrupt your body's natural processes!";
+            {% elif 'Proceed' in result.rating %}
+                return "⚖️ This food has some concerns but isn't dangerous - balance is key for healthy eating!";
+            {% else %}
+                if (ingredients.safe_ingredients && ingredients.safe_ingredients.length > 0) {
+                    const safeIngredient = ingredients.safe_ingredients[0];
+                    const benefitFacts = [
+                        `🌿 ${safeIngredient} provides essential nutrients your body easily recognizes!`,
+                        `💪 Whole ingredients like ${safeIngredient} support immune function!`,
+                        `❤️ ${safeIngredient} contains natural compounds that reduce inflammation!`
+                    ];
+                    return benefitFacts[Math.floor(Math.random() * benefitFacts.length)];
+                }
+                return "🌿 Whole food ingredients provide the building blocks your body needs!";
+            {% endif %}
+        }
+
+        // Handle results and show confetti
+        {% if result %}
+        {% if 'TRY AGAIN' in result.rating or 'Error' in result.rating %}
+            document.getElementById("funTip").innerText = generateFunTip({{ result | tojson }});
+            document.getElementById("funTip").style.display = 'block';
+        {% elif 'Danger' in result.rating %}
+            showerEmoji("/static/danger.png");
+            safeStreak = 0;
+            dangerCount++;
+            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
+            document.getElementById("funTip").style.display = 'block';
+        {% elif 'Proceed' in result.rating %}
+            showerEmoji("/static/carefully.png");
+            safeStreak = 0;
+            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
+            document.getElementById("funTip").style.display = 'block';
+        {% else %}
+            showerEmoji("/static/safe.png");
+            safeStreak++;
+            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
+            document.getElementById("funTip").style.display = 'block';
+        {% endif %}
+
+        localStorage.setItem('safeStreak', safeStreak);
+        localStorage.setItem('dangerCount', dangerCount);
+
+        {% if 'TRY AGAIN' not in result.rating and 'Error' not in result.rating %}
+        const badgeText = safeStreak >= 3
+            ? `🥇 ${safeStreak} healthy scans in a row!`
+            : dangerCount >= 2
+            ? `🚨 ${dangerCount} high-risk foods flagged this week!`
+            : `Keep scanning to earn your next badge!`;
+
+        document.getElementById("scanBadge").innerText = badgeText;
+        document.getElementById("scanBadge").style.display = 'block';
+        {% endif %}
+        {% endif %}
 
         function handleScanClick() {
             // Check limits
@@ -601,30 +714,28 @@
         }
 
         function subscribe(plan) {
-            // Create Stripe checkout session
-            fetch('/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    plan: plan,
-                    email: null // Optional: collect email
+            // Test mode - simulate subscription without Stripe
+            if (confirm(`Test subscription for ${plan === 'monthly' ? '$2.99/month' : '$29.99/year'}? (This is a test - no payment required)`)) {
+                fetch('/upgrade-premium', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan: plan })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.checkout_url) {
-                    // Redirect to Stripe checkout
-                    window.location.href = data.checkout_url;
-                } else {
-                    alert('Failed to create checkout session. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to start checkout process. Please try again.');
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        isPremium = true;
+                        alert('Test upgrade successful! You now have unlimited scans.');
+                        location.reload();
+                    } else {
+                        alert('Test upgrade failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Test upgrade failed. Please try again.');
+                });
+            }
         }
 
         // Update UI on load
