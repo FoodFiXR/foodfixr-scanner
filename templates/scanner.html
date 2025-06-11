@@ -18,6 +18,7 @@
             text-align: center;
             box-sizing: border-box;
             min-height: 100vh;
+            position: relative;
         }
 
         .scanner-container {
@@ -28,6 +29,8 @@
             width: 100%;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             margin-bottom: 20px;
+            position: relative;
+            z-index: 10;
         }
 
         .scanner-header {
@@ -143,6 +146,8 @@
             max-width: 650px;
             margin-top: 2em;
             box-shadow: 0 9px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 10;
         }
 
         .ingredient-category {
@@ -186,15 +191,75 @@
             display: none;
         }
 
+        /* Emoji Shower Styles */
+        .emoji-shower {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            overflow: hidden;
+        }
+
+        .emoji {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            opacity: 0.9;
+            animation: fall linear infinite;
+            user-select: none;
+            border-radius: 50%;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(calc(100vh + 100px)) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Pulse animation for result display */
+        .result-pulse {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
         @media (max-width: 480px) {
             .scanner-container {
                 padding: 20px;
                 margin: 10px;
             }
+            
+            .emoji {
+                width: 30px;
+                height: 30px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Emoji Shower Container -->
+    <div class="emoji-shower" id="emojiShower"></div>
+
     <div class="scanner-container">
         <!-- Header -->
         <div class="scanner-header">
@@ -260,7 +325,7 @@
 
     <!-- Results -->
     {% if result %}
-    <div class="result">
+    <div class="result result-pulse">
         <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
             {% if "Danger" in result.rating %}
             <img src="/static/danger.png" alt="Danger" width="50" />
@@ -343,6 +408,101 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
+
+        // Emoji Shower System
+        const emojiShower = {
+            container: null,
+            isActive: false,
+            emojiImages: {
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png',
+                tryAgain: '/static/safe.png'  // Use safe emoji for try again
+            },
+
+            init() {
+                this.container = document.getElementById('emojiShower');
+            },
+
+            start(type, duration = 3000) {
+                if (this.isActive) return;
+                
+                this.isActive = true;
+                const emojiImage = this.emojiImages[type] || this.emojiImages.safe;
+                
+                // Create emoji shower
+                const interval = setInterval(() => {
+                    this.createEmoji(emojiImage);
+                }, 300); // Slightly slower for images
+
+                // Stop after duration
+                setTimeout(() => {
+                    clearInterval(interval);
+                    this.isActive = false;
+                    
+                    // Clean up after additional 5 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 5000);
+                }, duration);
+            },
+
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
+                emoji.className = 'emoji';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
+                
+                // Random horizontal position
+                emoji.style.left = Math.random() * 100 + '%';
+                
+                // Random animation duration (2-6 seconds)
+                const duration = 2 + Math.random() * 4;
+                emoji.style.animationDuration = duration + 's';
+                
+                // Random horizontal drift
+                const drift = (Math.random() - 0.5) * 200;
+                emoji.style.transform = `translateX(${drift}px)`;
+                
+                // Add some variety in size
+                const size = 30 + Math.random() * 20; // 30-50px
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
+                this.container.appendChild(emoji);
+                
+                // Remove emoji after animation
+                setTimeout(() => {
+                    if (emoji.parentNode) {
+                        emoji.parentNode.removeChild(emoji);
+                    }
+                }, duration * 1000 + 1000);
+            },
+
+            cleanup() {
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
+                }
+            }
+        };
+
+        // Initialize emoji shower on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            emojiShower.init();
+            
+            // Trigger emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 4000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 3000);
+                {% else %}
+                emojiShower.start('safe', 3500);
+                {% endif %}
+            }, 300);
+            {% endif %}
+        });
 
         function handleScanClick() {
             // Check limits
