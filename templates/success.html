@@ -6,66 +6,165 @@
     <title>Welcome to Premium - FoodFixr</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
             margin: 0;
-            padding: 20px;
-            min-height: 100vh;
+            padding: 2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: "Segoe UI", sans-serif;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            min-height: 100vh;
+            text-align: center;
         }
-        .container {
+
+        .success-container {
             background: white;
-            border-radius: 15px;
+            border-radius: 20px;
             padding: 40px;
             max-width: 500px;
             width: 100%;
-            text-align: center;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         }
+
         .success-icon {
-            font-size: 4em;
-            color: #4CAF50;
+            font-size: 80px;
             margin-bottom: 20px;
         }
-        .btn {
-            background: #ff3cac;
+
+        .success-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
+        .success-subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .premium-features {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .features-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .feature-list li:before {
+            content: "✓ ";
+            color: #4CAF50;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .continue-button {
+            background: linear-gradient(135deg, #e91e63, #f06292);
             color: white;
-            padding: 15px 30px;
+            padding: 15px 40px;
             border: none;
-            border-radius: 25px;
-            font-size: 1.2em;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            margin: 20px 0;
+            margin-top: 20px;
+            transition: all 0.3s ease;
         }
-        .btn:hover {
-            background: #e6359a;
+
+        .continue-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+        }
+
+        .plan-info {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .plan-text {
+            font-size: 14px;
+            color: #2e7d32;
+            margin: 0;
+        }
+
+        @media (max-width: 480px) {
+            .success-container {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+            
+            .success-title {
+                font-size: 28px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="success-container">
         <div class="success-icon">🎉</div>
-        <h1>Welcome to Premium!</h1>
-        <p>Payment successful! You now have unlimited access to the FoodFixr Scanner.</p>
-        
-        <div style="background: #f0f8f0; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <h3>What's Next:</h3>
-            <p>✅ Unlimited ingredient scans<br>
-            📊 Track your scan history<br>
-            💡 Get advanced health insights<br>
-            🚀 Priority processing</p>
+        <h1 class="success-title">Welcome to Premium!</h1>
+        <p class="success-subtitle">Your subscription is now active and ready to use.</p>
+
+        <div class="plan-info">
+            <p class="plan-text">
+                <strong>{{ plan|title }} Plan Activated</strong><br>
+                {% if plan == 'yearly' %}
+                $29.99/year - You saved 17%!
+                {% else %}
+                $2.99/month
+                {% endif %}
+            </p>
         </div>
-        
-        <a href="/scanner" class="btn">🚀 Start Scanning Now</a>
-        
-        <p style="color: #666; font-size: 0.9em; margin-top: 30px;">
-            Your subscription will renew monthly at $2.99.<br>
-            You can cancel anytime from your account settings.
-        </p>
+
+        <div class="premium-features">
+            <div class="features-title">🔓 Premium Features Unlocked</div>
+            <ul class="feature-list">
+                <li>Unlimited ingredient scans</li>
+                <li>Advanced allergen detection</li>
+                <li>Detailed nutritional analysis</li>
+                <li>Health risk assessment</li>
+                <li>GMO identification</li>
+                <li>Scan history export</li>
+                <li>Priority customer support</li>
+                <li>Early access to new features</li>
+            </ul>
+        </div>
+
+        <a href="/" class="continue-button">
+            🔍 Start Scanning
+        </a>
+
+        <div style="margin-top: 30px; font-size: 14px; color: #666;">
+            <p>Need help? Contact us at support@foodfixr.com</p>
+            <p>You can manage your subscription in your account settings.</p>
+        </div>
     </div>
 </body>
 </html>
