@@ -1,89 +1,9 @@
-import os
-import re
-import time
-from datetime import datetime, timedelta
-from flask import Flask, request, render_template_string, session, redirect, url_for, jsonify
-from werkzeug.utils import secure_filename
-import stripe
-from PIL import Image
-
-# Import the fixed scanner
-from ingredient_scanner import scan_image_for_ingredients
-
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-
-# Stripe configuration
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_your_stripe_secret_key')
-STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_your_stripe_publishable_key')
-
-# Configure upload settings
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Trial settings
-TRIAL_DURATION_HOURS = 48
-TRIAL_SCAN_LIMIT = 10
-
-def get_trial_status():
-    """Check if trial is still active"""
-    if session.get('is_premium'):
-        return False, "Premium Active"
-    
-    trial_start = session.get('trial_start')
-    if not trial_start:
-        # Initialize trial
-        session['trial_start'] = datetime.now().isoformat()
-        session['scans_used'] = 0
-        return False, "Trial Active"
-    
-    # Check time limit
-    trial_start_dt = datetime.fromisoformat(trial_start)
-    time_elapsed = datetime.now() - trial_start_dt
-    
-    if time_elapsed > timedelta(hours=TRIAL_DURATION_HOURS):
-        return True, "Trial Expired - Time Limit"
-    
-    # Check scan limit
-    scans_used = session.get('scans_used', 0)
-    if scans_used >= TRIAL_SCAN_LIMIT:
-        return True, "Trial Expired - Scan Limit"
-    
-    return False, f"Trial Active ({scans_used}/{TRIAL_SCAN_LIMIT})"
-
-def get_trial_time_left():
-    """Get remaining trial time"""
-    if session.get('is_premium'):
-        return "Premium"
-    
-    trial_start = session.get('trial_start')
-    if not trial_start:
-        return "48h 0m"
-    
-    trial_start_dt = datetime.fromisoformat(trial_start)
-    time_elapsed = datetime.now() - trial_start_dt
-    time_left = timedelta(hours=TRIAL_DURATION_HOURS) - time_elapsed
-    
-    if time_left.total_seconds() <= 0:
-        return "0h 0m"
-    
-    hours = int(time_left.total_seconds() // 3600)
-    minutes = int((time_left.total_seconds() % 3600) // 60)
-    return f"{hours}h {minutes}m"
-
-# HTML Template with Stripe integration
-HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8" />
     <title>FoodFixr Scanner</title>
-    <script src="https://js.stripe.com/v3/"></script>
     <style>
         body {
             margin: 0;
@@ -101,6 +21,58 @@ HTML_TEMPLATE = '''
             position: relative;
         }
 
+        /* Emoji Shower Styles */
+        .emoji-shower {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            overflow: hidden;
+        }
+
+        .emoji {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            opacity: 0.9;
+            animation: fall linear infinite;
+            user-select: none;
+            border-radius: 50%;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(calc(100vh + 100px)) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Pulse animation for result display */
+        .result-pulse {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
         .scanner-container {
             background: white;
             border-radius: 20px;
@@ -111,6 +83,11 @@ HTML_TEMPLATE = '''
             margin-bottom: 20px;
             position: relative;
             z-index: 10;
+        }
+
+        .scanner-header {
+            text-align: center;
+            margin-bottom: 20px;
         }
 
         .app-title {
@@ -127,11 +104,6 @@ HTML_TEMPLATE = '''
             cursor: pointer;
             transition: transform 0.2s ease;
             border-radius: 15px;
-            background: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
         }
 
         .scan-icon:hover {
@@ -169,7 +141,7 @@ HTML_TEMPLATE = '''
             margin: 5px 0;
         }
 
-        .scan-button, .upgrade-button {
+        .scan-button {
             background: linear-gradient(135deg, #e91e63, #f06292);
             color: white;
             padding: 15px 30px;
@@ -184,18 +156,9 @@ HTML_TEMPLATE = '''
             transition: all 0.3s ease;
         }
 
-        .upgrade-button {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-        }
-
-        .scan-button:hover, .upgrade-button:hover {
+        .scan-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
-        }
-
-        .upgrade-button:hover {
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
         }
 
         .scan-button:disabled {
@@ -276,117 +239,8 @@ HTML_TEMPLATE = '''
             border-left: 4px solid #f44336;
         }
 
-        /* Emoji Shower Styles */
-        .emoji-shower {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 5;
-            overflow: hidden;
-        }
-
-        .emoji {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            opacity: 0.9;
-            animation: fall linear infinite;
-            user-select: none;
-            border-radius: 50%;
-        }
-
-        @keyframes fall {
-            0% {
-                transform: translateY(-100px) rotate(0deg);
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(calc(100vh + 100px)) rotate(360deg);
-                opacity: 0;
-            }
-        }
-
-        .result-pulse {
-            animation: pulse 0.6s ease-in-out;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(0.9);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.05);
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
         video, canvas, form {
             display: none;
-        }
-
-        /* Pricing Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 30px;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close:hover {
-            color: black;
-        }
-
-        .price {
-            font-size: 48px;
-            font-weight: bold;
-            color: #4CAF50;
-            margin: 20px 0;
-        }
-
-        .feature-list {
-            text-align: left;
-            margin: 20px 0;
-        }
-
-        .feature-list li {
-            margin: 10px 0;
-            padding-left: 20px;
-            position: relative;
-        }
-
-        .feature-list li:before {
-            content: "✅";
-            position: absolute;
-            left: 0;
         }
 
         @media (max-width: 480px) {
@@ -394,7 +248,7 @@ HTML_TEMPLATE = '''
                 padding: 20px;
                 margin: 10px;
             }
-            
+
             .emoji {
                 width: 30px;
                 height: 30px;
@@ -410,7 +264,7 @@ HTML_TEMPLATE = '''
         <!-- Header -->
         <div class="scanner-header">
             <div class="app-title">🔍 FoodFixr Scanner</div>
-            <div class="scan-icon" onclick="handleScanClick()">📷</div>
+            <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
         </div>
 
         <!-- Trial Status -->
@@ -418,7 +272,7 @@ HTML_TEMPLATE = '''
             <div class="trial-title" id="trialTitle">
                 {% if session.get('is_premium') %}
                     💎 Premium Active
-                {% elif trial_expired %}
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                     🔒 Trial Expired
                 {% else %}
                     🎉 Free Trial Active
@@ -427,7 +281,7 @@ HTML_TEMPLATE = '''
             {% if not session.get('is_premium') %}
             <div class="trial-info">
                 Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 | 
-                Time: <span id="timeLeft">{{ trial_time_left }}</span>
+                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
             </div>
             {% endif %}
         </div>
@@ -443,19 +297,12 @@ HTML_TEMPLATE = '''
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
                 📸 SCAN INGREDIENTS
-            {% elif trial_expired %}
-                🔒 TRIAL EXPIRED
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO CONTINUE
             {% else %}
                 📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
-
-        <!-- Upgrade Button -->
-        {% if not session.get('is_premium') %}
-        <button class="upgrade-button" onclick="openPricingModal()">
-            💎 UPGRADE TO PREMIUM
-        </button>
-        {% endif %}
 
         <!-- Loading State -->
         <div class="loading" id="loadingState">
@@ -469,6 +316,10 @@ HTML_TEMPLATE = '''
         <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileSelected()" />
     </form>
 
+    <form id="scanForm" method="post" enctype="multipart/form-data">
+        <input id="hiddenImage" type="file" name="image" />
+    </form>
+
     <video id="webcam" autoplay playsinline></video>
     <canvas id="snapshot"></canvas>
 
@@ -477,15 +328,15 @@ HTML_TEMPLATE = '''
     <div class="result result-pulse">
         <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
             {% if "Danger" in result.rating %}
-            <div style="font-size: 50px;">😱</div>
+            <img src="/static/danger.png" alt="Danger" width="50" />
             <h2 style="color: #b30000; margin: 0">Oh NOOOO! Danger!</h2>
             {% elif "Proceed" in result.rating %}
-            <div style="font-size: 50px;">😐</div>
+            <img src="/static/carefully.png" alt="Caution" width="50" />
             <h2 style="color: #e69500; margin: 0">Proceed carefully</h2>
             {% elif "TRY AGAIN" in result.rating %}
             <h2 style="color: #ff6b35; margin: 0">↪️ TRY AGAIN</h2>
             {% else %}
-            <div style="font-size: 50px;">😊</div>
+            <img src="/static/safe.png" alt="Safe" width="50" />
             <h2 style="color: #2a7f2a; margin: 0">Yay! Safe!</h2>
             {% endif %}
         </div>
@@ -546,55 +397,27 @@ HTML_TEMPLATE = '''
             </div>
         </div>
         {% endif %}
-
-        <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; font-size: 12px; color: #666;">
-            📊 Confidence: {{ result.confidence|title }} | 
-            🔍 Text Quality: {{ result.text_quality|title }} |
-            📝 Characters: {{ result.extracted_text_length }}
-        </div>
         {% else %}
         <p>Couldn't read ingredients clearly. Try better lighting and hold steady.</p>
         {% endif %}
     </div>
     {% endif %}
 
-    <!-- Pricing Modal -->
-    <div id="pricingModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closePricingModal()">&times;</span>
-            <h2>💎 Upgrade to Premium</h2>
-            <div class="price">$4.99<span style="font-size: 20px;">/month</span></div>
-            <ul class="feature-list">
-                <li>Unlimited ingredient scans</li>
-                <li>Advanced OCR technology</li>
-                <li>Detailed health insights</li>
-                <li>No time restrictions</li>
-                <li>Priority support</li>
-            </ul>
-            <button class="upgrade-button" onclick="handleUpgrade()">
-                💳 Subscribe Now
-            </button>
-        </div>
-    </div>
-
     <script>
-        // Stripe integration
-        const stripe = Stripe('{{ stripe_publishable_key }}');
-        
         // Global variables
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
-        // Emoji Shower System (using emoji characters as fallback)
+        // Emoji Shower System
         const emojiShower = {
             container: null,
             isActive: false,
-            emojiSets: {
-                safe: ['😊', '✅', '🌱', '💚', '🥬', '🍎', '🥕', '🌿', '👍', '😄'],
-                danger: ['😱', '💀', '⚠️', '🚨', '❌', '🔥', '💔', '😵', '🤢', '☠️'],
-                caution: ['⚠️', '😐', '🤔', '😬', '👀', '🔶', '📋', '🧐', '😕', '⚡'],
-                tryAgain: ['🔄', '📷', '💡', '🔍', '📱', '🎯', '🎪', '🌈', '✨', '🚀']
+            emojiImages: {
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png'
+                // No emoji shower for "try again" - as requested
             },
 
             init() {
@@ -602,34 +425,60 @@ HTML_TEMPLATE = '''
             },
 
             start(type, duration = 3000) {
-                if (this.isActive) return;
+                // Don't start if no type specified or if already active
+                if (!type || this.isActive) return;
                 
                 this.isActive = true;
-                const emojis = this.emojiSets[type] || this.emojiSets.safe;
+                const emojiImage = this.emojiImages[type];
                 
+                // Only proceed if we have a valid emoji image for this type
+                if (!emojiImage) {
+                    this.isActive = false;
+                    return;
+                }
+                
+                // Create emoji shower
                 const interval = setInterval(() => {
-                    this.createEmoji(emojis);
-                }, 200);
+                    this.createEmoji(emojiImage);
+                }, 300); // Interval for creating new emojis
 
+                // Stop after duration
                 setTimeout(() => {
                     clearInterval(interval);
                     this.isActive = false;
-                    setTimeout(() => this.cleanup(), 5000);
+                    
+                    // Clean up after additional 5 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 5000);
                 }, duration);
             },
 
-            createEmoji(emojiArray) {
-                const emoji = document.createElement('div');
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
                 emoji.className = 'emoji';
-                emoji.textContent = emojiArray[Math.floor(Math.random() * emojiArray.length)];
-                emoji.style.fontSize = '2rem';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
+                
+                // Random horizontal position
                 emoji.style.left = Math.random() * 100 + '%';
                 
+                // Random animation duration (2-6 seconds)
                 const duration = 2 + Math.random() * 4;
                 emoji.style.animationDuration = duration + 's';
                 
+                // Random horizontal drift
+                const drift = (Math.random() - 0.5) * 200;
+                emoji.style.transform = `translateX(${drift}px)`;
+                
+                // Add some variety in size
+                const size = 30 + Math.random() * 20; // 30-50px
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
                 this.container.appendChild(emoji);
                 
+                // Remove emoji after animation
                 setTimeout(() => {
                     if (emoji.parentNode) {
                         emoji.parentNode.removeChild(emoji);
@@ -648,24 +497,25 @@ HTML_TEMPLATE = '''
         document.addEventListener('DOMContentLoaded', function() {
             emojiShower.init();
             
+            // Trigger emoji shower if there's a result (but NOT for "TRY AGAIN")
             {% if result %}
             setTimeout(() => {
                 {% if "Danger" in result.rating %}
                 emojiShower.start('danger', 4000);
                 {% elif "Proceed" in result.rating %}
                 emojiShower.start('caution', 3000);
-                {% elif "TRY AGAIN" in result.rating %}
-                emojiShower.start('tryAgain', 2000);
-                {% else %}
+                {% elif "Safe" in result.rating %}
                 emojiShower.start('safe', 3500);
                 {% endif %}
+                // Note: No emoji shower for "TRY AGAIN" as requested
             }, 300);
             {% endif %}
         });
 
         function handleScanClick() {
+            // Check limits
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                openPricingModal();
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
@@ -684,11 +534,13 @@ HTML_TEMPLATE = '''
 
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                openPricingModal();
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
             showLoading();
+            scansUsed++;
+            updateScanCount();
             document.getElementById('uploadForm').submit();
         }
 
@@ -710,8 +562,36 @@ HTML_TEMPLATE = '''
         }
 
         function capturePhoto() {
-            // Implementation similar to previous version
-            alert("📷 Photo capture feature coming soon! Please use file upload for now.");
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            // Stop the video stream
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    alert('🔒 Trial expired! Please upgrade to continue scanning.');
+                    return;
+                }
+
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
         }
 
         function showLoading() {
@@ -719,177 +599,31 @@ HTML_TEMPLATE = '''
             document.getElementById('scanButton').style.display = 'none';
         }
 
-        // Pricing Modal Functions
-        function openPricingModal() {
-            document.getElementById('pricingModal').style.display = 'block';
-        }
-
-        function closePricingModal() {
-            document.getElementById('pricingModal').style.display = 'none';
-        }
-
-        // Stripe payment handling
-        function handleUpgrade() {
-            fetch('/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                return stripe.redirectToCheckout({ sessionId: data.sessionId });
-            })
-            .then(result => {
-                if (result.error) {
-                    alert(result.error.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Payment processing error. Please try again.');
-            });
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('pricingModal');
-            if (event.target == modal) {
-                modal.style.display = "none";
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            // Update button text
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = true;
             }
         }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
+            }
+        });
     </script>
 </body>
 </html>
-'''
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    error = None
-    result = None
-    
-    # Initialize session if needed
-    if 'trial_start' not in session:
-        session['trial_start'] = datetime.now().isoformat()
-        session['scans_used'] = 0
-    
-    # Check trial status
-    trial_expired, trial_status = get_trial_status()
-    trial_time_left = get_trial_time_left()
-    
-    if request.method == 'POST':
-        # Check if user can scan
-        if not session.get('is_premium') and (trial_expired or session.get('scans_used', 0) >= TRIAL_SCAN_LIMIT):
-            error = "Trial expired! Please upgrade to continue scanning."
-        else:
-            # Process the uploaded image
-            if 'image' not in request.files:
-                error = "No image uploaded"
-            else:
-                file = request.files['image']
-                if file.filename == '':
-                    error = "No image selected"
-                elif file:
-                    try:
-                        # Save the uploaded file
-                        timestamp = int(time.time())
-                        filename = f"{timestamp}_{secure_filename(file.filename)}"
-                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                        file.save(filepath)
-                        
-                        # Verify it's a valid image
-                        try:
-                            with Image.open(filepath) as img:
-                                img.verify()
-                        except Exception:
-                            error = "Invalid image file"
-                            os.remove(filepath)
-                        
-                        if not error:
-                            # Scan the image for ingredients
-                            result = scan_image_for_ingredients(filepath)
-                            
-                            # Update scan count if not premium
-                            if not session.get('is_premium'):
-                                session['scans_used'] = session.get('scans_used', 0) + 1
-                            
-                            # Clean up the uploaded file
-                            try:
-                                os.remove(filepath)
-                            except:
-                                pass
-                    
-                    except Exception as e:
-                        error = f"Error processing image: {str(e)}"
-    
-    return render_template_string(HTML_TEMPLATE, 
-                                error=error, 
-                                result=result,
-                                trial_expired=trial_expired,
-                                trial_time_left=trial_time_left,
-                                stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    try:
-        # Create Stripe checkout session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': 'FoodFixr Premium',
-                        'description': 'Unlimited ingredient scans and advanced features',
-                    },
-                    'unit_amount': 499,  # $4.99 in cents
-                    'recurring': {
-                        'interval': 'month',
-                    },
-                },
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=url_for('payment_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=url_for('index', _external=True),
-            metadata={
-                'user_session': session.get('trial_start', '')
-            }
-        )
-        
-        return jsonify({'sessionId': checkout_session.id})
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-@app.route('/payment-success')
-def payment_success():
-    session_id = request.args.get('session_id')
-    
-    if session_id:
-        try:
-            # Verify the payment with Stripe
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            
-            if checkout_session.payment_status == 'paid':
-                # Activate premium features
-                session['is_premium'] = True
-                session['premium_activated'] = datetime.now().isoformat()
-                session.permanent = True  # Make session persistent
-                
-                return render_template_string('''
-                <div style="text-align: center; padding: 50px; font-family: Arial;">
-                    <h1 style="color: #4CAF50;">🎉 Welcome to Premium!</h1>
-                    <p>Your FoodFixr Premium subscription is now active!</p>
-                    <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
-                        <li>✅ Unlimited ingredient scans</li>
-                        <li>✅ Advanced OCR technology</li>
-                        <li>✅ Detailed health insights</li>
-                        <li>✅ No time restrictions</li>
-                        <li>✅ Priority support</li>
-                    </ul>
-                    <a href="/" style="display: inline-block; margin-top: 30px; padding: 15px 30px; background: #4CAF50; color: white; text-decoration: none; border-radius: 25px;">
-                        Start Scanning 📱
-                    </a>
-                </div>
-                ''')
