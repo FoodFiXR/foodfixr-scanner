@@ -1,7 +1,10 @@
 Flask==2.3.3
-Werkzeug==2.3.7
 Pillow==10.0.1
-pytesseract==0.3.10
+Werkzeug==2.3.7
 gunicorn==21.2.0
-stripe==7.8.0
-python-dotenv==1.0.0
+
+# Optional OCR dependencies (comment out if not available)
+# pytesseract==0.3.10
+
+# For cloud deployment alternatives
+requests==2.31.0
