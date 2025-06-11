@@ -98,7 +98,7 @@
         }
 
         .scan-icon {
-            width: 350px;
+            width: 380px;
             height: 380px;
             margin: 20px auto;
             cursor: pointer;
@@ -296,11 +296,11 @@
         <!-- Scan Button -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
-                📸 SCAN INGREDIENTS
+                 SCAN INGREDIENTS
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
-                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
+                SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
 
@@ -447,7 +447,7 @@
                     clearInterval(interval);
                     this.isActive = false;
                     
-                    // Clean up after additional 5 seconds
+                    // Clean up after additional 10 seconds
                     setTimeout(() => {
                         this.cleanup();
                     }, 5000);
