@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: foodfixr-scanner
+    env: python
+    buildCommand: |
+      # Update package list
+      apt-get update
+      
+      # Install Tesseract OCR and language packs
+      apt-get install -y tesseract-ocr tesseract-ocr-eng
+      
+      # Install Python dependencies
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.16
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
+    plan: starter
