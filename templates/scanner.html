@@ -46,8 +46,8 @@
         }
 
         .scan-icon {
-            width: 80px;
-            height: 80px;
+            width: 300px;
+            height: 100px;
             margin: 20px auto;
             cursor: pointer;
             transition: transform 0.2s ease;
@@ -187,10 +187,6 @@
             border-left: 4px solid #f44336;
         }
 
-        video, canvas, form {
-            display: none;
-        }
-
         /* Emoji Shower Styles */
         .emoji-shower {
             position: fixed;
@@ -241,6 +237,10 @@
                 transform: scale(1);
                 opacity: 1;
             }
+        }
+
+        video, canvas, form {
+            display: none;
         }
 
         @media (max-width: 480px) {
@@ -307,7 +307,7 @@
         <!-- Loading State -->
         <div class="loading" id="loadingState">
             <div class="spinner"></div>
-            <div>Analyzing ingredients...</div>
+            <div>🔬 Analyzing ingredients...</div>
         </div>
     </div>
 
@@ -497,6 +497,8 @@
                 emojiShower.start('danger', 4000);
                 {% elif "Proceed" in result.rating %}
                 emojiShower.start('caution', 3000);
+                {% elif "TRY AGAIN" in result.rating %}
+                emojiShower.start('tryAgain', 2000);
                 {% else %}
                 emojiShower.start('safe', 3500);
                 {% endif %}
@@ -507,7 +509,7 @@
         function handleScanClick() {
             // Check limits
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('Trial expired! Please upgrade to continue scanning.');
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
@@ -526,12 +528,13 @@
 
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('Trial expired! Please upgrade to continue scanning.');
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
             showLoading();
             scansUsed++;
+            updateScanCount();
             document.getElementById('uploadForm').submit();
         }
 
@@ -547,7 +550,8 @@
                 })
                 .catch(function(err) {
                     console.error("Camera error:", err);
-                    alert("Camera access denied. Please use file upload.");
+                    alert("📷 Camera access denied. Please use file upload.");
+                    video.style.display = "none";
                 });
         }
 
@@ -560,6 +564,12 @@
             canvas.height = video.videoHeight;
             canvas.getContext("2d").drawImage(video, 0, 0);
             
+            // Stop the video stream
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
             canvas.toBlob(function (blob) {
                 const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
                 const container = new DataTransfer();
@@ -567,12 +577,13 @@
                 document.getElementById("hiddenImage").files = container.files;
                 
                 if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                    alert('Trial expired! Please upgrade to continue scanning.');
+                    alert('🔒 Trial expired! Please upgrade to continue scanning.');
                     return;
                 }
 
                 showLoading();
                 scansUsed++;
+                updateScanCount();
                 form.submit();
             }, "image/jpeg", 0.8);
         }
@@ -581,6 +592,32 @@
             document.getElementById('loadingState').style.display = 'block';
             document.getElementById('scanButton').style.display = 'none';
         }
+
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            // Update button text
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = true;
+            }
+        }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
+            }
+        });
     </script>
 </body>
 </html>
