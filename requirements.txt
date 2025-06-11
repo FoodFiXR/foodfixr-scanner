@@ -2,9 +2,7 @@ Flask==2.3.3
 Pillow==10.0.1
 Werkzeug==2.3.7
 gunicorn==21.2.0
+pytesseract==0.3.10
 
-# Optional OCR dependencies (comment out if not available)
-# pytesseract==0.3.10
-
-# For cloud deployment alternatives
+# Additional dependencies
 requests==2.31.0
