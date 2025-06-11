@@ -318,7 +318,7 @@
         <!-- Header -->
         <div class="scanner-header">
             <div class="app-title">🔍 FoodFixr Scanner</div>
-            <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+            <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
         </div>
 
         <!-- Trial Status -->
@@ -601,23 +601,30 @@
         }
 
         function subscribe(plan) {
-            if (confirm(`Subscribe for ${plan === 'monthly' ? '$2.99/month' : '$29.99/year'}? (Demo - no actual payment)`)) {
-                fetch('/upgrade-premium', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plan: plan })
+            // Create Stripe checkout session
+            fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    plan: plan,
+                    email: null // Optional: collect email
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        isPremium = true;
-                        alert('Welcome to Premium!');
-                        location.reload();
-                    } else {
-                        alert('Upgrade failed. Please try again.');
-                    }
-                });
-            }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.checkout_url) {
+                    // Redirect to Stripe checkout
+                    window.location.href = data.checkout_url;
+                } else {
+                    alert('Failed to create checkout session. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to start checkout process. Please try again.');
+            });
         }
 
         // Update UI on load
