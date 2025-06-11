@@ -1,164 +1,1012 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ingredient Scanner - FoodFixr</title>
+    <title>FoodFixr Scanner</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f5f5f5;
-        margin: 0;
-        padding: 20px;
-        text-align: center;
-      }
-      .container {
-        max-width: 800px;
-        margin: 0 auto;
-        background: white;
-        border-radius: 15px;
-        padding: 30px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      }
-      .upload-area {
-        border: 3px dashed #ddd;
-        border-radius: 15px;
-        padding: 40px;
-        margin: 20px 0;
-      }
-      .upload-area:hover {
-        border-color: #ff3cac;
-      }
-      input[type="file"] {
-        display: none;
-      }
-      .upload-label {
-        background: #ff3cac;
-        color: white;
-        padding: 15px 30px;
-        border-radius: 25px;
-        cursor: pointer;
-        display: inline-block;
-        font-size: 1.1em;
-      }
-      .upload-label:hover {
-        background: #e6359a;
-      }
-      .result {
-        background: white;
-        border-radius: 15px;
-        padding: 30px;
-        margin: 20px 0;
-        text-align: left;
-        border: 2px solid #eee;
-      }
-      .safe {
-        border-color: #4caf50;
-      }
-      .danger {
-        border-color: #f44336;
-      }
-      .caution {
-        border-color: #ff9800;
-      }
-      .try-again {
-        border-color: #2196f3;
-      }
+        body {
+            margin: 0;
+            padding: 1em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: "Segoe UI", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: hidden;
+            text-align: center;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
 
-      .ingredient-list {
-        margin: 10px 0;
-        padding: 10px;
-        background: #f9f9f9;
-        border-radius: 8px;
-      }
-      .back-link {
-        display: inline-block;
-        margin: 20px 0;
-        color: #666;
-        text-decoration: none;
-      }
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-image {
+            width: 200px;
+            height: 200px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            object-fit: cover;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .app-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .app-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* Trial Info Styling */
+        .trial-info {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8e8);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            border: 2px solid #4CAF50;
+        }
+
+        .trial-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .trial-stats {
+            margin: 15px 0;
+        }
+
+        .trial-stat {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .trial-premium {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            border: 2px solid #f39c12;
+            color: #8b4513;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 0.5em;
+            text-align: center;
+            color: #333;
+        }
+
+        .barcode {
+            width: 150px;
+            cursor: pointer;
+            margin: 1em;
+            transition: transform 0.2s ease;
+        }
+
+        .barcode:hover {
+            transform: scale(1.1);
+        }
+
+        .scanner-text {
+            font-size: 1em;
+            color: #444;
+            margin-bottom: 1em;
+        }
+
+        .start-button {
+            background: linear-gradient(135deg, #e91e63, #f06292);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 1em;
+            margin-bottom: 2em;
+            box-shadow: 0 4px 15px rgba(255, 60, 172, 0.3);
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .start-button:hover {
+            background: #e6359a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 60, 172, 0.4);
+        }
+
+        .start-button:active {
+            transform: translateY(0);
+        }
+
+        .start-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Payment Section */
+        .payment-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            border: 2px solid #e91e63;
+        }
+
+        .payment-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e91e63;
+            margin-bottom: 15px;
+        }
+
+        .price {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e91e63;
+            margin: 10px 0;
+        }
+
+        .subscribe-button {
+            background: linear-gradient(135deg, #e91e63, #f06292);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .subscribe-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(233, 30, 99, 0.3);
+        }
+
+        .yearly-button {
+            background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+        }
+
+        .features-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .features-list li {
+            padding: 5px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .features-list li:before {
+            content: "• ";
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .result {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(6px);
+            border-radius: 12px;
+            padding: 1.5em;
+            width: 100%;
+            max-width: 650px;
+            margin-top: 2em;
+            box-shadow: 0 9px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 1em;
+        }
+
+        li {
+            font-size: 1em;
+            margin: 0.5em 0;
+            text-align: left;
+        }
+
+        .ingredient-category {
+            margin-bottom: 1em;
+        }
+
+        .category-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.3em;
+        }
+
+        .ingredient-list {
+            color: #666;
+            margin-left: 1em;
+            font-style: italic;
+        }
+
+        .safe-ingredients {
+            color: #2a7f2a;
+        }
+
+        .risky-ingredients {
+            color: #b30000;
+        }
+
+        .moderate-ingredients {
+            color: #e69500;
+        }
+
+        .shower {
+            position: fixed;
+            top: -80px;
+            width: 50px;
+            height: 50px;
+            z-index: 9999;
+            animation: fall 8s linear forwards;
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-80px) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(120vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        .scan-again {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #ff3cac;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 40px;
+            font-size: 1em;
+            text-decoration: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .badge {
+            margin-top: 1em;
+            font-size: 1.1em;
+            background: #fff3cd;
+            color: #856404;
+            padding: 0.75em 1em;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #funTip {
+            margin-top: 1em;
+            font-size: 1em;
+            color: #006400;
+            font-style: italic;
+            line-height: 1.4;
+            padding: 0.5em;
+        }
+
+        video, canvas {
+            display: none;
+        }
+
+        .debug-info {
+            margin-top: 1em;
+            padding: 0.5em;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .try-again-header {
+            color: #ff6b35;
+            font-size: 1.5em;
+            margin-bottom: 1em;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #f44336;
+        }
+
+        /* Upgrade Prompt Styling */
+        .upgrade-prompt {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 2px solid #f39c12;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.2);
+        }
+
+        .upgrade-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #d68910;
+            margin-bottom: 10px;
+        }
+
+        .upgrade-prompt p {
+            color: #856404;
+            margin: 10px 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .upgrade-pricing {
+            margin: 15px 0;
+        }
+
+        .upgrade-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e91e63;
+            margin-bottom: 5px;
+        }
+
+        .upgrade-features {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .upgrade-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .upgrade-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upgrade-btn.primary {
+            background: linear-gradient(135deg, #e91e63, #f06292);
+            color: white;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+        }
+
+        .upgrade-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+        }
+
+        .upgrade-btn.secondary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .upgrade-btn.secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        @media (max-width: 480px) {
+            .main-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .logo-image {
+                width: 150px;
+                height: 150px;
+            }
+        }
     </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>🔍 Ingredient Scanner</h1>
-      <p>Take a photo of your food's ingredient list</p>
-
-      <form method="post" enctype="multipart/form-data">
-        <div class="upload-area">
-          <label for="file-input" class="upload-label">
-            📸 Choose Photo or Take Picture
-          </label>
-          <input
-            id="file-input"
-            type="file"
-            name="image"
-            accept="image/*"
-            capture="environment"
-            onchange="this.form.submit()"
-          />
-          <p style="margin-top: 15px; color: #666">
-            Make sure the ingredient list is clearly visible
-          </p>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <img src="/static/barcode.png" alt="FoodFixr Scanner" class="logo-image" onclick="triggerScanner()">
+            <div class="app-title">📷 Take a photo of your food's ingredients</div>
         </div>
-      </form>
 
-      {% if result %}
-      <div
-        class="result {% if 'TRY AGAIN' in result.rating %}try-again{% elif 'Danger' in result.rating %}danger{% elif 'Proceed' in result.rating %}caution{% else %}safe{% endif %}"
-      >
-        {% if "TRY AGAIN" in result.rating %}
-        <h2 style="color: #2196f3">📷 Try Again</h2>
-        <p>
-          We couldn't clearly read the ingredients. Please try taking a clearer
-          photo with better lighting.
-        </p>
+        <!-- Trial/Premium Status -->
+        <div class="trial-info" id="trialInfo">
+            <div class="trial-title" id="trialTitle">
+                {% if session.get('is_premium') %}
+                    💎 Premium Active!
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                    🔒 Trial Expired - Upgrade Required
+                {% else %}
+                    🎉 Free Trial: 10 Scans for 48 Hours
+                {% endif %}
+            </div>
+            <div class="trial-stats">
+                {% if session.get('is_premium') %}
+                    <div class="trial-stat"><strong>Status:</strong> Unlimited Scans</div>
+                    <div class="trial-stat"><strong>Next billing:</strong> {{ next_billing_date if next_billing_date else 'Active' }}</div>
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                    <div class="trial-stat" style="color: #e91e63;"><strong>Trial limit reached!</strong></div>
+                    <div class="trial-stat">Subscribe to continue scanning</div>
+                {% else %}
+                    <div class="trial-stat"><strong>Scans used:</strong> <span id="scansUsed">{{ session.get('scans_used', 0) }}</span> / 10</div>
+                    <div class="trial-stat"><strong>Time remaining:</strong> <span id="timeRemaining">{{ trial_time_left if trial_time_left else '48h 0m' }}</span></div>
+                {% endif %}
+            </div>
+            {% if not session.get('is_premium') %}
+            <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                {% if session.get('scans_used', 0) >= 10 or trial_expired %}
+                    Upgrade now to continue scanning ingredients
+                {% else %}
+                    After trial: $2.99/month for unlimited scans
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
 
-        {% else %} {% if "Danger" in result.rating %}
-        <h2 style="color: #f44336">⚠️ Oh NOOOO! Danger!</h2>
-        {% elif "Proceed" in result.rating %}
-        <h2 style="color: #ff9800">🤔 Proceed Carefully</h2>
+        <!-- Scanner Button -->
+        <button class="start-button" id="startButton" onclick="handleScanRequest()">
+            {% if session.get('is_premium') %}
+                🔍 SCAN INGREDIENTS
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO SCAN
+            {% else %}
+                📸 START FREE TRIAL ({{ 10 - session.get('scans_used', 0) }} scans left)
+            {% endif %}
+        </button>
+
+        <!-- Payment Section (shown when needed) -->
+        <div class="payment-section" id="paymentSection" style="{% if not session.get('is_premium') and (session.get('scans_used', 0) >= 10 or trial_expired) %}display: block;{% else %}display: none;{% endif %}">
+            <div class="payment-title">
+                {% if session.get('scans_used', 0) >= 10 %}
+                    🎯 You've Used All 10 Free Scans!
+                {% elif trial_expired %}
+                    ⏰ Your 48-Hour Trial Has Expired
+                {% else %}
+                    Upgrade to Premium
+                {% endif %}
+            </div>
+            <div class="price">$2.99/month</div>
+            <p style="margin: 10px 0; color: #666;">
+                {% if session.get('scans_used', 0) >= 10 or trial_expired %}
+                    Continue scanning with unlimited access
+                {% else %}
+                    Unlock unlimited scans and premium features
+                {% endif %}
+            </p>
+            
+            <ul class="features-list">
+                <li>Unlimited ingredient scans</li>
+                <li>Advanced allergen detection</li>
+                <li>Detailed nutritional analysis</li>
+                <li>Health risk assessment</li>
+                <li>GMO identification</li>
+                <li>Scan history export</li>
+                <li>Priority customer support</li>
+            </ul>
+
+            <button class="subscribe-button" onclick="subscribe('monthly')">
+                Continue with Monthly - $2.99
+            </button>
+            <button class="subscribe-button yearly-button" onclick="subscribe('yearly')">
+                Best Value: Yearly - $29.99 (Save 17%)
+            </button>
+            
+            <div style="font-size: 12px; color: #999; margin-top: 15px; line-height: 1.4;">
+                💳 Secure payment • Cancel anytime • 30-day money-back guarantee
+            </div>
+        </div>
+    </div>
+
+    <!-- Forms for scanning -->
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="snapshot"></canvas>
+
+    <form id="uploadForm" method="post" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileUpload()" style="display: none" />
+    </form>
+
+    <form id="scanForm" method="post" enctype="multipart/form-data" style="display: none">
+        <input id="hiddenImage" type="file" name="image" />
+    </form>
+
+    <!-- Results Section -->
+    {% if result %}
+    <div class="result {% if 'TRY AGAIN' in result.rating %}try-again {% elif 'Danger' in result.rating %}danger {% elif 'Proceed' in result.rating %}caution {% else %}safe{% endif %}">
+        {% if "TRY AGAIN" in result.rating or "Error" in result.rating %}
+        <div class="try-again-header">↪️ TRY AGAIN</div>
+        <p>We couldn't clearly read the ingredients. Please try taking a clearer photo with better lighting.</p>
+
         {% else %}
-        <h2 style="color: #4caf50">✅ Yay! Safe!</h2>
-        {% endif %}
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+            {% if "Danger" in result.rating %}
+            <img src="/static/danger.png" alt="Danger Emoji" width="50" />
+            <h2 style="color: #b30000; margin: 0">Oh NOOOO! Danger!</h2>
+            {% elif "Proceed" in result.rating %}
+            <img src="/static/carefully.png" alt="Caution Emoji" width="50" />
+            <h2 style="color: #e69500; margin: 0">Proceed carefully</h2>
+            {% else %}
+            <img src="/static/safe.png" alt="Safe Emoji" width="50" />
+            <h2 style="color: #2a7f2a; margin: 0">Yay! Safe!</h2>
+            {% endif %}
+        </div>
 
         <h3>Detected Ingredients:</h3>
 
+        <!-- Show safe ingredients when food is safe -->
         {% if result.matched_ingredients.safe_ingredients %}
-        <div class="ingredient-list">
-          <strong style="color: #4caf50">✅ Safe Ingredients:</strong><br />
-          {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+        <div class="ingredient-category">
+            <div class="category-title safe-ingredients">✅ Safe Ingredients:</div>
+            <div class="ingredient-list safe-ingredients">
+                {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+            </div>
         </div>
-        {% endif %} {% if result.matched_ingredients.trans_fat %}
-        <div class="ingredient-list">
-          <strong style="color: #f44336">⚠️ Trans Fat:</strong><br />
-          {{ result.matched_ingredients.trans_fat | join(", ") }}
-        </div>
-        {% endif %} {% if result.matched_ingredients.excitotoxins %}
-        <div class="ingredient-list">
-          <strong style="color: #f44336">⚠️ Excitotoxins:</strong><br />
-          {{ result.matched_ingredients.excitotoxins | join(", ") }}
-        </div>
-        {% endif %} {% if result.matched_ingredients.corn %}
-        <div class="ingredient-list">
-          <strong style="color: #ff9800">🌽 Corn-based:</strong><br />
-          {{ result.matched_ingredients.corn | join(", ") }}
-        </div>
-        {% endif %} {% if result.matched_ingredients.sugar %}
-        <div class="ingredient-list">
-          <strong style="color: #ff9800">🍯 Sugars:</strong><br />
-          {{ result.matched_ingredients.sugar | join(", ") }}
-        </div>
-        {% endif %} {% if result.matched_ingredients.gmo %}
-        <div class="ingredient-list">
-          <strong style="color: #ff9800">🧬 GMO:</strong><br />
-          {{ result.matched_ingredients.gmo | join(", ") }}
-        </div>
-        {% endif %} {% endif %}
-      </div>
-      {% endif %}
+        {% endif %}
 
-      <a href="/" class="back-link">← Back to Home</a>
+        <!-- Show risky ingredients when found -->
+        {% if result.matched_ingredients.trans_fat %}
+        <div class="ingredient-category">
+            <div class="category-title risky-ingredients">⚠️ Trans Fat:</div>
+            <div class="ingredient-list risky-ingredients">
+                {{ result.matched_ingredients.trans_fat | join(", ") }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.matched_ingredients.excitotoxins %}
+        <div class="ingredient-category">
+            <div class="category-title risky-ingredients">⚠️ Excitotoxins:</div>
+            <div class="ingredient-list risky-ingredients">
+                {{ result.matched_ingredients.excitotoxins | join(", ") }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.matched_ingredients.corn %}
+        <div class="ingredient-category">
+            <div class="category-title moderate-ingredients">🌽 Corn-based:</div>
+            <div class="ingredient-list moderate-ingredients">
+                {{ result.matched_ingredients.corn | join(", ") }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.matched_ingredients.sugar %}
+        <div class="ingredient-category">
+            <div class="category-title moderate-ingredients">🍯 Sugars:</div>
+            <div class="ingredient-list moderate-ingredients">
+                {{ result.matched_ingredients.sugar | join(", ") }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.matched_ingredients.gmo %}
+        <div class="ingredient-category">
+            <div class="category-title moderate-ingredients">🧬 GMO:</div>
+            <div class="ingredient-list moderate-ingredients">
+                {{ result.matched_ingredients.gmo | join(", ") }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Show all detected ingredients if none in specific categories -->
+        {% if not result.matched_ingredients.safe_ingredients and not result.matched_ingredients.trans_fat and not result.matched_ingredients.excitotoxins and not result.matched_ingredients.corn and not result.matched_ingredients.sugar and not result.matched_ingredients.gmo %}
+        <div class="ingredient-category">
+            <div class="category-title">📋 All Detected:</div>
+            <div class="ingredient-list">
+                {% if result.matched_ingredients.all_detected %}
+                {{ result.matched_ingredients.all_detected | join(", ") }}
+                {% else %}
+                No ingredients clearly detected. Try taking a clearer photo.
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="badge" id="scanBadge"></div>
+        <p id="funTip"></p>
+        
+        <!-- Upgrade prompt after results -->
+        {% if not session.get('is_premium') %}
+        <div class="upgrade-prompt" id="upgradePrompt" style="{% if session.get('scans_used', 0) >= 8 %}display: block;{% else %}display: none;{% endif %}">
+            {% if session.get('scans_used', 0) >= 10 or trial_expired %}
+            <div class="upgrade-title">🎯 Trial Complete!</div>
+            <p>You've used all your free scans. Upgrade now to continue analyzing ingredients!</p>
+            {% elif session.get('scans_used', 0) >= 9 %}
+            <div class="upgrade-title">⚠️ Last Free Scan Used!</div>
+            <p>This was your final free scan. Upgrade to continue scanning unlimited ingredients!</p>
+            {% elif session.get('scans_used', 0) >= 8 %}
+            <div class="upgrade-title">🔔 Almost There!</div>
+            <p>You have {{ 10 - session.get('scans_used', 0) }} free scan{{ 's' if (10 - session.get('scans_used', 0)) != 1 else '' }} remaining. Upgrade for unlimited access!</p>
+            {% endif %}
+            
+            <div class="upgrade-pricing">
+                <div class="upgrade-price">$2.99/month</div>
+                <div class="upgrade-features">
+                    ✓ Unlimited scans ✓ Advanced analysis ✓ Priority support
+                </div>
+            </div>
+            
+            <div class="upgrade-buttons">
+                <button class="upgrade-btn primary" onclick="subscribe('monthly')">
+                    Upgrade Now
+                </button>
+                <button class="upgrade-btn secondary" onclick="subscribe('yearly')">
+                    Save 17% - Yearly
+                </button>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- Debug information -->
+        {% if result.confidence %}
+        <div class="debug-info">
+            Confidence: {{ result.confidence }} | Text Length: {{ result.extracted_text_length }}
+        </div>
+        {% endif %}
     </div>
-  </body>
+    {% endif %}
+
+    <script>
+        // Global variables for trial management
+        let scansUsed = {{ session.get('scans_used', 0) }};
+        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
+        let trialExpired = {{ 'true' if trial_expired else 'false' }};
+        
+        // Update trial status and upgrade prompts
+        function updateTrialStatus() {
+            const trialInfo = document.getElementById('trialInfo');
+            const trialTitle = document.getElementById('trialTitle');
+            const startButton = document.getElementById('startButton');
+            const paymentSection = document.getElementById('paymentSection');
+            const upgradePrompt = document.getElementById('upgradePrompt');
+            
+            document.getElementById('scansUsed').textContent = scansUsed;
+            
+            if (isPremium) {
+                trialInfo.className = 'trial-info trial-premium';
+                trialTitle.textContent = '💎 Premium Active!';
+                startButton.textContent = '🔍 SCAN INGREDIENTS';
+                startButton.disabled = false;
+                paymentSection.style.display = 'none';
+                if (upgradePrompt) upgradePrompt.style.display = 'none';
+            } else if (scansUsed >= 10 || trialExpired) {
+                trialTitle.textContent = '🔒 Trial Expired - Upgrade Required';
+                startButton.textContent = '💳 UPGRADE TO SCAN';
+                startButton.disabled = true;
+                paymentSection.style.display = 'block';
+                if (upgradePrompt) {
+                    upgradePrompt.style.display = 'block';
+                    updateUpgradePromptText();
+                }
+            } else {
+                const scansLeft = 10 - scansUsed;
+                trialTitle.textContent = '🎉 Free Trial: 10 Scans for 48 Hours';
+                startButton.textContent = `📸 START FREE TRIAL (${scansLeft} scans left)`;
+                startButton.disabled = false;
+                paymentSection.style.display = 'none';
+                
+                // Show upgrade prompt when approaching limit
+                if (upgradePrompt) {
+                    if (scansUsed >= 8) {
+                        upgradePrompt.style.display = 'block';
+                        updateUpgradePromptText();
+                    } else {
+                        upgradePrompt.style.display = 'none';
+                    }
+                }
+                
+                // Show warning when close to limit
+                if (scansUsed >= 8) {
+                    startButton.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+                    startButton.textContent = `⚠️ LAST ${scansLeft} FREE SCAN${scansLeft === 1 ? '' : 'S'}`;
+                }
+            }
+        }
+
+        // Update upgrade prompt text based on scans used
+        function updateUpgradePromptText() {
+            const upgradePrompt = document.getElementById('upgradePrompt');
+            if (!upgradePrompt) return;
+
+            let title, message;
+            
+            if (scansUsed >= 10 || trialExpired) {
+                title = '🎯 Trial Complete!';
+                message = "You've used all your free scans. Upgrade now to continue analyzing ingredients!";
+            } else if (scansUsed >= 9) {
+                title = '⚠️ Last Free Scan Used!';
+                message = "This was your final free scan. Upgrade to continue scanning unlimited ingredients!";
+            } else if (scansUsed >= 8) {
+                const scansLeft = 10 - scansUsed;
+                title = '🔔 Almost There!';
+                message = `You have ${scansLeft} free scan${scansLeft !== 1 ? 's' : ''} remaining. Upgrade for unlimited access!`;
+            }
+
+            const titleElement = upgradePrompt.querySelector('.upgrade-title');
+            const messageElement = upgradePrompt.querySelector('p');
+            
+            if (titleElement) titleElement.textContent = title;
+            if (messageElement) messageElement.textContent = message;
+        }
+
+        // Handle scan request with trial check
+        function handleScanRequest() {
+            // Check if user needs to upgrade
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                showPaymentSection();
+                return;
+            }
+            
+            // Show warning when approaching limit
+            if (!isPremium && scansUsed >= 8) {
+                const scansLeft = 10 - scansUsed;
+                if (!confirm(`You have ${scansLeft} free scan${scansLeft === 1 ? '' : 's'} remaining. Continue?`)) {
+                    return;
+                }
+            }
+            
+            triggerScanner();
+        }
+
+        function showPaymentSection() {
+            document.getElementById('paymentSection').style.display = 'block';
+            document.getElementById('paymentSection').scrollIntoView({ behavior: 'smooth' });
+            
+            // Update button text
+            document.getElementById('startButton').textContent = '💳 UPGRADE TO SCAN';
+            document.getElementById('startButton').disabled = true;
+        }
+
+        // Handle file upload with scan limit check
+        function handleFileUpload() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                showPaymentSection();
+                return;
+            }
+            
+            // Increment scan count and submit form
+            scansUsed++;
+            updateTrialStatus();
+            document.getElementById('uploadForm').submit();
+        }
+
+        // Trigger scanner function
+        function triggerScanner() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                showPaymentSection();
+                return;
+            }
+
+            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+            
+            if (isPhone) {
+                document.getElementById("fileInput").click();
+            } else {
+                const video = document.getElementById("webcam");
+                video.style.display = "block";
+                navigator.mediaDevices.enumerateDevices().then((devices) => {
+                    const cameras = devices.filter((device) => device.kind === "videoinput");
+                    const rearCamera = cameras.find((cam) => cam.label.toLowerCase().includes("back")) || cameras[0];
+                    navigator.mediaDevices
+                        .getUserMedia({ video: { deviceId: rearCamera.deviceId } })
+                        .then(function (stream) {
+                            video.srcObject = stream;
+                            video.play();
+                            setTimeout(() => capture(), 1500);
+                        });
+                });
+            }
+        }
+
+        // Capture function for desktop
+        function capture() {
+            const form = document.getElementById("scanForm");
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                const input = document.getElementById("hiddenImage");
+                input.files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    showPaymentSection();
+                    return;
+                }
+                
+                scansUsed++;
+                updateTrialStatus();
+                form.submit();
+            }, "image/jpeg");
+        }
+
+        // Subscription function
+        function subscribe(plan) {
+            if (plan === 'monthly') {
+                // Simulate payment processing
+                if (confirm('Subscribe for $2.99/month? (This is a demo - no actual payment will be processed)')) {
+                    // In a real app, this would redirect to Stripe/PayPal
+                    simulateSuccessfulPayment();
+                }
+            } else if (plan === 'yearly') {
+                if (confirm('Subscribe for $29.99/year and save 17%? (This is a demo - no actual payment will be processed)')) {
+                    simulateSuccessfulPayment();
+                }
+            }
+        }
+
+        // Simulate successful payment (replace with real payment processing)
+        function simulateSuccessfulPayment() {
+            // Send request to backend to mark user as premium
+            fetch('/upgrade-premium', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ plan: 'premium' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    isPremium = true;
+                    scansUsed = 0; // Reset scans for new premium user
+                    updateTrialStatus();
+                    alert('Welcome to Premium! You now have unlimited scans.');
+                } else {
+                    alert('Upgrade failed. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Upgrade failed. Please try again.');
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTrialStatus();
+        });
+
+        // Keep all your existing shower emoji and fun fact functions
+        function showerEmoji(imgSrc) {
+            for (let i = 0; i < 45; i++) {
+                let img = document.createElement("img");
+                img.src = imgSrc;
+                img.className = "shower";
+
+                const zoneWidth = window.innerWidth / 5;
+                const zone = i % 5;
+                const xPosition = (zone * zoneWidth) + (Math.random() * zoneWidth * 0.8);
+
+                img.style.left = Math.min(xPosition, window.innerWidth - 60) + "px";
+                img.style.animationDelay = (Math.random() * 4).toFixed(2) + "s";
+                img.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                const duration = 7 + (Math.random() * 2);
+                img.style.animationDuration = duration + "s";
+
+                document.body.appendChild(img);
+
+                setTimeout(() => {
+                    if (img && img.parentNode) {
+                        img.remove();
+                    }
+                }, (duration + 1) * 1000);
+            }
+        }
+
+        // Keep your existing streak and badge logic
+        let safeStreak = parseInt(localStorage.getItem('safeStreak')) || 0;
+        let dangerCount = parseInt(localStorage.getItem('dangerCount')) || 0;
+
+        // Fun fact generation (keep your existing function)
+        function generateFunFact(result) {
+            const ingredients = result.matched_ingredients;
+            // ... keep all your existing fun fact logic ...
+            return "🌿 Great choice for healthier eating!";
+        }
+
+        // Result handling with emoji shower and upgrade prompts
+        {% if result %}
+        {% if 'TRY AGAIN' in result.rating or 'Error' in result.rating %}
+            document.getElementById("funTip").innerText = "💡 Tip: Hold your camera steady and ensure good lighting for best results!";
+        {% elif 'Danger' in result.rating %}
+            showerEmoji("/static/danger.png");
+            safeStreak = 0;
+            dangerCount++;
+        {% elif 'Proceed' in result.rating %}
+            showerEmoji("/static/carefully.png");
+            safeStreak = 0;
+        {% else %}
+            showerEmoji("/static/safe.png");
+            safeStreak++;
+        {% endif %}
+
+        localStorage.setItem('safeStreak', safeStreak);
+        localStorage.setItem('dangerCount', dangerCount);
+
+        {% if 'TRY AGAIN' not in result.rating and 'Error' not in result.rating %}
+        const badgeText = safeStreak >= 3
+            ? `🥇 ${safeStreak} healthy scans in a row!`
+            : dangerCount >= 2
+            ? `🚨 ${dangerCount} high-risk foods flagged this week!`
+            : `Keep scanning to earn your next badge!`;
+
+        if (document.getElementById("scanBadge")) {
+            document.getElementById("scanBadge").innerText = badgeText;
+        }
+
+        // Show upgrade prompt after scan if approaching limit
+        const upgradePrompt = document.getElementById('upgradePrompt');
+        if (upgradePrompt && !isPremium) {
+            if (scansUsed >= 8) {
+                upgradePrompt.style.display = 'block';
+                updateUpgradePromptText();
+                // Smooth scroll to upgrade prompt
+                setTimeout(() => {
+                    upgradePrompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 2000); // Wait for emoji shower to finish
+            }
+        }
+        {% endif %}
+        {% endif %}
+    </script>
+
+    <a class="scan-again" href="/">🔄 Scan Again</a>
+</body>
 </html>
