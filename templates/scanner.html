@@ -29,7 +29,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 5;
+            z-index: 9999;
             overflow: hidden;
         }
 
@@ -82,7 +82,7 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             margin-bottom: 20px;
             position: relative;
-            z-index: 10;
+            z-index: 1;
         }
 
         .scanner-header {
@@ -98,8 +98,8 @@
         }
 
         .scan-icon {
-            width: 80px;
-            height: 80px;
+            width: 300px;
+            height: 400px;
             margin: 20px auto;
             cursor: pointer;
             transition: transform 0.2s ease;
@@ -199,7 +199,7 @@
             margin-top: 2em;
             box-shadow: 0 9px 20px rgba(0, 0, 0, 0.1);
             position: relative;
-            z-index: 10;
+            z-index: 1;
         }
 
         .ingredient-category {
@@ -264,7 +264,7 @@
         <!-- Header -->
         <div class="scanner-header">
             <div class="app-title">🔍 FoodFixr Scanner</div>
-            <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+            <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
         </div>
 
         <!-- Trial Status -->
@@ -307,7 +307,7 @@
         <!-- Loading State -->
         <div class="loading" id="loadingState">
             <div class="spinner"></div>
-            <div>🔬 Analyzing ingredients...</div>
+            <div> Analyzing ingredients...</div>
         </div>
     </div>
 
