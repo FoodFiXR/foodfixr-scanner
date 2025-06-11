@@ -453,8 +453,9 @@
     <div class="main-container">
         <!-- Logo Section -->
         <div class="logo-section">
-            <img src="/static/barcode.png" alt="FoodFixr Scanner" class="logo-image" onclick="triggerScanner()">
-            <div class="app-title">📷 Take a photo of your food's ingredients</div>
+            <img src="/static/barcode.png" alt="FoodFixr Scanner" class="logo-image" onclick="handleScanRequest()">
+            <div class="app-title">🔍 FoodFixr Scanner</div>
+            <div class="app-subtitle">AI-powered ingredient analysis for healthier food choices</div>
         </div>
 
         <!-- Trial/Premium Status -->
@@ -494,13 +495,24 @@
         <!-- Scanner Button -->
         <button class="start-button" id="startButton" onclick="handleScanRequest()">
             {% if session.get('is_premium') %}
-                🔍 SCAN INGREDIENTS
+                📸 SCAN INGREDIENTS
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO SCAN
             {% else %}
-                📸 START FREE TRIAL ({{ 10 - session.get('scans_used', 0) }} scans left)
+                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} free left)
             {% endif %}
         </button>
+
+        <!-- Features List (compact) -->
+        <div style="margin: 20px 0; text-align: left; max-width: 350px;">
+            <h3 style="margin-bottom: 15px; color: #333; font-size: 16px;">What you get:</h3>
+            <ul class="features-list" style="font-size: 13px;">
+                <li>AI-powered ingredient analysis</li>
+                <li>Health risk detection</li>
+                <li>GMO identification</li>
+                <li>Instant safety ratings</li>
+            </ul>
+        </div>
 
         <!-- Payment Section (shown when needed) -->
         <div class="payment-section" id="paymentSection" style="{% if not session.get('is_premium') and (session.get('scans_used', 0) >= 10 or trial_expired) %}display: block;{% else %}display: none;{% endif %}">
