@@ -55,7 +55,6 @@
             transform: scale(1.1);
         }
 
-        /* Trial Status */
         .trial-status {
             background: linear-gradient(135deg, #e8f5e8, #f0f8e8);
             border-radius: 15px;
@@ -87,7 +86,6 @@
             margin: 5px 0;
         }
 
-        /* Scan Button */
         .scan-button {
             background: linear-gradient(135deg, #e91e63, #f06292);
             color: white;
@@ -115,78 +113,27 @@
             box-shadow: none;
         }
 
-        .scan-button.warning {
-            background: linear-gradient(135deg, #ff9800, #f57c00);
-        }
-
-        /* Payment Section */
-        .payment-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-            border: 2px solid #e91e63;
+        .loading {
             display: none;
+            padding: 20px;
+            text-align: center;
         }
 
-        .payment-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #e91e63;
-            margin-bottom: 15px;
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #e91e63;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
         }
 
-        .price {
-            font-size: 24px;
-            font-weight: 700;
-            color: #e91e63;
-            margin: 10px 0;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        .features-list {
-            list-style: none;
-            padding: 0;
-            margin: 15px 0;
-            text-align: left;
-            font-size: 14px;
-        }
-
-        .features-list li {
-            padding: 3px 0;
-            color: #555;
-        }
-
-        .features-list li:before {
-            content: "✓ ";
-            color: #4CAF50;
-            font-weight: bold;
-        }
-
-        .subscribe-button {
-            background: linear-gradient(135deg, #e91e63, #f06292);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            padding: 12px 25px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 10px 5px;
-            transition: all 0.3s ease;
-            width: 100%;
-        }
-
-        .subscribe-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 5px 15px rgba(233, 30, 99, 0.3);
-        }
-
-        .yearly-button {
-            background: linear-gradient(135deg, #4CAF50, #45a049) !important;
-        }
-
-        /* Results */
         .result {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(6px);
@@ -226,81 +173,15 @@
             color: #e69500;
         }
 
-        .try-again-header {
-            color: #ff6b35;
-            font-size: 1.5em;
-            margin-bottom: 1em;
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #f44336;
         }
 
-        /* Upgrade Prompt */
-        .upgrade-prompt {
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-            border: 2px solid #f39c12;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.2);
-            display: none;
-        }
-
-        .upgrade-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #d68910;
-            margin-bottom: 10px;
-        }
-
-        .upgrade-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .upgrade-btn {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .upgrade-btn.primary {
-            background: linear-gradient(135deg, #e91e63, #f06292);
-            color: white;
-        }
-
-        .upgrade-btn.secondary {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-        }
-
-        /* Loading */
-        .loading {
-            display: none;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #e91e63;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Hidden elements */
         video, canvas, form {
             display: none;
         }
@@ -318,11 +199,11 @@
         <!-- Header -->
         <div class="scanner-header">
             <div class="app-title">🔍 FoodFixr Scanner</div>
-            <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+            <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
         </div>
 
         <!-- Trial Status -->
-        <div class="trial-status" id="trialStatus">
+        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
             <div class="trial-title" id="trialTitle">
                 {% if session.get('is_premium') %}
                     💎 Premium Active
@@ -340,6 +221,13 @@
             {% endif %}
         </div>
 
+        <!-- Error Message -->
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
         <!-- Scan Button -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
@@ -355,27 +243,6 @@
         <div class="loading" id="loadingState">
             <div class="spinner"></div>
             <div>Analyzing ingredients...</div>
-        </div>
-
-        <!-- Payment Section -->
-        <div class="payment-section" id="paymentSection">
-            <div class="payment-title">Upgrade to Continue</div>
-            <div class="price">$2.99/month</div>
-            <p style="margin: 10px 0; color: #666;">Unlimited ingredient scanning</p>
-            
-            <ul class="features-list">
-                <li>Unlimited scans</li>
-                <li>Advanced analysis</li>
-                <li>Health risk detection</li>
-                <li>Priority support</li>
-            </ul>
-
-            <button class="subscribe-button" onclick="subscribe('monthly')">
-                Monthly - $2.99
-            </button>
-            <button class="subscribe-button yearly-button" onclick="subscribe('yearly')">
-                Yearly - $29.99 (Save 17%)
-            </button>
         </div>
     </div>
 
@@ -394,11 +261,6 @@
     <!-- Results -->
     {% if result %}
     <div class="result">
-        {% if "TRY AGAIN" in result.rating or "Error" in result.rating %}
-        <div class="try-again-header">↪️ TRY AGAIN</div>
-        <p>Couldn't read ingredients clearly. Try better lighting and hold steady.</p>
-
-        {% else %}
         <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
             {% if "Danger" in result.rating %}
             <img src="/static/danger.png" alt="Danger" width="50" />
@@ -406,12 +268,15 @@
             {% elif "Proceed" in result.rating %}
             <img src="/static/carefully.png" alt="Caution" width="50" />
             <h2 style="color: #e69500; margin: 0">Proceed carefully</h2>
+            {% elif "TRY AGAIN" in result.rating %}
+            <h2 style="color: #ff6b35; margin: 0">↪️ TRY AGAIN</h2>
             {% else %}
             <img src="/static/safe.png" alt="Safe" width="50" />
             <h2 style="color: #2a7f2a; margin: 0">Yay! Safe!</h2>
             {% endif %}
         </div>
 
+        {% if "TRY AGAIN" not in result.rating %}
         <h3>Detected Ingredients:</h3>
 
         {% if result.matched_ingredients.safe_ingredients %}
@@ -467,42 +332,8 @@
             </div>
         </div>
         {% endif %}
-
-        <!-- Upgrade Prompt -->
-        {% if not session.get('is_premium') and session.get('scans_used', 0) >= 8 %}
-        <div class="upgrade-prompt" style="display: block;">
-            <div class="upgrade-title">
-                {% if session.get('scans_used', 0) >= 10 %}
-                    🎯 Trial Complete!
-                {% elif session.get('scans_used', 0) >= 9 %}
-                    ⚠️ Last Free Scan Used!
-                {% else %}
-                    🔔 Almost There!
-                {% endif %}
-            </div>
-            <p>
-                {% if session.get('scans_used', 0) >= 10 %}
-                    You've used all free scans. Upgrade for unlimited access!
-                {% elif session.get('scans_used', 0) >= 9 %}
-                    This was your final free scan. Upgrade to continue!
-                {% else %}
-                    You have {{ 10 - session.get('scans_used', 0) }} free scans left.
-                {% endif %}
-            </p>
-            <div class="upgrade-buttons">
-                <button class="upgrade-btn primary" onclick="subscribe('monthly')">
-                    Upgrade Now
-                </button>
-                <button class="upgrade-btn secondary" onclick="subscribe('yearly')">
-                    Save 17%
-                </button>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Badge and Fun Tip -->
-        <div class="badge" id="scanBadge" style="display: none;"></div>
-        <p id="funTip" style="display: none;"></p>
+        {% else %}
+        <p>Couldn't read ingredients clearly. Try better lighting and hold steady.</p>
         {% endif %}
     </div>
     {% endif %}
@@ -513,136 +344,14 @@
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
-        // Confetti shower function
-        function showerEmoji(imgSrc) {
-            for (let i = 0; i < 45; i++) {
-                let img = document.createElement("img");
-                img.src = imgSrc;
-                img.className = "shower";
-
-                const zoneWidth = window.innerWidth / 5;
-                const zone = i % 5;
-                const xPosition = (zone * zoneWidth) + (Math.random() * zoneWidth * 0.8);
-
-                img.style.left = Math.min(xPosition, window.innerWidth - 60) + "px";
-                img.style.animationDelay = (Math.random() * 4).toFixed(2) + "s";
-                img.style.transform = `rotate(${Math.random() * 360}deg)`;
-
-                const duration = 7 + (Math.random() * 2);
-                img.style.animationDuration = duration + "s";
-
-                document.body.appendChild(img);
-
-                setTimeout(() => {
-                    if (img && img.parentNode) {
-                        img.remove();
-                    }
-                }, (duration + 1) * 1000);
-            }
-        }
-
-        // Streak tracking
-        let safeStreak = parseInt(localStorage.getItem('safeStreak')) || 0;
-        let dangerCount = parseInt(localStorage.getItem('dangerCount')) || 0;
-
-        // Generate fun facts
-        function generateFunFact(result) {
-            const ingredients = result.matched_ingredients;
-
-            {% if 'TRY AGAIN' in result.rating or 'Error' in result.rating %}
-                return "💡 Tip: Hold your camera steady and ensure good lighting for best results!";
-            {% elif 'Danger' in result.rating %}
-                if (ingredients.trans_fat && ingredients.trans_fat.length > 0) {
-                    const transFatFacts = [
-                        `🚨 ${ingredients.trans_fat[0]} raises LDL (bad) cholesterol while lowering HDL (good) cholesterol!`,
-                        `⚠️ Trans fats like ${ingredients.trans_fat[0]} cause inflammation in blood vessels!`,
-                        `💔 Just 2 grams daily of ${ingredients.trans_fat[0]} increases heart attack risk by 23%!`
-                    ];
-                    return transFatFacts[Math.floor(Math.random() * transFatFacts.length)];
-                }
-                if (ingredients.excitotoxins && ingredients.excitotoxins.length > 0) {
-                    const excitotoxinFacts = [
-                        `🧠 ${ingredients.excitotoxins[0]} can overstimulate brain neurons, potentially causing headaches!`,
-                        `⚡ Excitotoxins like ${ingredients.excitotoxins[0]} may trigger migraines in sensitive individuals!`
-                    ];
-                    return excitotoxinFacts[Math.floor(Math.random() * excitotoxinFacts.length)];
-                }
-                return "🚨 High-risk ingredients can disrupt your body's natural processes!";
-            {% elif 'Proceed' in result.rating %}
-                return "⚖️ This food has some concerns but isn't dangerous - balance is key for healthy eating!";
-            {% else %}
-                if (ingredients.safe_ingredients && ingredients.safe_ingredients.length > 0) {
-                    const safeIngredient = ingredients.safe_ingredients[0];
-                    const benefitFacts = [
-                        `🌿 ${safeIngredient} provides essential nutrients your body easily recognizes!`,
-                        `💪 Whole ingredients like ${safeIngredient} support immune function!`,
-                        `❤️ ${safeIngredient} contains natural compounds that reduce inflammation!`
-                    ];
-                    return benefitFacts[Math.floor(Math.random() * benefitFacts.length)];
-                }
-                return "🌿 Whole food ingredients provide the building blocks your body needs!";
-            {% endif %}
-        }
-
-        // Handle results and show confetti
-        {% if result %}
-        {% if 'TRY AGAIN' in result.rating or 'Error' in result.rating %}
-            document.getElementById("funTip").innerText = generateFunTip({{ result | tojson }});
-            document.getElementById("funTip").style.display = 'block';
-        {% elif 'Danger' in result.rating %}
-            showerEmoji("/static/danger.png");
-            safeStreak = 0;
-            dangerCount++;
-            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
-            document.getElementById("funTip").style.display = 'block';
-        {% elif 'Proceed' in result.rating %}
-            showerEmoji("/static/carefully.png");
-            safeStreak = 0;
-            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
-            document.getElementById("funTip").style.display = 'block';
-        {% else %}
-            showerEmoji("/static/safe.png");
-            safeStreak++;
-            document.getElementById("funTip").innerText = generateFunFact({{ result | tojson }});
-            document.getElementById("funTip").style.display = 'block';
-        {% endif %}
-
-        localStorage.setItem('safeStreak', safeStreak);
-        localStorage.setItem('dangerCount', dangerCount);
-
-        {% if 'TRY AGAIN' not in result.rating and 'Error' not in result.rating %}
-        const badgeText = safeStreak >= 3
-            ? `🥇 ${safeStreak} healthy scans in a row!`
-            : dangerCount >= 2
-            ? `🚨 ${dangerCount} high-risk foods flagged this week!`
-            : `Keep scanning to earn your next badge!`;
-
-        document.getElementById("scanBadge").innerText = badgeText;
-        document.getElementById("scanBadge").style.display = 'block';
-        {% endif %}
-        {% endif %}
-
         function handleScanClick() {
             // Check limits
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                showPaymentSection();
+                alert('Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
-            // Show warning for last scans
-            if (!isPremium && scansUsed >= 8) {
-                const scansLeft = 10 - scansUsed;
-                if (!confirm(`You have ${scansLeft} free scan${scansLeft === 1 ? '' : 's'} remaining. Continue?`)) {
-                    return;
-                }
-            }
-
             triggerScanner();
-        }
-
-        function showPaymentSection() {
-            document.getElementById('paymentSection').style.display = 'block';
-            document.getElementById('paymentSection').scrollIntoView({ behavior: 'smooth' });
         }
 
         function triggerScanner() {
@@ -657,7 +366,7 @@
 
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                showPaymentSection();
+                alert('Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
@@ -698,7 +407,7 @@
                 document.getElementById("hiddenImage").files = container.files;
                 
                 if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                    showPaymentSection();
+                    alert('Trial expired! Please upgrade to continue scanning.');
                     return;
                 }
 
@@ -712,38 +421,6 @@
             document.getElementById('loadingState').style.display = 'block';
             document.getElementById('scanButton').style.display = 'none';
         }
-
-        function subscribe(plan) {
-            // Test mode - simulate subscription without Stripe
-            if (confirm(`Test subscription for ${plan === 'monthly' ? '$2.99/month' : '$29.99/year'}? (This is a test - no payment required)`)) {
-                fetch('/upgrade-premium', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plan: plan })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        isPremium = true;
-                        alert('Test upgrade successful! You now have unlimited scans.');
-                        location.reload();
-                    } else {
-                        alert('Test upgrade failed. Please try again.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Test upgrade failed. Please try again.');
-                });
-            }
-        }
-
-        // Update UI on load
-        document.addEventListener('DOMContentLoaded', function() {
-            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                showPaymentSection();
-            }
-        });
     </script>
 </body>
 </html>
