@@ -22,7 +22,7 @@
             text-align: center;
             min-height: 100vh;
             position: relative;
-            padding: 12px 8px;
+            padding: 20px 15px;
         }
 
         /* Enhanced Emoji Shower Styles */
@@ -38,29 +38,31 @@
         }
 
         .emoji {
-            position: fixed;
+            position: absolute;
             width: 45px;
             height: 45px;
             opacity: 0.95;
-            animation: fall 8s linear forwards;
+            animation: enhancedFall linear infinite;
             user-select: none;
             border-radius: 50%;
             filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
         }
 
-        @keyframes fall {
+        @keyframes enhancedFall {
             0% {
-                transform: translateY(-80px) rotate(0deg);
+                transform: translateY(-120px) rotate(0deg) scale(0.8);
                 opacity: 0;
             }
             10% {
                 opacity: 1;
+                transform: translateY(-80px) rotate(36deg) scale(1);
             }
             90% {
                 opacity: 0.8;
+                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
             }
             100% {
-                transform: translateY(120vh) rotate(720deg);
+                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
                 opacity: 0;
             }
         }
@@ -86,7 +88,7 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 24px;
-            padding: 20px 18px;
+            padding: 32px 24px;
             max-width: 380px;
             width: 100%;
             box-shadow: 
@@ -95,12 +97,12 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             z-index: 1;
-            margin: 0 3px 12px 3px;
+            margin-bottom: 20px;
         }
 
         /* Header Styling */
         .app-header {
-            margin-bottom: 12px;
+            margin-bottom: 16px;        /* Reduced from 28px */
         }
 
         .app-logo {
@@ -108,7 +110,7 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            margin-bottom: 6px;
+            margin-bottom: 6px;         /* Reduced from 8px */
         }
 
         .logo-text {
@@ -129,43 +131,64 @@
 
         /* Scanner Icon */
         .scanner-section {
-            margin: 16px 0 20px 0;
+            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
         }
 
         .scan-icon-container {
             position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 12px;
+            display: inline-block;
+            margin-bottom: 12px;        /* Reduced from 20px */
         }
 
         .scan-icon {
-            width: 180px;
-            height: 180px;
+            width: 200px;        /* Increased from 140px for bigger image */
+            height: 200px;       /* Increased from 140px for bigger image */
             cursor: pointer;
-            margin: 0.5em auto;
-            transition: transform 0.2s ease;
-            border-radius: 16px;
-            object-fit: contain;
-            display: block;
-            box-shadow: 0 8px 24px rgba(233, 30, 99, 0.15);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 20px;
+            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
+            object-fit: contain;  /* Ensures proper aspect ratio */
         }
 
         .scan-icon:hover {
             transform: scale(1.05);
+            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
         }
 
         .scan-icon:active {
             transform: scale(0.98);
         }
 
-        /* Enhanced Trial Status */
+        /* Scan Pulse Effect */
+        .scan-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 220px;        /* Adjusted to match new larger icon size */
+            height: 220px;       /* Adjusted to match new larger icon size */
+            border: 3px solid rgba(233, 30, 99, 0.3);
+            border-radius: 20px;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        /* Trial Status */
         .trial-status {
             background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
             border-radius: 16px;
             padding: 18px;
-            margin: 16px 0;
+            margin: 24px 0;
             border: 2px solid #4CAF50;
             position: relative;
             overflow: hidden;
@@ -265,10 +288,6 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        .scan-button.upgrade {
-            background: linear-gradient(135deg, #ff9800, #f57c00);
-        }
-
         /* Enhanced Loading State */
         .loading {
             display: none;
@@ -297,7 +316,7 @@
             font-weight: 600;
         }
 
-        /* Enhanced Results */
+        /* Enhanced Results - Mobile First Design */
         .result {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
@@ -429,55 +448,6 @@
             font-weight: 600;
         }
 
-        /* Flash Messages */
-        .flash-messages {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10000;
-            width: 90%;
-            max-width: 400px;
-        }
-
-        .flash-message {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-weight: 600;
-            text-align: center;
-            animation: slideDown 0.3s ease-out;
-        }
-
-        .flash-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .flash-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .flash-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        @keyframes slideDown {
-            from {
-                transform: translateY(-100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
         /* Hidden Elements */
         video, canvas, form {
             display: none;
@@ -486,12 +456,20 @@
         /* Mobile Responsiveness */
         @media (max-width: 480px) {
             body {
-                padding: 8px 5px;
+                padding: 12px 8px;      /* Reduced from 15px 10px */
             }
             
             .app-container {
-                padding: 16px 14px;
-                margin: 0 2px 8px 2px;
+                padding: 20px 18px;     /* Reduced from 24px 20px */
+                margin: 0 3px 12px 3px; /* Reduced margins */
+            }
+
+            .app-header {
+                margin-bottom: 12px;    /* Reduced from default */
+            }
+
+            .scanner-section {
+                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
             }
 
             .logo-text {
@@ -499,9 +477,13 @@
             }
 
             .scan-icon {
-                width: 160px;
-                height: 160px;
-                margin: 0.3em auto;
+                width: 160px;        /* Larger on mobile too */
+                height: 160px;       /* Larger on mobile too */
+            }
+
+            .scan-pulse {
+                width: 180px;        /* Adjusted for mobile */
+                height: 180px;       /* Adjusted for mobile */
             }
 
             .emoji {
@@ -515,34 +497,17 @@
             }
 
             .result-emoji {
-                width: 42px;
-                height: 42px;
+                width: 48px;
+                height: 48px;
             }
 
             .result-title {
                 font-size: 20px;
             }
-
-            .scanner-section {
-                margin: 12px 0 16px 0;
-            }
         }
     </style>
 </head>
 <body>
-    <!-- Flash Messages -->
-    <div class="flash-messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-message flash-{{ category }}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
-
     <!-- Enhanced Emoji Shower Container -->
     <div class="emoji-shower" id="emojiShower"></div>
 
@@ -558,7 +523,8 @@
         <!-- Scanner Section -->
         <div class="scanner-section">
             <div class="scan-icon-container">
-                <img src="/static/Foodfixr.jpeg" alt="FoodFixr Scanner" class="scan-icon" onclick="handleScanClick()">
+                <div class="scan-pulse"></div>
+                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
 
@@ -567,7 +533,7 @@
             <div class="trial-title" id="trialTitle">
                 {% if session.get('is_premium') %}
                     💎 Premium Active
-                {% elif trial_expired %}
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                     🔒 Trial Expired
                 {% else %}
                     🎉 Free Trial Active
@@ -575,11 +541,8 @@
             </div>
             {% if not session.get('is_premium') %}
             <div class="trial-info">
-                {% if not trial_expired %}
-                    Time Left: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
-                {% else %}
-                    Upgrade to continue unlimited scanning!
-                {% endif %}
+                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
+                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
             </div>
             {% endif %}
         </div>
@@ -592,14 +555,13 @@
         {% endif %}
 
         <!-- Enhanced Scan Button -->
-        <button class="scan-button{% if trial_expired and not session.get('is_premium') %} upgrade{% endif %}" 
-                id="scanButton" onclick="handleScanClick()">
+        <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
                 📸 SCAN INGREDIENTS
-            {% elif trial_expired %}
-                💳 UPGRADE NOW ($2.99/month)
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO CONTINUE
             {% else %}
-                📸 SCAN INGREDIENTS
+                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
 
@@ -714,6 +676,7 @@
 
     <script>
         // Global variables
+        let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
@@ -744,10 +707,12 @@
                 
                 console.log(`🎊 Starting enhanced ${type} emoji shower`);
                 
+                // More frequent emoji creation for denser shower
                 const interval = setInterval(() => {
                     this.createEmoji(emojiImage);
-                }, 200);
+                }, 200); // Faster creation rate
 
+                // Also create bursts of emojis
                 let burstCount = 0;
                 const burstInterval = setInterval(() => {
                     if (burstCount >= 3) {
@@ -755,17 +720,20 @@
                         return;
                     }
                     
+                    // Create burst of 3-5 emojis
                     for (let i = 0; i < 3 + Math.random() * 3; i++) {
                         setTimeout(() => this.createEmoji(emojiImage), i * 100);
                     }
                     burstCount++;
                 }, 1000);
 
+                // Stop after duration
                 setTimeout(() => {
                     clearInterval(interval);
                     clearInterval(burstInterval);
                     this.isActive = false;
                     
+                    // Clean up after additional 6 seconds
                     setTimeout(() => {
                         this.cleanup();
                     }, 6000);
@@ -778,23 +746,29 @@
                 emoji.src = imageSrc;
                 emoji.alt = 'emoji';
                 
+                // More varied horizontal positions
                 emoji.style.left = (Math.random() * 120 - 10) + '%';
                 
+                // Varied animation duration (3-7 seconds)
                 const duration = 3 + Math.random() * 4;
                 emoji.style.animationDuration = duration + 's';
                 
+                // Enhanced horizontal drift
                 const drift = (Math.random() - 0.5) * 300;
                 emoji.style.setProperty('--drift', drift + 'px');
                 
+                // More size variety (35-55px)
                 const size = 35 + Math.random() * 20;
                 emoji.style.width = size + 'px';
                 emoji.style.height = size + 'px';
                 
+                // Random delay for staggered effect
                 const delay = Math.random() * 1000;
                 emoji.style.animationDelay = delay + 'ms';
                 
                 this.container.appendChild(emoji);
                 
+                // Remove emoji after animation completes
                 setTimeout(() => {
                     if (emoji.parentNode) {
                         emoji.parentNode.removeChild(emoji);
@@ -814,15 +788,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             emojiShower.init();
             
-            // Auto-hide flash messages
-            setTimeout(() => {
-                const flashMessages = document.querySelectorAll('.flash-message');
-                flashMessages.forEach(msg => {
-                    msg.style.animation = 'slideUp 0.3s ease-out forwards';
-                    setTimeout(() => msg.remove(), 300);
-                });
-            }, 5000);
-            
             // Trigger enhanced emoji shower if there's a result
             {% if result %}
             setTimeout(() => {
@@ -838,9 +803,8 @@
         });
 
         function handleScanClick() {
-            if (!isPremium && trialExpired) {
-                // Redirect to upgrade page
-                window.location.href = '/upgrade';
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
@@ -858,12 +822,14 @@
         }
 
         function handleFileSelected() {
-            if (!isPremium && trialExpired) {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
                 alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
             }
 
             showLoading();
+            scansUsed++;
+            updateScanCount();
             document.getElementById('uploadForm').submit();
         }
 
@@ -904,12 +870,14 @@
                 container.items.add(file);
                 document.getElementById("hiddenImage").files = container.files;
                 
-                if (!isPremium && trialExpired) {
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
                     alert('🔒 Trial expired! Please upgrade to continue scanning.');
                     return;
                 }
 
                 showLoading();
+                scansUsed++;
+                updateScanCount();
                 form.submit();
             }, "image/jpeg", 0.8);
         }
@@ -917,6 +885,21 @@
         function showLoading() {
             document.getElementById('loadingState').style.display = 'block';
             document.getElementById('scanButton').style.display = 'none';
+        }
+
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = true;
+            }
         }
 
         // Auto-scroll to results when they appear
@@ -928,41 +911,6 @@
                 }, 600);
             }
         });
-
-        // Update trial status in real-time
-        function updateTrialStatus() {
-            if (isPremium) return;
-            
-            fetch('/trial-status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.expired && !trialExpired) {
-                        location.reload(); // Refresh page to update UI
-                    }
-                    const timeLeftElement = document.getElementById('timeLeft');
-                    if (timeLeftElement) {
-                        timeLeftElement.textContent = data.time_left;
-                    }
-                })
-                .catch(err => console.log('Error updating trial status:', err));
-        }
-
-        // Update trial status every minute
-        if (!isPremium) {
-            setInterval(updateTrialStatus, 60000);
-        }
-
-        // Add slideUp animation for flash messages
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideUp {
-                to {
-                    transform: translateY(-100%);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
     </script>
 </body>
 </html>
