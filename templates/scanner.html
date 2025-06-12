@@ -39,8 +39,8 @@
 
         .emoji {
             position: absolute;
-            width: 50px;
-            height: 50px;
+            width: 45px;
+            height: 45px;
             opacity: 0.95;
             animation: enhancedFall linear infinite;
             user-select: none;
@@ -141,8 +141,8 @@
         }
 
         .scan-icon {
-            width: 400px;
-            height: 380px;
+            width: 140px;        /* Increased from 120px */
+            height: 140px;       /* Increased from 120px */
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             border-radius: 20px;
@@ -163,8 +163,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 380px;
-            height: 400px;
+            width: 160px;        /* Adjusted to match new icon size */
+            height: 160px;       /* Adjusted to match new icon size */
             border: 3px solid rgba(233, 30, 99, 0.3);
             border-radius: 20px;
             transform: translate(-50%, -50%);
@@ -298,8 +298,8 @@
             border: 4px solid rgba(233, 30, 99, 0.1);
             border-top: 4px solid #e91e63;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 48px;
+            height: 48px;
             animation: spin 1s linear infinite;
             margin: 0 auto 16px;
         }
@@ -315,15 +315,18 @@
             font-weight: 600;
         }
 
-        /* Enhanced Results */
+        /* Enhanced Results - Mobile First Design */
         .result {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 28px;
+            padding: 20px;
             width: 100%;
             max-width: 420px;
             margin-top: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.08),
+                0 8px 32px rgba(233, 30, 99, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             z-index: 1;
@@ -332,15 +335,15 @@
         .result-header {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 16px;
-            margin-bottom: 24px;
-            padding: 16px;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 16px 20px;
             border-radius: 12px;
         }
 
         .result-header.safe {
-            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+            background: linear-gradient(135deg, #fff8e1, #f0f4c3);
         }
 
         .result-header.caution {
@@ -352,15 +355,17 @@
         }
 
         .result-emoji {
-            width: 56px;
-            height: 56px;
-            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+            width: 48px;
+            height: 48px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+            flex-shrink: 0;
         }
 
         .result-title {
-            font-size: 24px;
-            font-weight: 800;
+            font-size: 22px;
+            font-weight: 700;
             margin: 0;
+            text-align: left;
         }
 
         .result-title.safe { color: #2e7d32; }
@@ -368,11 +373,11 @@
         .result-title.danger { color: #c62828; }
 
         .ingredients-section {
-            margin-top: 24px;
+            margin-top: 0;
         }
 
         .section-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #333;
             margin-bottom: 16px;
@@ -380,44 +385,46 @@
         }
 
         .ingredient-category {
-            margin-bottom: 16px;
-            padding: 12px;
-            border-radius: 10px;
+            margin-bottom: 12px;
+            padding: 16px;
+            border-radius: 12px;
             text-align: left;
+            border-left: 4px solid;
         }
 
         .category-title {
             font-weight: 700;
             margin-bottom: 8px;
-            font-size: 15px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .ingredient-list {
             font-size: 14px;
-            line-height: 1.5;
-            margin-left: 8px;
+            line-height: 1.6;
+            margin: 0;
+            color: #555;
         }
 
         .safe-ingredients {
-            background: rgba(76, 175, 80, 0.1);
-            border-left: 4px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4CAF50;
         }
         .safe-ingredients .category-title { color: #2e7d32; }
-        .safe-ingredients .ingredient-list { color: #388e3c; }
 
         .risky-ingredients {
-            background: rgba(244, 67, 54, 0.1);
-            border-left: 4px solid #f44336;
+            background: rgba(244, 67, 54, 0.08);
+            border-left-color: #f44336;
         }
         .risky-ingredients .category-title { color: #c62828; }
-        .risky-ingredients .ingredient-list { color: #d32f2f; }
 
         .moderate-ingredients {
-            background: rgba(255, 152, 0, 0.1);
-            border-left: 4px solid #ff9800;
+            background: rgba(255, 152, 0, 0.08);
+            border-left-color: #ff9800;
         }
         .moderate-ingredients .category-title { color: #f57c00; }
-        .moderate-ingredients .ingredient-list { color: #ef6c00; }
 
         .try-again-message {
             background: linear-gradient(135deg, #fff3e0, #ffe0b2);
@@ -461,13 +468,13 @@
             }
 
             .scan-icon {
-                width: 100px;
-                height: 100px;
+                width: 120px;        /* Slightly smaller on mobile */
+                height: 120px;       /* Slightly smaller on mobile */
             }
 
             .scan-pulse {
-                width: 120px;
-                height: 120px;
+                width: 140px;        /* Adjusted for mobile */
+                height: 140px;       /* Adjusted for mobile */
             }
 
             .emoji {
@@ -508,7 +515,7 @@
         <div class="scanner-section">
             <div class="scan-icon-container">
                 <div class="scan-pulse"></div>
-                <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
 
