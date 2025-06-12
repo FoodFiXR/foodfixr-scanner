@@ -3,10 +3,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8" />
-    <title>Food Fixr - Ingredient Scanner</title>
-    {% if stripe_publishable_key %}
-    <script src="https://js.stripe.com/v3/"></script>
-    {% endif %}
+    <title>FoodFixr Scanner</title>
     <style>
         * {
             margin: 0;
@@ -15,323 +12,297 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            color: #333;
-            padding: 1rem;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 400px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 2rem 1.5rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            justify-content: flex-start;
+            overflow-x: hidden;
             text-align: center;
-            backdrop-filter: blur(10px);
+            min-height: 100vh;
+            position: relative;
+            padding: 20px 15px;
         }
 
-        .logo-section {
-            margin-bottom: 2rem;
-        }
-
-        .logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 2rem;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-
-        .robot-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #ff6b6b, #ffa726);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .tagline {
-            color: #666;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        /* Trial Status Banner */
-        .trial-banner {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-            padding: 1rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-        }
-
-        .trial-expired {
-            background: linear-gradient(135deg, #f44336, #d32f2f);
-        }
-
-        .trial-time {
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        /* Food Label Design */
-        .food-label {
-            background: white;
-            border: 2px solid #333;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1.5rem 0;
-            text-align: left;
-            font-family: 'Courier New', monospace;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .label-header {
-            text-align: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-            border-bottom: 1px solid #333;
-            padding-bottom: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .label-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-        }
-
-        .jar-icon {
-            width: 40px;
-            height: 40px;
-            margin: 0 auto 0.5rem;
-            background: linear-gradient(135deg, #ffa726, #ff7043);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .magnifying-glass {
-            width: 60px;
-            height: 60px;
-            margin: 1rem auto;
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .magnifying-glass:hover {
-            transform: scale(1.1);
-        }
-
-        .scan-instruction {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 1rem 0;
-        }
-
-        .scan-button {
-            background: linear-gradient(135deg, #ff6b6b, #ff5722);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 25px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            margin: 1rem 0;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-        }
-
-        .scan-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-        }
-
-        .scan-button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        /* Results Styling */
-        .results {
-            margin-top: 2rem;
-            text-align: left;
-        }
-
-        .result-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-
-        .result-safe {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-        }
-
-        .result-caution {
-            background: linear-gradient(135deg, #ff9800, #f57c00);
-            color: white;
-        }
-
-        .result-danger {
-            background: linear-gradient(135deg, #f44336, #d32f2f);
-            color: white;
-        }
-
-        .result-try-again {
-            background: linear-gradient(135deg, #9e9e9e, #616161);
-            color: white;
-        }
-
-        .ingredient-category {
-            margin: 1rem 0;
-            padding: 0.5rem;
-            border-radius: 8px;
-            border-left: 4px solid #ddd;
-        }
-
-        .category-safe { border-left-color: #4CAF50; background: #f1f8e9; }
-        .category-caution { border-left-color: #ff9800; background: #fff3e0; }
-        .category-danger { border-left-color: #f44336; background: #ffebee; }
-
-        .category-title {
-            font-weight: bold;
-            margin-bottom: 0.3rem;
-            font-size: 0.9rem;
-        }
-
-        .ingredient-list {
-            font-size: 0.8rem;
-            color: #666;
-            line-height: 1.4;
-        }
-
-        /* Subscription Modal */
-        .subscription-modal {
+        /* Enhanced Emoji Shower Styles */
+        .emoji-shower {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        .emoji {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            opacity: 0.95;
+            animation: enhancedFall linear infinite;
+            user-select: none;
+            border-radius: 50%;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+        }
+
+        @keyframes enhancedFall {
+            0% {
+                transform: translateY(-120px) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(-80px) rotate(36deg) scale(1);
+            }
+            90% {
+                opacity: 0.8;
+                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
+            }
+            100% {
+                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
+                opacity: 0;
+            }
+        }
+
+        /* Floating animation for result display */
+        .result-float {
+            animation: floatIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes floatIn {
+            0% {
+                transform: translateY(60px) scale(0.9);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Main App Container */
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 32px 24px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 
+                0 20px 60px rgba(233, 30, 99, 0.15),
+                0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            margin-bottom: 20px;
+        }
+
+        /* Header Styling */
+        .app-header {
+            margin-bottom: 16px;        /* Reduced from 28px */
+        }
+
+        .app-logo {
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
-            padding: 1rem;
+            gap: 12px;
+            margin-bottom: 6px;         /* Reduced from 8px */
         }
 
-        .modal-content {
-            background: white;
+        .logo-text {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+
+        .app-subtitle {
+            font-size: 15px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Scanner Icon */
+        .scanner-section {
+            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
+        }
+
+        .scan-icon-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 12px;        /* Reduced from 20px */
+        }
+
+        .scan-icon {
+            width: 200px;        /* Increased from 140px for bigger image */
+            height: 200px;       /* Increased from 140px for bigger image */
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             border-radius: 20px;
-            padding: 2rem;
-            max-width: 400px;
+            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
+            object-fit: contain;  /* Ensures proper aspect ratio */
+        }
+
+        .scan-icon:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
+        }
+
+        .scan-icon:active {
+            transform: scale(0.98);
+        }
+
+        /* Scan Pulse Effect */
+        .scan-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 220px;        /* Adjusted to match new larger icon size */
+            height: 220px;       /* Adjusted to match new larger icon size */
+            border: 3px solid rgba(233, 30, 99, 0.3);
+            border-radius: 20px;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        /* Trial Status */
+        .trial-status {
+            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+            border-radius: 16px;
+            padding: 18px;
+            margin: 24px 0;
+            border: 2px solid #4CAF50;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trial-status::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
             width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .trial-status:hover::before {
+            left: 100%;
+        }
+
+        .trial-status.expired {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-color: #ff9800;
+        }
+
+        .trial-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .trial-status.expired .trial-title {
+            color: #f57c00;
+        }
+
+        .trial-info {
+            font-size: 14px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        /* Modern Scan Button */
+        .scan-button {
+            background: linear-gradient(135deg, #e91e63, #ad1457);
+            color: white;
+            padding: 18px 32px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            margin: 20px 0;
+            box-shadow: 
+                0 8px 24px rgba(233, 30, 99, 0.4),
+                0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scan-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .scan-button:hover::before {
+            left: 100%;
+        }
+
+        .scan-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 32px rgba(233, 30, 99, 0.5),
+                0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .scan-button:active {
+            transform: translateY(-1px);
+        }
+
+        .scan-button:disabled {
+            background: linear-gradient(135deg, #bdbdbd, #9e9e9e);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Enhanced Loading State */
+        .loading {
+            display: none;
+            padding: 24px;
             text-align: center;
         }
 
-        .subscribe-button {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 25px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .subscribe-button:hover {
-            transform: translateY(-2px);
-        }
-
-        .features-list {
-            text-align: left;
-            margin: 1rem 0;
-            padding-left: 1rem;
-        }
-
-        .features-list li {
-            margin: 0.5rem 0;
-            font-size: 0.9rem;
-        }
-
-        .price {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #4CAF50;
-            margin: 1rem 0;
-        }
-
-        /* Hidden elements */
-        video, canvas, input[type="file"] {
-            display: none;
-        }
-
-        /* Notification */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 1rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            z-index: 1001;
-            max-width: 300px;
-        }
-
-        .notification.error { background: #f44336; }
-        .notification.success { background: #4CAF50; }
-        .notification.warning { background: #ff9800; }
-
-        /* Loading animation */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
+        .spinner {
+            border: 4px solid rgba(233, 30, 99, 0.1);
+            border-top: 4px solid #e91e63;
             border-radius: 50%;
+            width: 48px;
+            height: 48px;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
+            margin: 0 auto 16px;
         }
 
         @keyframes spin {
@@ -339,306 +310,607 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Responsive adjustments */
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        /* Enhanced Results - Mobile First Design */
+        .result {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 420px;
+            margin-top: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.08),
+                0 8px 32px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 16px 20px;
+            border-radius: 12px;
+        }
+
+        .result-header.safe {
+            background: linear-gradient(135deg, #fff8e1, #f0f4c3);
+        }
+
+        .result-header.caution {
+            background: linear-gradient(135deg, #fff8e1, #ffecb3);
+        }
+
+        .result-header.danger {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+        }
+
+        .result-emoji {
+            width: 48px;
+            height: 48px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+            flex-shrink: 0;
+        }
+
+        .result-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0;
+            text-align: left;
+        }
+
+        .result-title.safe { color: #2e7d32; }
+        .result-title.caution { color: #f57c00; }
+        .result-title.danger { color: #c62828; }
+
+        .ingredients-section {
+            margin-top: 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .ingredient-category {
+            margin-bottom: 12px;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: left;
+            border-left: 4px solid;
+        }
+
+        .category-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ingredient-list {
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+            color: #555;
+        }
+
+        .safe-ingredients {
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4CAF50;
+        }
+        .safe-ingredients .category-title { color: #2e7d32; }
+
+        .risky-ingredients {
+            background: rgba(244, 67, 54, 0.08);
+            border-left-color: #f44336;
+        }
+        .risky-ingredients .category-title { color: #c62828; }
+
+        .moderate-ingredients {
+            background: rgba(255, 152, 0, 0.08);
+            border-left-color: #ff9800;
+        }
+        .moderate-ingredients .category-title { color: #f57c00; }
+
+        .try-again-message {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 2px solid #ff9800;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            font-size: 16px;
+            color: #ef6c00;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: #c62828;
+            padding: 18px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 4px solid #f44336;
+            font-weight: 600;
+        }
+
+        /* Hidden Elements */
+        video, canvas, form {
+            display: none;
+        }
+
+        /* Mobile Responsiveness */
         @media (max-width: 480px) {
-            .container {
-                margin: 0.5rem;
-                padding: 1.5rem 1rem;
+            body {
+                padding: 12px 8px;      /* Reduced from 15px 10px */
             }
             
-            .logo {
-                font-size: 1.8rem;
+            .app-container {
+                padding: 20px 18px;     /* Reduced from 24px 20px */
+                margin: 0 3px 12px 3px; /* Reduced margins */
+            }
+
+            .app-header {
+                margin-bottom: 12px;    /* Reduced from default */
+            }
+
+            .scanner-section {
+                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
+            }
+
+            .logo-text {
+                font-size: 28px;
+            }
+
+            .scan-icon {
+                width: 160px;        /* Larger on mobile too */
+                height: 160px;       /* Larger on mobile too */
+            }
+
+            .scan-pulse {
+                width: 180px;        /* Adjusted for mobile */
+                height: 180px;       /* Adjusted for mobile */
+            }
+
+            .emoji {
+                width: 35px;
+                height: 35px;
+            }
+
+            .result {
+                margin-top: 20px;
+                padding: 24px 20px;
+            }
+
+            .result-emoji {
+                width: 48px;
+                height: 48px;
+            }
+
+            .result-title {
+                font-size: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Logo Section -->
-        <div class="logo-section">
-            <div class="logo">
-                <div class="robot-icon">🤖</div>
-                FOOD FIXR
+    <!-- Enhanced Emoji Shower Container -->
+    <div class="emoji-shower" id="emojiShower"></div>
+
+    <div class="app-container">
+        <!-- Modern Header -->
+        <div class="app-header">
+            <div class="app-logo">
+                <div class="logo-text">FOOD FIXR</div>
             </div>
-            <div class="tagline">Ingredient Scanner & Health Analyzer</div>
+            <div class="app-subtitle">Smart Ingredient Scanner</div>
         </div>
 
-        <!-- Trial Status -->
-        {% if not trial_expired %}
-        <div class="trial-banner">
-            <div>🎉 <strong>Free Trial Active</strong></div>
-            <div class="trial-time">Time left: {{ trial_time_left }}</div>
-            <div style="font-size: 0.8rem; margin-top: 0.5rem;">
-                Then $2.99/month for unlimited scans
+        <!-- Scanner Section -->
+        <div class="scanner-section">
+            <div class="scan-icon-container">
+                <div class="scan-pulse"></div>
+                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
-        {% elif trial_expired and not session.get('is_premium') %}
-        <div class="trial-banner trial-expired">
-            <div>🔒 <strong>Free Trial Expired</strong></div>
-            <div>Subscribe to continue scanning</div>
+
+        <!-- Enhanced Trial Status -->
+        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
+            <div class="trial-title" id="trialTitle">
+                {% if session.get('is_premium') %}
+                    💎 Premium Active
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                    🔒 Trial Expired
+                {% else %}
+                    🎉 Free Trial Active
+                {% endif %}
+            </div>
+            {% if not session.get('is_premium') %}
+            <div class="trial-info">
+                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
+                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
+            </div>
+            {% endif %}
         </div>
-        {% elif session.get('is_premium') %}
-        <div class="trial-banner">
-            <div>✅ <strong>Premium Active</strong></div>
-            <div>Unlimited ingredient scans</div>
+
+        <!-- Error Message -->
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
         </div>
         {% endif %}
 
-        <!-- Food Label Mockup -->
-        <div class="food-label">
-            <div class="label-header">FOOD LABEL<br>INGREDIENT READER</div>
-            <div class="jar-icon">🏺</div>
-            <div class="label-content">
-                <div>INGREDIENTS:</div>
-                <div>___________</div>
-                <div>___________</div>
-                <div>___________</div>
-                <div style="grid-column: 1 / -1; text-align: center; margin-top: 0.5rem;">
-                    <div style="width: 100%; height: 20px; background: repeating-linear-gradient(90deg, #000 0, #000 2px, transparent 2px, transparent 6px);"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Scanner Interface -->
-        <div class="magnifying-glass" onclick="startScan()">🔍</div>
-        <div class="scan-instruction">📸 Tap to scan ingredient label</div>
-        
-        <button class="scan-button" id="scanButton" onclick="startScan()" 
-                {% if trial_expired and not session.get('is_premium') %}disabled{% endif %}>
-            {% if trial_expired and not session.get('is_premium') %}
-                Subscribe to Continue
+        <!-- Enhanced Scan Button -->
+        <button class="scan-button" id="scanButton" onclick="handleScanClick()">
+            {% if session.get('is_premium') %}
+                📸 SCAN INGREDIENTS
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO CONTINUE
             {% else %}
-                START SCANNING
+                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
 
-        <!-- Hidden form elements -->
-        <form id="uploadForm" method="post" enctype="multipart/form-data">
-            <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="this.form.submit()">
-        </form>
+        <!-- Enhanced Loading State -->
+        <div class="loading" id="loadingState">
+            <div class="spinner"></div>
+            <div class="loading-text">🔬 Analyzing ingredients...</div>
+        </div>
+    </div>
 
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="snapshot"></canvas>
+    <!-- Hidden Forms -->
+    <form id="uploadForm" method="post" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileSelected()" />
+    </form>
 
-        <!-- Results Section -->
-        {% if result %}
-        <div class="results">
-            {% if "TRY AGAIN" in result.rating %}
-            <div class="result-header result-try-again">
-                <span>↪️ TRY AGAIN</span>
-            </div>
-            <p>We couldn't read the ingredients clearly. Please try taking a clearer photo with better lighting.</p>
-            
-            {% elif "Danger" in result.rating %}
-            <div class="result-header result-danger">
-                <span>🚨 DANGER DETECTED!</span>
-            </div>
-            
-            {% elif "Proceed" in result.rating %}
-            <div class="result-header result-caution">
-                <span>⚠️ PROCEED CAREFULLY</span>
-            </div>
-            
-            {% else %}
-            <div class="result-header result-safe">
-                <span>✅ LOOKS SAFE!</span>
-            </div>
-            {% endif %}
+    <form id="scanForm" method="post" enctype="multipart/form-data">
+        <input id="hiddenImage" type="file" name="image" />
+    </form>
 
-            {% if result.matched_ingredients %}
-            <!-- Safe Ingredients -->
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="snapshot"></canvas>
+
+    <!-- Enhanced Results -->
+    {% if result %}
+    <div class="result result-float">
+        {% if "Danger" in result.rating %}
+        <div class="result-header danger">
+            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+            <h2 class="result-title danger">Oh NOOOO! Danger!</h2>
+        </div>
+        {% elif "Proceed" in result.rating %}
+        <div class="result-header caution">
+            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+            <h2 class="result-title caution">Proceed carefully</h2>
+        </div>
+        {% elif "TRY AGAIN" in result.rating %}
+        <div class="result-header caution">
+            <h2 class="result-title caution">↪️ TRY AGAIN</h2>
+        </div>
+        {% else %}
+        <div class="result-header safe">
+            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+            <h2 class="result-title safe">Yay! Safe!</h2>
+        </div>
+        {% endif %}
+
+        {% if "TRY AGAIN" not in result.rating %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+
             {% if result.matched_ingredients.safe_ingredients %}
-            <div class="ingredient-category category-safe">
+            <div class="ingredient-category safe-ingredients">
                 <div class="category-title">✅ Safe Ingredients:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.safe_ingredients | join(", ") }}</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+                </div>
             </div>
             {% endif %}
 
-            <!-- Dangerous Ingredients -->
             {% if result.matched_ingredients.trans_fat %}
-            <div class="ingredient-category category-danger">
-                <div class="category-title">🚨 Trans Fats:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.trans_fat | join(", ") }}</div>
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">⚠️ Trans Fat:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.trans_fat | join(", ") }}
+                </div>
             </div>
             {% endif %}
 
             {% if result.matched_ingredients.excitotoxins %}
-            <div class="ingredient-category category-danger">
+            <div class="ingredient-category risky-ingredients">
                 <div class="category-title">⚠️ Excitotoxins:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.excitotoxins | join(", ") }}</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.excitotoxins | join(", ") }}
+                </div>
             </div>
             {% endif %}
 
-            <!-- Moderate Risk Ingredients -->
             {% if result.matched_ingredients.corn %}
-            <div class="ingredient-category category-caution">
+            <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">🌽 Corn-based:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.corn | join(", ") }}</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.corn | join(", ") }}
+                </div>
             </div>
             {% endif %}
 
             {% if result.matched_ingredients.sugar %}
-            <div class="ingredient-category category-caution">
+            <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">🍯 Sugars:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.sugar | join(", ") }}</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar | join(", ") }}
+                </div>
             </div>
             {% endif %}
 
             {% if result.matched_ingredients.gmo %}
-            <div class="ingredient-category category-caution">
+            <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">🧬 GMO:</div>
-                <div class="ingredient-list">{{ result.matched_ingredients.gmo | join(", ") }}</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
             </div>
             {% endif %}
-            {% endif %}
+        </div>
+        {% else %}
+        <div class="try-again-message">
+            Couldn't read ingredients clearly. Try better lighting and hold steady.
         </div>
         {% endif %}
-
-        <!-- Error Display -->
-        {% if error %}
-        <div class="notification error" id="errorNotification">
-            {{ error }}
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Subscription Modal -->
-    {% if trial_expired and not session.get('is_premium') %}
-    <div class="subscription-modal" id="subscriptionModal">
-        <div class="modal-content">
-            <h2>🔒 Trial Expired</h2>
-            <p>Your 48-hour free trial has ended.</p>
-            <div class="price">$2.99/month</div>
-            <ul class="features-list">
-                <li>✅ Unlimited ingredient scans</li>
-                <li>✅ Advanced health analysis</li>
-                <li>✅ Personalized recommendations</li>
-                <li>✅ Cancel anytime</li>
-            </ul>
-            <button class="subscribe-button" onclick="createCheckoutSession()">
-                Subscribe Now
-            </button>
-        </div>
     </div>
     {% endif %}
 
     <script>
-        // Stripe initialization
-        {% if stripe_publishable_key %}
-        const stripe = Stripe('{{ stripe_publishable_key }}');
-        {% endif %}
+        // Global variables
+        let scansUsed = {{ session.get('scans_used', 0) }};
+        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
+        let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
-        // Scanner functionality
-        const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
-        const video = document.getElementById("webcam");
-        const canvas = document.getElementById("snapshot");
+        // Enhanced Emoji Shower System
+        const emojiShower = {
+            container: null,
+            isActive: false,
+            emojiImages: {
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png'
+            },
 
-        function startScan() {
-            {% if trial_expired and not session.get('is_premium') %}
-            showNotification('Please subscribe to continue scanning', 'warning');
-            return;
+            init() {
+                this.container = document.getElementById('emojiShower');
+            },
+
+            start(type, duration = 4000) {
+                if (!type || this.isActive) return;
+                
+                this.isActive = true;
+                const emojiImage = this.emojiImages[type];
+                
+                if (!emojiImage) {
+                    this.isActive = false;
+                    return;
+                }
+                
+                console.log(`🎊 Starting enhanced ${type} emoji shower`);
+                
+                // More frequent emoji creation for denser shower
+                const interval = setInterval(() => {
+                    this.createEmoji(emojiImage);
+                }, 200); // Faster creation rate
+
+                // Also create bursts of emojis
+                let burstCount = 0;
+                const burstInterval = setInterval(() => {
+                    if (burstCount >= 3) {
+                        clearInterval(burstInterval);
+                        return;
+                    }
+                    
+                    // Create burst of 3-5 emojis
+                    for (let i = 0; i < 3 + Math.random() * 3; i++) {
+                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
+                    }
+                    burstCount++;
+                }, 1000);
+
+                // Stop after duration
+                setTimeout(() => {
+                    clearInterval(interval);
+                    clearInterval(burstInterval);
+                    this.isActive = false;
+                    
+                    // Clean up after additional 6 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 6000);
+                }, duration);
+            },
+
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
+                emoji.className = 'emoji';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
+                
+                // More varied horizontal positions
+                emoji.style.left = (Math.random() * 120 - 10) + '%';
+                
+                // Varied animation duration (3-7 seconds)
+                const duration = 3 + Math.random() * 4;
+                emoji.style.animationDuration = duration + 's';
+                
+                // Enhanced horizontal drift
+                const drift = (Math.random() - 0.5) * 300;
+                emoji.style.setProperty('--drift', drift + 'px');
+                
+                // More size variety (35-55px)
+                const size = 35 + Math.random() * 20;
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
+                // Random delay for staggered effect
+                const delay = Math.random() * 1000;
+                emoji.style.animationDelay = delay + 'ms';
+                
+                this.container.appendChild(emoji);
+                
+                // Remove emoji after animation completes
+                setTimeout(() => {
+                    if (emoji.parentNode) {
+                        emoji.parentNode.removeChild(emoji);
+                    }
+                }, (duration * 1000) + delay + 1000);
+            },
+
+            cleanup() {
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
+                }
+                console.log('🧹 Enhanced emoji shower cleaned up');
+            }
+        };
+
+        // Initialize emoji shower on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            emojiShower.init();
+            
+            // Trigger enhanced emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 5000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 4000);
+                {% elif "Safe" in result.rating %}
+                emojiShower.start('safe', 4500);
+                {% endif %}
+            }, 400);
             {% endif %}
+        });
 
+        function handleScanClick() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
+                return;
+            }
+
+            triggerScanner();
+        }
+
+        function triggerScanner() {
+            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+            
             if (isPhone) {
                 document.getElementById("fileInput").click();
             } else {
-                // Desktop camera capture
-                video.style.display = "block";
-                navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: { ideal: "environment" }
-                    } 
-                })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                    video.play();
-                    setTimeout(() => capture(), 1500);
-                })
-                .catch(function(error) {
-                    console.error('Camera error:', error);
-                    document.getElementById("fileInput").click();
-                });
+                startWebcam();
             }
         }
 
-        function capture() {
-            const form = document.getElementById("uploadForm");
+        function handleFileSelected() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                alert('🔒 Trial expired! Please upgrade to continue scanning.');
+                return;
+            }
+
+            showLoading();
+            scansUsed++;
+            updateScanCount();
+            document.getElementById('uploadForm').submit();
+        }
+
+        function startWebcam() {
+            const video = document.getElementById("webcam");
+            video.style.display = "block";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    setTimeout(() => capturePhoto(), 2000);
+                })
+                .catch(function(err) {
+                    console.error("Camera error:", err);
+                    alert("📷 Camera access denied. Please use file upload.");
+                    video.style.display = "none";
+                });
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
             
             canvas.toBlob(function (blob) {
                 const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
                 const container = new DataTransfer();
                 container.items.add(file);
-                const input = document.getElementById("fileInput");
-                input.files = container.files;
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    alert('🔒 Trial expired! Please upgrade to continue scanning.');
+                    return;
+                }
+
+                showLoading();
+                scansUsed++;
+                updateScanCount();
                 form.submit();
-            }, "image/jpeg");
+            }, "image/jpeg", 0.8);
         }
 
-        // Subscription functionality
-        async function createCheckoutSession() {
-            const button = event.target;
-            button.disabled = true;
-            button.innerHTML = '<div class="loading"></div>Processing...';
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('scanButton').style.display = 'none';
+        }
 
-            try {
-                {% if stripe_publishable_key %}
-                const response = await fetch('/create-checkout-session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ plan: 'monthly' })
-                });
-
-                const data = await response.json();
-                if (data.checkout_url) {
-                    window.location.href = data.checkout_url;
-                } else {
-                    throw new Error(data.error || 'Failed to create checkout session');
-                }
-                {% else %}
-                showNotification('Stripe not configured. Contact support.', 'error');
-                {% endif %}
-            } catch (error) {
-                console.error('Checkout error:', error);
-                showNotification('Payment failed. Please try again.', 'error');
-                button.disabled = false;
-                button.innerHTML = 'Subscribe Now';
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = true;
             }
         }
 
-        // Notification system
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 5000);
-        }
-
-        // Auto-hide error notifications
-        document.addEventListener('DOMContentLoaded', function() {
-            const errorNotification = document.getElementById('errorNotification');
-            if (errorNotification) {
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
                 setTimeout(() => {
-                    errorNotification.style.display = 'none';
-                }, 5000);
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 600);
             }
         });
-
-        // Handle successful payment redirect
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('subscription') === 'success' || window.location.pathname === '/success') {
-            showNotification('🎉 Subscription activated! Enjoy unlimited scanning!', 'success');
-        }
     </script>
 </body>
 </html>
