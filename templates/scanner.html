@@ -389,8 +389,118 @@
       </div>
     </div>
 
-    <!-- Results section (same as original) -->
-    <div id="resultsContainer"></div>
+    <!-- Results section -->
+    {% if result %}
+    <div
+      class="result {% if 'TRY AGAIN' in result.rating %}try-again {% elif 'Danger' in result.rating %}danger {% elif 'Proceed' in result.rating %}caution {% else %}safe{% endif %}"
+    >
+      {% if "TRY AGAIN" in result.rating or "Error" in result.rating %}
+      <div class="try-again-header">↪️ TRY AGAIN</div>
+      <p>
+        We couldn't clearly read the ingredients. Please try taking a clearer
+        photo with better lighting.
+      </p>
+
+      {% else %}
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+        "
+      >
+        {% if "Danger" in result.rating %}
+        <img src="/static/danger.png" alt="Danger Emoji" width="50" />
+        <h2 style="color: #b30000; margin: 0">Oh NOOOO! Danger!</h2>
+        {% elif "Proceed" in result.rating %}
+        <img src="/static/carefully.png" alt="Caution Emoji" width="50" />
+        <h2 style="color: #e69500; margin: 0">Proceed carefully</h2>
+        {% else %}
+        <img src="/static/safe.png" alt="Safe Emoji" width="50" />
+        <h2 style="color: #2a7f2a; margin: 0">Yay! Safe!</h2>
+        {% endif %}
+      </div>
+
+      <h3>Detected Ingredients:</h3>
+
+      <!-- Show safe ingredients when food is safe -->
+      {% if result.matched_ingredients.safe_ingredients %}
+      <div class="ingredient-category">
+        <div class="category-title safe-ingredients">✅ Safe Ingredients:</div>
+        <div class="ingredient-list safe-ingredients">
+          {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Show risky ingredients when found -->
+      {% if result.matched_ingredients.trans_fat %}
+      <div class="ingredient-category">
+        <div class="category-title risky-ingredients">⚠️ Trans Fat:</div>
+        <div class="ingredient-list risky-ingredients">
+          {{ result.matched_ingredients.trans_fat | join(", ") }}
+        </div>
+      </div>
+      {% endif %} {% if result.matched_ingredients.excitotoxins %}
+      <div class="ingredient-category">
+        <div class="category-title risky-ingredients">⚠️ Excitotoxins:</div>
+        <div class="ingredient-list risky-ingredients">
+          {{ result.matched_ingredients.excitotoxins | join(", ") }}
+        </div>
+      </div>
+      {% endif %} {% if result.matched_ingredients.corn %}
+      <div class="ingredient-category">
+        <div class="category-title moderate-ingredients">🌽 Corn-based:</div>
+        <div class="ingredient-list moderate-ingredients">
+          {{ result.matched_ingredients.corn | join(", ") }}
+        </div>
+      </div>
+      {% endif %} {% if result.matched_ingredients.sugar %}
+      <div class="ingredient-category">
+        <div class="category-title moderate-ingredients">🍯 Sugars:</div>
+        <div class="ingredient-list moderate-ingredients">
+          {{ result.matched_ingredients.sugar | join(", ") }}
+        </div>
+      </div>
+      {% endif %} {% if result.matched_ingredients.gmo %}
+      <div class="ingredient-category">
+        <div class="category-title moderate-ingredients">🧬 GMO:</div>
+        <div class="ingredient-list moderate-ingredients">
+          {{ result.matched_ingredients.gmo | join(", ") }}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Show all detected ingredients if none in specific categories -->
+      {% if not result.matched_ingredients.safe_ingredients and not
+      result.matched_ingredients.trans_fat and not
+      result.matched_ingredients.excitotoxins and not
+      result.matched_ingredients.corn and not result.matched_ingredients.sugar
+      and not result.matched_ingredients.gmo %}
+      <div class="ingredient-category">
+        <div class="category-title">📋 All Detected:</div>
+        <div class="ingredient-list">
+          {% if result.matched_ingredients.all_detected %} {{
+          result.matched_ingredients.all_detected | join(", ") }} {% else %} No
+          ingredients clearly detected. Try taking a clearer photo. {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="badge" id="scanBadge"></div>
+      <p id="funTip"></p>
+      {% endif %}
+
+      <!-- Debug information (optional - remove in production) -->
+      {% if result.confidence %}
+      <div class="debug-info">
+        Confidence: {{ result.confidence }} | Text Length: {{
+        result.extracted_text_length }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
 
     <script>
       // Stripe configuration
