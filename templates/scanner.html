@@ -38,30 +38,32 @@
         }
 
         .emoji {
-            position: fixed;
+            position: absolute;
             width: 45px;
             height: 45px;
             opacity: 0.95;
-            animation: fall 8s linear forwards;
+            animation: enhancedFall linear infinite;
             user-select: none;
             border-radius: 50%;
             filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
         }
 
-        @keyframes fall {
-        0% {
-          transform: translateY(-80px) rotate(0deg);
-          opacity: 0;
-        }
-        10% {
-          opacity: 1;
-        }
-        90% {
-          opacity: 0.8;
-        }
-        100% {
-          transform: translateY(120vh) rotate(720deg);
-          opacity: 0;
+        @keyframes enhancedFall {
+            0% {
+                transform: translateY(-120px) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(-80px) rotate(36deg) scale(1);
+            }
+            90% {
+                opacity: 0.8;
+                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
+            }
+            100% {
+                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
+                opacity: 0;
             }
         }
 
@@ -100,15 +102,15 @@
 
         /* Header Styling */
         .app-header {
-            margin-bottom: 8px;
+            margin-bottom: 16px;        /* Reduced from 28px */
         }
 
         .app-logo {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 3px;
-            margin-bottom: 8px;
+            gap: 12px;
+            margin-bottom: 6px;         /* Reduced from 8px */
         }
 
         .logo-text {
@@ -129,24 +131,28 @@
 
         /* Scanner Icon */
         .scanner-section {
-            margin: 12px 0 16px 0; 
+            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
         }
 
         .scan-icon-container {
             position: relative;
             display: inline-block;
-            margin-bottom: 20px;
+            margin-bottom: 12px;        /* Reduced from 20px */
         }
 
         .scan-icon {
-            width: 300px;
-        cursor: pointer;
-        margin: 1.5em;
-        transition: transform 0.2s ease;
+            width: 200px;        /* Increased from 140px for bigger image */
+            height: 200px;       /* Increased from 140px for bigger image */
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 20px;
+            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
+            object-fit: contain;  /* Ensures proper aspect ratio */
         }
 
         .scan-icon:hover {
-            transform: scale(1.1);
+            transform: scale(1.05);
+            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
         }
 
         .scan-icon:active {
@@ -154,7 +160,28 @@
         }
 
         /* Scan Pulse Effect */
-        
+        .scan-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 220px;        /* Adjusted to match new larger icon size */
+            height: 220px;       /* Adjusted to match new larger icon size */
+            border: 3px solid rgba(233, 30, 99, 0.3);
+            border-radius: 20px;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+            }
+        }
 
         /* Trial Status */
         .trial-status {
@@ -429,12 +456,20 @@
         /* Mobile Responsiveness */
         @media (max-width: 480px) {
             body {
-                padding: 15px 10px;
+                padding: 12px 8px;      /* Reduced from 15px 10px */
             }
             
             .app-container {
-                padding: 24px 20px;
-                margin: 0 5px 15px 5px;
+                padding: 20px 18px;     /* Reduced from 24px 20px */
+                margin: 0 3px 12px 3px; /* Reduced margins */
+            }
+
+            .app-header {
+                margin-bottom: 12px;    /* Reduced from default */
+            }
+
+            .scanner-section {
+                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
             }
 
             .logo-text {
@@ -442,13 +477,13 @@
             }
 
             .scan-icon {
-                width: 120px;        /* Slightly smaller on mobile */
-                height: 120px;       /* Slightly smaller on mobile */
+                width: 160px;        /* Larger on mobile too */
+                height: 160px;       /* Larger on mobile too */
             }
 
             .scan-pulse {
-                width: 140px;        /* Adjusted for mobile */
-                height: 140px;       /* Adjusted for mobile */
+                width: 180px;        /* Adjusted for mobile */
+                height: 180px;       /* Adjusted for mobile */
             }
 
             .emoji {
@@ -489,7 +524,7 @@
         <div class="scanner-section">
             <div class="scan-icon-container">
                 <div class="scan-pulse"></div>
-                <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
 
