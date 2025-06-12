@@ -5,23 +5,27 @@
     <meta charset="UTF-8" />
     <title>FoodFixr Scanner</title>
     <style>
-        body {
+        * {
             margin: 0;
-            padding: 1em;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: "Segoe UI", sans-serif;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             overflow-x: hidden;
             text-align: center;
-            box-sizing: border-box;
             min-height: 100vh;
             position: relative;
+            padding: 20px 15px;
         }
 
-        /* Emoji Shower Styles */
+        /* Enhanced Emoji Shower Styles */
         .emoji-shower {
             position: fixed;
             top: 0;
@@ -35,153 +39,269 @@
 
         .emoji {
             position: absolute;
-            width: 40px;
-            height: 40px;
-            opacity: 0.9;
-            animation: fall linear infinite;
+            width: 45px;
+            height: 45px;
+            opacity: 0.95;
+            animation: enhancedFall linear infinite;
             user-select: none;
             border-radius: 50%;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
         }
 
-        @keyframes fall {
+        @keyframes enhancedFall {
             0% {
-                transform: translateY(-100px) rotate(0deg);
+                transform: translateY(-120px) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            10% {
                 opacity: 1;
+                transform: translateY(-80px) rotate(36deg) scale(1);
+            }
+            90% {
+                opacity: 0.8;
+                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
             }
             100% {
-                transform: translateY(calc(100vh + 100px)) rotate(360deg);
+                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
                 opacity: 0;
             }
         }
 
-        /* Pulse animation for result display */
-        .result-pulse {
-            animation: pulse 0.6s ease-in-out;
+        /* Floating animation for result display */
+        .result-float {
+            animation: floatIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes floatIn {
+            0% {
+                transform: translateY(60px) scale(0.9);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Main App Container */
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 32px 24px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 
+                0 20px 60px rgba(233, 30, 99, 0.15),
+                0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            margin-bottom: 20px;
+        }
+
+        /* Header Styling */
+        .app-header {
+            margin-bottom: 28px;
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .logo-text {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+
+        .app-subtitle {
+            font-size: 15px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Scanner Icon */
+        .scanner-section {
+            margin: 32px 0;
+        }
+
+        .scan-icon-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .scan-icon {
+            width: 120px;
+            height: 120px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 20px;
+            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
+        }
+
+        .scan-icon:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
+        }
+
+        .scan-icon:active {
+            transform: scale(0.98);
+        }
+
+        /* Scan Pulse Effect */
+        .scan-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 140px;
+            height: 140px;
+            border: 3px solid rgba(233, 30, 99, 0.3);
+            border-radius: 20px;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
             0% {
-                transform: scale(0.9);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.05);
-            }
-            100% {
-                transform: scale(1);
+                transform: translate(-50%, -50%) scale(1);
                 opacity: 1;
             }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+            }
         }
 
-        .scanner-container {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 400px;
-            width: 100%;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .scanner-header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .app-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .scan-icon {
-            width: 380px;
-            height: 380px;
-            margin: 20px auto;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            border-radius: 15px;
-        }
-
-        .scan-icon:hover {
-            transform: scale(1.1);
-        }
-
+        /* Trial Status */
         .trial-status {
-            background: linear-gradient(135deg, #e8f5e8, #f0f8e8);
-            border-radius: 15px;
-            padding: 15px;
-            margin: 15px 0;
-            text-align: center;
+            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+            border-radius: 16px;
+            padding: 18px;
+            margin: 24px 0;
             border: 2px solid #4CAF50;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trial-status::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .trial-status:hover::before {
+            left: 100%;
         }
 
         .trial-status.expired {
-            background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
-            border-color: #e17055;
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-color: #ff9800;
         }
 
         .trial-title {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
             color: #2e7d32;
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .trial-status.expired .trial-title {
-            color: #d63031;
+            color: #f57c00;
         }
 
         .trial-info {
             font-size: 14px;
             color: #555;
-            margin: 5px 0;
+            font-weight: 500;
         }
 
+        /* Modern Scan Button */
         .scan-button {
-            background: linear-gradient(135deg, #e91e63, #f06292);
+            background: linear-gradient(135deg, #e91e63, #ad1457);
             color: white;
-            padding: 15px 30px;
+            padding: 18px 32px;
             border: none;
-            border-radius: 50px;
+            border-radius: 16px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
             width: 100%;
-            margin: 15px 0;
-            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
-            transition: all 0.3s ease;
+            margin: 20px 0;
+            box-shadow: 
+                0 8px 24px rgba(233, 30, 99, 0.4),
+                0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scan-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .scan-button:hover::before {
+            left: 100%;
         }
 
         .scan-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 32px rgba(233, 30, 99, 0.5),
+                0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .scan-button:active {
+            transform: translateY(-1px);
         }
 
         .scan-button:disabled {
-            background: #ccc;
+            background: linear-gradient(135deg, #bdbdbd, #9e9e9e);
             cursor: not-allowed;
             transform: none;
-            box-shadow: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
+        /* Enhanced Loading State */
         .loading {
             display: none;
-            padding: 20px;
+            padding: 24px;
             text-align: center;
         }
 
         .spinner {
-            border: 4px solid #f3f3f3;
+            border: 4px solid rgba(233, 30, 99, 0.1);
             border-top: 4px solid #e91e63;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 16px;
         }
 
         @keyframes spin {
@@ -189,85 +309,213 @@
             100% { transform: rotate(360deg); }
         }
 
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        /* Enhanced Results */
         .result {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(6px);
-            border-radius: 12px;
-            padding: 1.5em;
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 28px;
             width: 100%;
-            max-width: 650px;
-            margin-top: 2em;
-            box-shadow: 0 9px 20px rgba(0, 0, 0, 0.1);
+            max-width: 420px;
+            margin-top: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.08),
+                0 8px 32px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             z-index: 1;
         }
 
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .result-header.safe {
+            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+        }
+
+        .result-header.caution {
+            background: linear-gradient(135deg, #fff8e1, #ffecb3);
+        }
+
+        .result-header.danger {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+        }
+
+        .result-emoji {
+            width: 56px;
+            height: 56px;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+        }
+
+        .result-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0;
+        }
+
+        .result-title.safe { color: #2e7d32; }
+        .result-title.caution { color: #f57c00; }
+        .result-title.danger { color: #c62828; }
+
+        .ingredients-section {
+            margin-top: 24px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
         .ingredient-category {
-            margin-bottom: 1em;
+            margin-bottom: 16px;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: left;
         }
 
         .category-title {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.3em;
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 15px;
         }
 
         .ingredient-list {
-            color: #666;
-            margin-left: 1em;
-            font-style: italic;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-left: 8px;
         }
 
         .safe-ingredients {
-            color: #2a7f2a;
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid #4CAF50;
         }
+        .safe-ingredients .category-title { color: #2e7d32; }
+        .safe-ingredients .ingredient-list { color: #388e3c; }
 
         .risky-ingredients {
-            color: #b30000;
+            background: rgba(244, 67, 54, 0.1);
+            border-left: 4px solid #f44336;
         }
+        .risky-ingredients .category-title { color: #c62828; }
+        .risky-ingredients .ingredient-list { color: #d32f2f; }
 
         .moderate-ingredients {
-            color: #e69500;
+            background: rgba(255, 152, 0, 0.1);
+            border-left: 4px solid #ff9800;
+        }
+        .moderate-ingredients .category-title { color: #f57c00; }
+        .moderate-ingredients .ingredient-list { color: #ef6c00; }
+
+        .try-again-message {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 2px solid #ff9800;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            font-size: 16px;
+            color: #ef6c00;
+            font-weight: 600;
         }
 
         .error-message {
-            background: #ffebee;
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
             color: #c62828;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
+            padding: 18px;
+            border-radius: 12px;
+            margin: 20px 0;
             border-left: 4px solid #f44336;
+            font-weight: 600;
         }
 
+        /* Hidden Elements */
         video, canvas, form {
             display: none;
         }
 
+        /* Mobile Responsiveness */
         @media (max-width: 480px) {
-            .scanner-container {
-                padding: 20px;
-                margin: 10px;
+            body {
+                padding: 15px 10px;
+            }
+            
+            .app-container {
+                padding: 24px 20px;
+                margin: 0 5px 15px 5px;
+            }
+
+            .logo-text {
+                font-size: 28px;
+            }
+
+            .scan-icon {
+                width: 100px;
+                height: 100px;
+            }
+
+            .scan-pulse {
+                width: 120px;
+                height: 120px;
             }
 
             .emoji {
-                width: 30px;
-                height: 30px;
+                width: 35px;
+                height: 35px;
+            }
+
+            .result {
+                margin-top: 20px;
+                padding: 24px 20px;
+            }
+
+            .result-emoji {
+                width: 48px;
+                height: 48px;
+            }
+
+            .result-title {
+                font-size: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Emoji Shower Container -->
+    <!-- Enhanced Emoji Shower Container -->
     <div class="emoji-shower" id="emojiShower"></div>
 
-    <div class="scanner-container">
-        <!-- Header -->
-        <div class="scanner-header">
-            <div class="app-title">🔍 FoodFixr Scanner</div>
-            <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+    <div class="app-container">
+        <!-- Modern Header -->
+        <div class="app-header">
+            <div class="app-logo">
+                <div class="logo-text">FOOD FIXR</div>
+            </div>
+            <div class="app-subtitle">Smart Ingredient Scanner</div>
         </div>
 
-        <!-- Trial Status -->
+        <!-- Scanner Section -->
+        <div class="scanner-section">
+            <div class="scan-icon-container">
+                <div class="scan-pulse"></div>
+                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+            </div>
+        </div>
+
+        <!-- Enhanced Trial Status -->
         <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
             <div class="trial-title" id="trialTitle">
                 {% if session.get('is_premium') %}
@@ -280,7 +528,7 @@
             </div>
             {% if not session.get('is_premium') %}
             <div class="trial-info">
-                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 | 
+                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
                 Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
             </div>
             {% endif %}
@@ -293,25 +541,25 @@
         </div>
         {% endif %}
 
-        <!-- Scan Button -->
+        <!-- Enhanced Scan Button -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
-                 SCAN INGREDIENTS
+                📸 SCAN INGREDIENTS
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
-                SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
+                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
 
-        <!-- Loading State -->
+        <!-- Enhanced Loading State -->
         <div class="loading" id="loadingState">
             <div class="spinner"></div>
-            <div> Analyzing ingredients...</div>
+            <div class="loading-text">🔬 Analyzing ingredients...</div>
         </div>
     </div>
 
-    <!-- Forms -->
+    <!-- Hidden Forms -->
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileSelected()" />
     </form>
@@ -323,82 +571,92 @@
     <video id="webcam" autoplay playsinline></video>
     <canvas id="snapshot"></canvas>
 
-    <!-- Results -->
+    <!-- Enhanced Results -->
     {% if result %}
-    <div class="result result-pulse">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-            {% if "Danger" in result.rating %}
-            <img src="/static/danger.png" alt="Danger" width="50" />
-            <h2 style="color: #b30000; margin: 0">Oh NOOOO! Danger!</h2>
-            {% elif "Proceed" in result.rating %}
-            <img src="/static/carefully.png" alt="Caution" width="50" />
-            <h2 style="color: #e69500; margin: 0">Proceed carefully</h2>
-            {% elif "TRY AGAIN" in result.rating %}
-            <h2 style="color: #ff6b35; margin: 0">↪️ TRY AGAIN</h2>
-            {% else %}
-            <img src="/static/safe.png" alt="Safe" width="50" />
-            <h2 style="color: #2a7f2a; margin: 0">Yay! Safe!</h2>
-            {% endif %}
+    <div class="result result-float">
+        {% if "Danger" in result.rating %}
+        <div class="result-header danger">
+            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+            <h2 class="result-title danger">Oh NOOOO! Danger!</h2>
         </div>
+        {% elif "Proceed" in result.rating %}
+        <div class="result-header caution">
+            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+            <h2 class="result-title caution">Proceed carefully</h2>
+        </div>
+        {% elif "TRY AGAIN" in result.rating %}
+        <div class="result-header caution">
+            <h2 class="result-title caution">↪️ TRY AGAIN</h2>
+        </div>
+        {% else %}
+        <div class="result-header safe">
+            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+            <h2 class="result-title safe">Yay! Safe!</h2>
+        </div>
+        {% endif %}
 
         {% if "TRY AGAIN" not in result.rating %}
-        <h3>Detected Ingredients:</h3>
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
 
-        {% if result.matched_ingredients.safe_ingredients %}
-        <div class="ingredient-category">
-            <div class="category-title safe-ingredients">✅ Safe Ingredients:</div>
-            <div class="ingredient-list safe-ingredients">
-                {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+            {% if result.matched_ingredients.safe_ingredients %}
+            <div class="ingredient-category safe-ingredients">
+                <div class="category-title">✅ Safe Ingredients:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.safe_ingredients | join(", ") }}
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        {% if result.matched_ingredients.trans_fat %}
-        <div class="ingredient-category">
-            <div class="category-title risky-ingredients">⚠️ Trans Fat:</div>
-            <div class="ingredient-list risky-ingredients">
-                {{ result.matched_ingredients.trans_fat | join(", ") }}
+            {% if result.matched_ingredients.trans_fat %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">⚠️ Trans Fat:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.trans_fat | join(", ") }}
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        {% if result.matched_ingredients.excitotoxins %}
-        <div class="ingredient-category">
-            <div class="category-title risky-ingredients">⚠️ Excitotoxins:</div>
-            <div class="ingredient-list risky-ingredients">
-                {{ result.matched_ingredients.excitotoxins | join(", ") }}
+            {% if result.matched_ingredients.excitotoxins %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">⚠️ Excitotoxins:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.excitotoxins | join(", ") }}
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        {% if result.matched_ingredients.corn %}
-        <div class="ingredient-category">
-            <div class="category-title moderate-ingredients">🌽 Corn-based:</div>
-            <div class="ingredient-list moderate-ingredients">
-                {{ result.matched_ingredients.corn | join(", ") }}
+            {% if result.matched_ingredients.corn %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">🌽 Corn-based:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.corn | join(", ") }}
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        {% if result.matched_ingredients.sugar %}
-        <div class="ingredient-category">
-            <div class="category-title moderate-ingredients">🍯 Sugars:</div>
-            <div class="ingredient-list moderate-ingredients">
-                {{ result.matched_ingredients.sugar | join(", ") }}
+            {% if result.matched_ingredients.sugar %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">🍯 Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar | join(", ") }}
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        {% if result.matched_ingredients.gmo %}
-        <div class="ingredient-category">
-            <div class="category-title moderate-ingredients">🧬 GMO:</div>
-            <div class="ingredient-list moderate-ingredients">
-                {{ result.matched_ingredients.gmo | join(", ") }}
+            {% if result.matched_ingredients.gmo %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">🧬 GMO:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
         {% else %}
-        <p>Couldn't read ingredients clearly. Try better lighting and hold steady.</p>
+        <div class="try-again-message">
+            Couldn't read ingredients clearly. Try better lighting and hold steady.
+        </div>
         {% endif %}
     </div>
     {% endif %}
@@ -409,7 +667,7 @@
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
-        // Emoji Shower System
+        // Enhanced Emoji Shower System
         const emojiShower = {
             container: null,
             isActive: false,
@@ -417,40 +675,55 @@
                 safe: '/static/safe.png',
                 danger: '/static/danger.png',
                 caution: '/static/carefully.png'
-                // No emoji shower for "try again" - as requested
             },
 
             init() {
                 this.container = document.getElementById('emojiShower');
             },
 
-            start(type, duration = 3000) {
-                // Don't start if no type specified or if already active
+            start(type, duration = 4000) {
                 if (!type || this.isActive) return;
                 
                 this.isActive = true;
                 const emojiImage = this.emojiImages[type];
                 
-                // Only proceed if we have a valid emoji image for this type
                 if (!emojiImage) {
                     this.isActive = false;
                     return;
                 }
                 
-                // Create emoji shower
+                console.log(`🎊 Starting enhanced ${type} emoji shower`);
+                
+                // More frequent emoji creation for denser shower
                 const interval = setInterval(() => {
                     this.createEmoji(emojiImage);
-                }, 300); // Interval for creating new emojis
+                }, 200); // Faster creation rate
+
+                // Also create bursts of emojis
+                let burstCount = 0;
+                const burstInterval = setInterval(() => {
+                    if (burstCount >= 3) {
+                        clearInterval(burstInterval);
+                        return;
+                    }
+                    
+                    // Create burst of 3-5 emojis
+                    for (let i = 0; i < 3 + Math.random() * 3; i++) {
+                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
+                    }
+                    burstCount++;
+                }, 1000);
 
                 // Stop after duration
                 setTimeout(() => {
                     clearInterval(interval);
+                    clearInterval(burstInterval);
                     this.isActive = false;
                     
-                    // Clean up after additional 10 seconds
+                    // Clean up after additional 6 seconds
                     setTimeout(() => {
                         this.cleanup();
-                    }, 5000);
+                    }, 6000);
                 }, duration);
             },
 
@@ -460,36 +733,41 @@
                 emoji.src = imageSrc;
                 emoji.alt = 'emoji';
                 
-                // Random horizontal position
-                emoji.style.left = Math.random() * 100 + '%';
+                // More varied horizontal positions
+                emoji.style.left = (Math.random() * 120 - 10) + '%';
                 
-                // Random animation duration (2-6 seconds)
-                const duration = 2 + Math.random() * 4;
+                // Varied animation duration (3-7 seconds)
+                const duration = 3 + Math.random() * 4;
                 emoji.style.animationDuration = duration + 's';
                 
-                // Random horizontal drift
-                const drift = (Math.random() - 0.5) * 200;
-                emoji.style.transform = `translateX(${drift}px)`;
+                // Enhanced horizontal drift
+                const drift = (Math.random() - 0.5) * 300;
+                emoji.style.setProperty('--drift', drift + 'px');
                 
-                // Add some variety in size
-                const size = 30 + Math.random() * 20; // 30-50px
+                // More size variety (35-55px)
+                const size = 35 + Math.random() * 20;
                 emoji.style.width = size + 'px';
                 emoji.style.height = size + 'px';
                 
+                // Random delay for staggered effect
+                const delay = Math.random() * 1000;
+                emoji.style.animationDelay = delay + 'ms';
+                
                 this.container.appendChild(emoji);
                 
-                // Remove emoji after animation
+                // Remove emoji after animation completes
                 setTimeout(() => {
                     if (emoji.parentNode) {
                         emoji.parentNode.removeChild(emoji);
                     }
-                }, duration * 1000 + 1000);
+                }, (duration * 1000) + delay + 1000);
             },
 
             cleanup() {
                 while (this.container.firstChild) {
                     this.container.removeChild(this.container.firstChild);
                 }
+                console.log('🧹 Enhanced emoji shower cleaned up');
             }
         };
 
@@ -497,23 +775,21 @@
         document.addEventListener('DOMContentLoaded', function() {
             emojiShower.init();
             
-            // Trigger emoji shower if there's a result (but NOT for "TRY AGAIN")
+            // Trigger enhanced emoji shower if there's a result
             {% if result %}
             setTimeout(() => {
                 {% if "Danger" in result.rating %}
-                emojiShower.start('danger', 4000);
+                emojiShower.start('danger', 5000);
                 {% elif "Proceed" in result.rating %}
-                emojiShower.start('caution', 3000);
+                emojiShower.start('caution', 4000);
                 {% elif "Safe" in result.rating %}
-                emojiShower.start('safe', 3500);
+                emojiShower.start('safe', 4500);
                 {% endif %}
-                // Note: No emoji shower for "TRY AGAIN" as requested
-            }, 300);
+            }, 400);
             {% endif %}
         });
 
         function handleScanClick() {
-            // Check limits
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
                 alert('🔒 Trial expired! Please upgrade to continue scanning.');
                 return;
@@ -570,7 +846,6 @@
             canvas.height = video.videoHeight;
             canvas.getContext("2d").drawImage(video, 0, 0);
             
-            // Stop the video stream
             const stream = video.srcObject;
             const tracks = stream.getTracks();
             tracks.forEach(track => track.stop());
@@ -605,7 +880,6 @@
                 scansUsedElement.textContent = scansUsed;
             }
             
-            // Update button text
             const scanButton = document.getElementById('scanButton');
             if (!isPremium && scansUsed < 10) {
                 scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
@@ -621,7 +895,7 @@
             if (result) {
                 setTimeout(() => {
                     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 500);
+                }, 600);
             }
         });
     </script>
