@@ -914,6 +914,16 @@ function capturePhoto() {
                 }, 600);
             }
         });
+        // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanButton = document.getElementById('scanButton');
+            
+            // Update the button to be clickable even when trial expires
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.style.cursor = 'pointer';
+            }
+        });
     </script>
 </body>
 </html>
