@@ -1,191 +1,82 @@
-import re
-import os
+import pytesseract
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+import re
 from scanner_config import *
-
-# Check if pytesseract is available
-try:
-    import pytesseract
-    TESSERACT_AVAILABLE = True
-    print("✅ Tesseract is available")
-except ImportError:
-    TESSERACT_AVAILABLE = False
-    print("⚠️ Tesseract not available, using fallback")
 
 def preprocess_image(image):
     """Enhanced image preprocessing for better OCR accuracy"""
-    try:
-        # Convert to grayscale
-        if image.mode != 'L':
-            image = image.convert('L')
-        
-        # Resize if too large (helps with processing speed and memory)
-        max_size = 1200
-        if max(image.size) > max_size:
-            ratio = max_size / max(image.size)
-            new_size = tuple(int(dim * ratio) for dim in image.size)
-            image = image.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Enhance contrast
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1.5)
-        
-        # Enhance sharpness
-        enhancer = ImageEnhance.Sharpness(image)
-        image = enhancer.enhance(1.2)
-        
-        # Auto-level the image
-        image = ImageOps.autocontrast(image)
-        
-        return image
-    except Exception as e:
-        print(f"Image preprocessing error: {e}")
-        return image
+    # Convert to grayscale
+    if image.mode != 'L':
+        image = image.convert('L')
+    
+    # Enhance contrast
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.0)
+    
+    # Enhance sharpness
+    enhancer = ImageEnhance.Sharpness(image)
+    image = enhancer.enhance(2.0)
+    
+    # Apply slight blur to reduce noise
+    image = image.filter(ImageFilter.MedianFilter(size=3))
+    
+    # Auto-level the image
+    image = ImageOps.autocontrast(image)
+    
+    return image
 
 def correct_image_orientation(image):
     """Improved orientation correction with fallback"""
     try:
-        if TESSERACT_AVAILABLE:
-            osd = pytesseract.image_to_osd(image)
-            rotation_match = re.search(r'(?<=Rotate: )\d+', osd)
-            if rotation_match:
-                rotation_angle = int(rotation_match.group(0))
-                if rotation_angle != 0:
-                    return image.rotate(360 - rotation_angle, expand=True)
+        osd = pytesseract.image_to_osd(image)
+        rotation_match = re.search(r'(?<=Rotate: )\d+', osd)
+        if rotation_match:
+            rotation_angle = int(rotation_match.group(0))
+            if rotation_angle != 0:
+                return image.rotate(360 - rotation_angle, expand=True)
         return image
     except Exception as e:
         print(f"Orientation detection failed: {e}, using original image")
         return image
 
-def extract_text_with_tesseract(image_path):
-    """Extract text using Tesseract OCR with timeout protection"""
+def extract_text_from_image(image_path):
+    """Enhanced text extraction with multiple OCR configurations"""
     try:
         image = Image.open(image_path)
         image = correct_image_orientation(image)
         image = preprocess_image(image)
         
-        # Use optimized OCR configuration
-        config = '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.():-'
-        
         # Try multiple OCR configurations for better accuracy
         configs = [
-            config,  # Primary config
+            '--oem 3 --psm 6',  # Default: uniform block of text
             '--oem 3 --psm 8',  # Single word
             '--oem 3 --psm 7',  # Single text line
             '--oem 3 --psm 4',  # Single column of text
+            '--oem 3 --psm 3',  # Fully automatic page segmentation
         ]
         
         texts = []
-        for cfg in configs:
+        for config in configs:
             try:
-                text = pytesseract.image_to_string(image, config=cfg, timeout=20)
-                if text and text.strip():
-                    texts.append(text.strip())
-            except Exception as e:
-                print(f"OCR config failed: {e}")
+                text = pytesseract.image_to_string(image, config=config)
+                if text.strip():
+                    texts.append(text)
+            except Exception:
                 continue
         
         # Combine all extracted texts
-        combined_text = ' '.join(texts) if texts else ""
+        combined_text = ' '.join(texts)
         
         # Clean and normalize the text
         combined_text = re.sub(r'\s+', ' ', combined_text)  # Normalize whitespace
-        combined_text = re.sub(r'[^\w\s,.-]', '', combined_text)  # Remove special chars
-        combined_text = combined_text.strip()
+        combined_text = re.sub(r'[^\w\s,.-]', '', combined_text)  # Remove special chars except common punctuation
         
-        print(f"Tesseract extracted: {combined_text[:150]}...")
+        print(f"Extracted text: {combined_text[:200]}...")  # Debug output
         return combined_text
         
     except Exception as e:
-        print(f"Tesseract extraction error: {e}")
+        print(f"❌ Error reading image: {e}")
         return ""
-
-def extract_text_fallback(image_path):
-    """
-    Fallback text extraction that simulates finding realistic ingredients
-    This ensures the scanner always returns results for demo/testing
-    """
-    try:
-        print("Using fallback ingredient detection...")
-        
-        # Simulate realistic ingredient combinations based on common food types
-        ingredient_sets = [
-            # Processed foods
-            ["water", "sugar", "wheat flour", "vegetable oil", "salt", "corn syrup", "natural flavors", "preservatives"],
-            
-            # Snack foods
-            ["corn", "vegetable oil", "salt", "sugar", "natural flavors", "artificial colors", "monosodium glutamate"],
-            
-            # Baked goods
-            ["wheat flour", "sugar", "butter", "eggs", "baking powder", "vanilla extract", "salt", "milk"],
-            
-            # Canned/packaged foods
-            ["water", "tomatoes", "sugar", "salt", "citric acid", "natural flavors", "modified corn starch"],
-            
-            # Dairy products
-            ["milk", "cream", "sugar", "natural flavors", "carrageenan", "guar gum"],
-            
-            # Beverages
-            ["water", "high fructose corn syrup", "citric acid", "natural flavors", "sodium benzoate", "caffeine"],
-            
-            # Frozen foods
-            ["water", "wheat flour", "vegetable oil", "salt", "sugar", "modified food starch", "natural flavors"],
-            
-            # Condiments
-            ["water", "vinegar", "sugar", "salt", "modified corn starch", "natural flavors", "xanthan gum"]
-        ]
-        
-        # Randomly select an ingredient set
-        import random
-        selected_set = random.choice(ingredient_sets)
-        
-        # Add some randomness - remove 1-2 ingredients or add extras
-        final_ingredients = selected_set.copy()
-        
-        # Sometimes add problematic ingredients for testing
-        if random.random() < 0.3:  # 30% chance
-            problematic = random.choice([
-                "partially hydrogenated oil",
-                "high fructose corn syrup", 
-                "monosodium glutamate",
-                "artificial colors",
-                "sodium nitrite"
-            ])
-            final_ingredients.append(problematic)
-        
-        # Sometimes add more safe ingredients
-        if random.random() < 0.4:  # 40% chance
-            safe_extras = ["garlic powder", "onion powder", "spices", "herbs", "vitamin c"]
-            final_ingredients.extend(random.sample(safe_extras, random.randint(1, 2)))
-        
-        result_text = ", ".join(final_ingredients)
-        print(f"Fallback generated: {result_text}")
-        return result_text
-        
-    except Exception as e:
-        print(f"Fallback extraction error: {e}")
-        # Ultimate fallback
-        return "water, sugar, wheat flour, salt, vegetable oil, natural flavors"
-
-def extract_text_from_image(image_path):
-    """Main text extraction function with comprehensive fallback"""
-    print(f"🔍 Processing image: {os.path.basename(image_path)}")
-    
-    extracted_text = ""
-    
-    # Try Tesseract if available
-    if TESSERACT_AVAILABLE:
-        extracted_text = extract_text_with_tesseract(image_path)
-        
-        # Check if we got meaningful text
-        if extracted_text and len(extracted_text.strip()) > 10:
-            print(f"✅ Tesseract success: {len(extracted_text)} characters")
-            return extracted_text
-        else:
-            print("⚠️ Tesseract didn't extract enough text, using fallback")
-    
-    # Use fallback if Tesseract failed or unavailable
-    return extract_text_fallback(image_path)
 
 def normalize_text(text):
     """Enhanced text normalization"""
@@ -197,17 +88,13 @@ def normalize_text(text):
     # Fix common OCR errors
     ocr_corrections = {
         '0': 'o',
-        '1': 'l', 
+        '1': 'l',
         '5': 's',
         '8': 'b',
         'rn': 'm',
         'vv': 'w',
         'ii': 'll',
         'oo': '00',
-        'com ': 'corn ',
-        'natur ': 'natural ',
-        'artif ': 'artificial ',
-        'preserv ': 'preservative ',
     }
     
     for wrong, correct in ocr_corrections.items():
@@ -258,8 +145,31 @@ def fuzzy_match_ingredient(text, ingredient_list):
     
     return matches
 
+def get_ingredient_variations(ingredient):
+    """Get common variations and abbreviations for ingredients"""
+    variations = [ingredient]
+    
+    # Common abbreviations and variations
+    abbreviations = {
+        'monosodium glutamate': ['msg', 'mono sodium glutamate'],
+        'high fructose corn syrup': ['hfcs', 'corn syrup high fructose'],
+        'partially hydrogenated': ['part hydrogenated', 'partially hydrog'],
+        'hydrogenated oil': ['hydrog oil', 'hydrogenated oils'],
+        'natural flavor': ['natural flavors', 'nat flavor', 'natural flavoring'],
+        'vegetable oil': ['veg oil', 'vegetable oils'],
+        'corn syrup': ['corn syr'],
+        'citric acid': ['citric'],
+        'ascorbic acid': ['ascorbic'],
+    }
+    
+    ingredient_lower = ingredient.lower()
+    if ingredient_lower in abbreviations:
+        variations.extend(abbreviations[ingredient_lower])
+    
+    return variations
+
 def match_ingredients(text):
-    """Enhanced ingredient matching that finds ALL ingredients"""
+    """Enhanced ingredient matching that finds ALL ingredients, not just risky ones"""
     if not text:
         return {
             "trans_fat": [],
@@ -270,8 +180,6 @@ def match_ingredients(text):
             "safe_ingredients": [],
             "all_detected": []
         }
-    
-    print(f"🔬 Analyzing text: {text[:100]}...")
     
     # Use precise matching for each category
     trans_fat_matches = fuzzy_match_ingredient(text, trans_fat_high_risk + trans_fat_moderate_risk)
@@ -287,8 +195,7 @@ def match_ingredients(text):
         "tomatoes", "cheese", "cream", "vanilla", "cinnamon", "pepper", "herbs",
         "spices", "whole wheat", "brown rice", "quinoa", "almonds", "nuts",
         "coconut", "cocoa", "chocolate", "vanilla extract", "baking soda",
-        "baking powder", "yeast", "honey", "maple syrup", "sea salt", "iodized salt",
-        "garlic powder", "onion powder", "paprika", "oregano", "basil"
+        "baking powder", "yeast", "honey", "maple syrup", "sea salt", "iodized salt"
     ]
     
     safe_matches = fuzzy_match_ingredient(text, safe_ingredients)
@@ -296,15 +203,6 @@ def match_ingredients(text):
     # Combine all detected ingredients
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
                            sugar_matches + gmo_matches + safe_matches))
-    
-    print(f"📊 Found ingredients:")
-    print(f"  • Trans fat: {trans_fat_matches}")
-    print(f"  • Excitotoxins: {excitotoxin_matches}")
-    print(f"  • Corn: {corn_matches}")
-    print(f"  • Sugar: {sugar_matches}")
-    print(f"  • GMO: {gmo_matches}")
-    print(f"  • Safe: {safe_matches}")
-    print(f"  • Total: {len(all_detected)} ingredients")
     
     return {
         "trans_fat": list(set(trans_fat_matches)),
@@ -346,7 +244,6 @@ def rate_ingredients(matches, text_quality):
     
     # If any TOP 5 dangerous ingredients found, return danger immediately
     if top5_danger_found:
-        print(f"🚨 DANGER: Found top 5 dangerous ingredients: {top5_danger_found}")
         return "🚨 Oh NOOOO! Danger!"
     
     # Count all problematic ingredients (not including safe ingredients)
@@ -361,8 +258,6 @@ def rate_ingredients(matches, text_quality):
         total_problematic_count += len(matches["sugar"])
     if matches["gmo"]:
         total_problematic_count += len(matches["gmo"])
-    
-    print(f"⚖️ Total problematic ingredients: {total_problematic_count}")
     
     # NEW LOGIC: 3+ problematic ingredients = danger, 1-2 = caution
     if total_problematic_count >= 3:
@@ -403,76 +298,14 @@ def assess_text_quality(text):
     
     return "good"
 
-def get_emoji_shower_type(rating):
-    """Determine emoji shower type based on rating - returns None for TRY AGAIN"""
-    if "TRY AGAIN" in rating:
-        return None  # No emoji shower for try again
-    elif "Danger" in rating or "NOOOO" in rating:
-        return "danger"
-    elif "Proceed carefully" in rating or "carefully" in rating:
-        return "caution"
-    elif "Safe" in rating or "Yay" in rating:
-        return "safe"
-    else:
-        return None
-
-def get_emoji_shower_config(emoji_shower_type):
-    """Get emoji shower configuration based on type"""
-    if not emoji_shower_type:
-        return None
-    
-    configs = {
-        "safe": {
-            "type": "safe",
-            "duration": 3500,
-            "intensity": "medium",
-            "emoji_path": "/static/safe.png",
-            "message": "Celebrating safe ingredients! 🎉"
-        },
-        "caution": {
-            "type": "caution", 
-            "duration": 3000,
-            "intensity": "low",
-            "emoji_path": "/static/carefully.png",
-            "message": "Proceed with caution ⚠️"
-        },
-        "danger": {
-            "type": "danger",
-            "duration": 4000, 
-            "intensity": "high",
-            "emoji_path": "/static/danger.png",
-            "message": "Dangerous ingredients detected! 🚨"
-        }
-    }
-    
-    return configs.get(emoji_shower_type)
-
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with enhanced processing and emoji shower support"""
-    print(f"🚀 Starting ingredient scan for: {os.path.basename(image_path)}")
-    
+    """Main scanning function with enhanced processing and quality assessment"""
     try:
-        # Extract text from image
         text = extract_text_from_image(image_path)
-        print(f"📝 Extracted text length: {len(text)}")
-        
-        # Assess text quality
         text_quality = assess_text_quality(text)
-        print(f"🎯 Text quality: {text_quality}")
         
-        # Match ingredients
         matches = match_ingredients(text)
-        
-        # Rate the ingredients
         rating = rate_ingredients(matches, text_quality)
-        print(f"🏆 Final rating: {rating}")
-        
-        # Determine emoji shower type and configuration
-        emoji_shower_type = get_emoji_shower_type(rating)
-        emoji_shower_config = get_emoji_shower_config(emoji_shower_type)
-        print(f"🎊 Emoji shower type: {emoji_shower_type}")
-        if emoji_shower_config:
-            print(f"🎨 Emoji config: {emoji_shower_config['message']}")
         
         # Add confidence score based on text extraction quality
         if text_quality == "very_poor":
@@ -490,35 +323,27 @@ def scan_image_for_ingredients(image_path):
             "confidence": confidence,
             "extracted_text_length": len(text),
             "text_quality": text_quality,
-            "extracted_text": text[:200] + "..." if len(text) > 200 else text,
-            "emoji_shower_type": emoji_shower_type,  # Add emoji shower type to result
-            "emoji_shower_config": emoji_shower_config  # Add full emoji configuration
+            "extracted_text": text[:200] + "..." if len(text) > 200 else text  # For debugging
         }
         
-        print(f"✅ Scan complete! Rating: {rating}, Confidence: {confidence}")
+        print(f"Scan result: {rating}, Confidence: {confidence}, Text quality: {text_quality}")
+        print(f"All detected ingredients: {matches.get('all_detected', [])}")
         return result
         
     except Exception as e:
-        print(f"❌ Critical error in scan_image_for_ingredients: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Return safe fallback result
+        print(f"❌ Error in scan_image_for_ingredients: {e}")
         return {
-            "rating": "✅ Yay! Safe!",
+            "rating": "↪️ TRY AGAIN",
             "matched_ingredients": {
                 "trans_fat": [],
                 "excitotoxins": [],
                 "corn": [],
-                "sugar": ["sugar"],
+                "sugar": [],
                 "gmo": [],
-                "safe_ingredients": ["water", "salt", "flour"],
-                "all_detected": ["water", "salt", "flour", "sugar"]
+                "safe_ingredients": [],
+                "all_detected": []
             },
-            "confidence": "medium",
-            "text_quality": "good",
-            "extracted_text_length": 25,
-            "extracted_text": "water, salt, flour, sugar",
-            "emoji_shower_type": "safe",  # Safe fallback gets safe emoji shower
-            "emoji_shower_config": get_emoji_shower_config("safe")  # Add config for fallback
+            "confidence": "very_low",
+            "text_quality": "very_poor",
+            "extracted_text_length": 0
         }
