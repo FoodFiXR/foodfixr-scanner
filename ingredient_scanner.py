@@ -312,7 +312,6 @@ def match_ingredients(text):
         "corn": list(set(corn_matches)),
         "sugar": list(set(sugar_matches)),
         "gmo": list(set(gmo_matches)),
-        "safe_ingredients": list(set(safe_matches)),
         "all_detected": all_detected
     }
 
