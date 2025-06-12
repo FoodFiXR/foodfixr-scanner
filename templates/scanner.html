@@ -804,9 +804,10 @@
 
         function handleScanClick() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                return;
-            }
+    window.location.href = 'upgrade.html';
+    return;
+}
+
 
             triggerScanner();
         }
@@ -823,8 +824,10 @@
 
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                return;
+    window.location.href = 'upgrade.html';
+    return;
+}
+
             }
 
             showLoading();
@@ -871,8 +874,10 @@
                 document.getElementById("hiddenImage").files = container.files;
                 
                 if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                    alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                    return;
+    window.location.href = 'upgrade.html';
+    return;
+}
+
                 }
 
                 showLoading();
