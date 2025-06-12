@@ -186,6 +186,11 @@ def create_checkout_session():
         data = request.get_json()
         plan = data.get('plan', 'monthly')
         
+        # Check if Stripe is configured
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
+        
         # Define pricing based on your upgrade.html plans
         prices = {
             'weekly': {
@@ -203,10 +208,20 @@ def create_checkout_session():
         }
         
         if plan not in prices:
+            print(f"ERROR: Invalid plan selected: {plan}")
             return jsonify({'error': 'Invalid plan selected'}), 400
         
         price_id = prices[plan]['price_id']
+        
+        if not price_id:
+            print(f"ERROR: No price ID configured for plan: {plan}")
+            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
+        
+        # Log for debugging
+        print(f"Creating checkout session for plan: {plan}, price_id: {price_id}")
+        
         success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
+        cancel_url = f"{DOMAIN}/upgrade"
         
         # Create checkout session
         checkout_session = stripe.checkout.Session.create(
@@ -217,7 +232,7 @@ def create_checkout_session():
             }],
             mode='subscription',
             success_url=success_url,
-            cancel_url=f"{DOMAIN}/upgrade",
+            cancel_url=cancel_url,
             metadata={
                 'user_id': session.get('user_id'),
                 'plan': plan
@@ -225,11 +240,17 @@ def create_checkout_session():
             customer_email=data.get('email') if data.get('email') else None,
         )
         
+        print(f"Checkout session created successfully: {checkout_session.id}")
         return jsonify({'checkout_url': checkout_session.url})
         
+    except stripe.error.StripeError as e:
+        print(f"Stripe error: {str(e)}")
+        return jsonify({'error': f'Payment error: {str(e)}'}), 400
     except Exception as e:
-        print(f"Stripe checkout error: {e}")
-        return jsonify({'error': 'Failed to create checkout session'}), 400
+        print(f"Unexpected error in create_checkout_session: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
 
 @app.route('/success')
 def success():
