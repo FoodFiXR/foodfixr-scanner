@@ -595,44 +595,66 @@
         }
 
         function startUpgrade() {
-            console.log(`Starting upgrade for ${selectedPlan} plan`);
-            
-            // Show loading state
-            const button = document.getElementById('upgradeButton');
-            const originalText = button.textContent;
-            
-            document.getElementById('upgradeButton').style.display = 'none';
-            document.getElementById('loadingState').style.display = 'block';
-            
-            // Create checkout session
-            fetch('/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    plan: selectedPlan
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.checkout_url) {
-                    // Redirect to Stripe checkout
-                    window.location.href = data.checkout_url;
-                } else {
-                    throw new Error(data.error || 'Failed to create checkout session');
-                }
-            })
-            .catch(error => {
-                console.error('Upgrade error:', error);
-                alert('❌ Unable to start upgrade process. Please try again.');
-                
-                // Restore button
-                document.getElementById('loadingState').style.display = 'none';
-                document.getElementById('upgradeButton').style.display = 'block';
-                button.textContent = originalText;
-            });
+    console.log(`Starting upgrade for ${selectedPlan} plan`);
+    
+    // Show loading state
+    const button = document.getElementById('upgradeButton');
+    const originalText = button.textContent;
+    
+    document.getElementById('upgradeButton').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'block';
+    
+    // Create checkout session
+    fetch('/create-checkout-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            plan: selectedPlan
+        })
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json().then(data => {
+            if (!response.ok) {
+                throw new Error(data.error || `Server error: ${response.status}`);
+            }
+            return data;
+        });
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data.checkout_url) {
+            // Redirect to Stripe checkout
+            window.location.href = data.checkout_url;
+        } else {
+            throw new Error('No checkout URL received');
         }
+    })
+    .catch(error => {
+        console.error('Upgrade error:', error);
+        
+        // Show more detailed error message
+        let errorMessage = '❌ Unable to start upgrade process. ';
+        if (error.message.includes('Payment system not configured')) {
+            errorMessage += 'The payment system is not properly configured. Please try again later or contact support.';
+        } else if (error.message.includes('Price not configured')) {
+            errorMessage += 'This plan is not available yet. Please try another plan or contact support.';
+        } else if (error.message.includes('Network')) {
+            errorMessage += 'Network error. Please check your connection and try again.';
+        } else {
+            errorMessage += error.message || 'Please try again.';
+        }
+        
+        alert(errorMessage);
+        
+        // Restore button
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('upgradeButton').style.display = 'block';
+        button.textContent = originalText;
+    });
+}
 
         // Auto-select monthly plan on load
         document.addEventListener('DOMContentLoaded', function() {
