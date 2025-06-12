@@ -1,916 +1,695 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <meta charset="UTF-8" />
-    <title>FoodFixr Scanner</title>
+    <title>Food Ingredient Scanner</title>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+      body {
+        margin: 0;
+        padding: 1em;
+        background: #e0e0e0;
+        font-family: "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        overflow-x: hidden;
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      h1 {
+        font-size: 2em;
+        margin-bottom: 0.5em;
+        text-align: center;
+      }
+
+      .barcode {
+        width: 300px;
+        cursor: pointer;
+        margin: 1.5em;
+        transition: transform 0.2s ease;
+      }
+
+      .barcode:hover {
+        transform: scale(1.1);
+      }
+
+      .scanner-text {
+        font-size: 1em;
+        color: #444;
+        margin-bottom: 1em;
+      }
+
+      .start-button {
+        background: #ff3cac;
+        color: white;
+        padding: 15px 30px;
+        border: none;
+        border-radius: 50px;
+        font-size: 1.2em;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 1em;
+        margin-bottom: 2em;
+        box-shadow: 0 4px 15px rgba(255, 60, 172, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      .start-button:hover {
+        background: #e6359a;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255, 60, 172, 0.4);
+      }
+
+      .start-button:active {
+        transform: translateY(0);
+      }
+
+      .start-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .result {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(6px);
+        border-radius: 12px;
+        padding: 0.5em;
+        width: 100%;
+        max-width: 650px;
+        margin-top: 3em;
+        box-shadow: 0 9px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin-top: 1em;
+      }
+
+      li {
+        font-size: 1em;
+        margin: 0.5em 0;
+        text-align: left;
+      }
+
+      .ingredient-category {
+        margin-bottom: 1em;
+      }
+
+      .category-title {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.3em;
+      }
+
+      .ingredient-list {
+        color: #666;
+        margin-left: 1em;
+        font-style: italic;
+      }
+
+      .safe-ingredients {
+        color: #2a7f2a;
+      }
+
+      .risky-ingredients {
+        color: #b30000;
+      }
+
+      .moderate-ingredients {
+        color: #e69500;
+      }
+
+      .shower {
+        position: fixed;
+        top: -80px;
+        width: 50px;
+        height: 50px;
+        z-index: 9999;
+        animation: fall 8s linear forwards;
+        pointer-events: none;
+        opacity: 0.9;
+      }
+
+      @keyframes fall {
+        0% {
+          transform: translateY(-80px) rotate(0deg);
+          opacity: 0;
         }
-
-        body {
-            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            overflow-x: hidden;
-            text-align: center;
-            min-height: 100vh;
-            position: relative;
-            padding: 20px 15px;
+        10% {
+          opacity: 1;
         }
-
-        /* Enhanced Emoji Shower Styles */
-        .emoji-shower {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            overflow: hidden;
+        90% {
+          opacity: 0.8;
         }
-
-        .emoji {
-            position: absolute;
-            width: 45px;
-            height: 45px;
-            opacity: 0.95;
-            animation: enhancedFall linear infinite;
-            user-select: none;
-            border-radius: 50%;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+        100% {
+          transform: translateY(120vh) rotate(720deg);
+          opacity: 0;
         }
+      }
 
-        @keyframes enhancedFall {
-            0% {
-                transform: translateY(-120px) rotate(0deg) scale(0.8);
-                opacity: 0;
-            }
-            10% {
-                opacity: 1;
-                transform: translateY(-80px) rotate(36deg) scale(1);
-            }
-            90% {
-                opacity: 0.8;
-                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
-            }
-            100% {
-                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
-                opacity: 0;
-            }
-        }
+      .scan-again {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #ff3cac;
+        color: white;
+        padding: 10px 16px;
+        border-radius: 40px;
+        font-size: 1em;
+        text-decoration: none;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
 
-        /* Floating animation for result display */
-        .result-float {
-            animation: floatIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
+      .badge {
+        margin-top: 1em;
+        font-size: 1.1em;
+        background: #fff3cd;
+        color: #856404;
+        padding: 0.75em 1em;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
 
-        @keyframes floatIn {
-            0% {
-                transform: translateY(60px) scale(0.9);
-                opacity: 0;
-            }
-            100% {
-                transform: translateY(0) scale(1);
-                opacity: 1;
-            }
-        }
+      #funTip {
+        margin-top: 1em;
+        font-size: 1em;
+        color: #006400;
+        font-style: italic;
+        line-height: 1.4;
+        padding: 0.5em;
+      }
 
-        /* Main App Container */
-        .app-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 32px 24px;
-            max-width: 380px;
-            width: 100%;
-            box-shadow: 
-                0 20px 60px rgba(233, 30, 99, 0.15),
-                0 8px 32px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 1;
-            margin-bottom: 20px;
-        }
+      video,
+      canvas {
+        display: none;
+      }
 
-        /* Header Styling */
-        .app-header {
-            margin-bottom: 16px;        /* Reduced from 28px */
-        }
+      .debug-info {
+        margin-top: 1em;
+        padding: 0.5em;
+        background: #f0f0f0;
+        border-radius: 5px;
+        font-size: 0.8em;
+        color: #666;
+      }
 
-        .app-logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 6px;         /* Reduced from 8px */
-        }
+      .try-again-header {
+        color: #ff6b35;
+        font-size: 1.5em;
+        margin-bottom: 1em;
+      }
 
-        .logo-text {
-            font-size: 32px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #e91e63, #9c27b0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: -1px;
-        }
+      /* Subscription UI Styles */
+      .subscription-banner {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1em;
+        margin: 1em 0;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        max-width: 500px;
+        width: 100%;
+      }
 
-        .app-subtitle {
-            font-size: 15px;
-            color: #666;
-            font-weight: 500;
-        }
+      .trial-status {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.8em;
+        border-radius: 8px;
+        margin-bottom: 1em;
+        font-size: 0.9em;
+      }
 
-        /* Scanner Icon */
-        .scanner-section {
-            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
-        }
+      .subscription-expired {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        color: white;
+        padding: 2em;
+        margin: 2em 0;
+        border-radius: 15px;
+        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+        max-width: 500px;
+        width: 100%;
+      }
 
-        .scan-icon-container {
-            position: relative;
-            display: inline-block;
-            margin-bottom: 12px;        /* Reduced from 20px */
-        }
+      .subscribe-button {
+        background: #4CAF50;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 25px;
+        font-size: 1.1em;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 1em;
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        transition: all 0.3s ease;
+      }
 
-        .scan-icon {
-            width: 200px;        /* Increased from 140px for bigger image */
-            height: 200px;       /* Increased from 140px for bigger image */
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            border-radius: 20px;
-            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
-            object-fit: contain;  /* Ensures proper aspect ratio */
-        }
+      .subscribe-button:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+      }
 
-        .scan-icon:hover {
-            transform: scale(1.05);
-            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
-        }
+      .price-info {
+        font-size: 1.2em;
+        margin: 0.5em 0;
+        font-weight: bold;
+      }
 
-        .scan-icon:active {
-            transform: scale(0.98);
-        }
+      .trial-countdown {
+        font-size: 1.1em;
+        color: #ff6b35;
+        font-weight: bold;
+        margin: 0.5em 0;
+      }
 
-        /* Scan Pulse Effect */
-        .scan-pulse {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 220px;        /* Adjusted to match new larger icon size */
-            height: 220px;       /* Adjusted to match new larger icon size */
-            border: 3px solid rgba(233, 30, 99, 0.3);
-            border-radius: 20px;
-            transform: translate(-50%, -50%);
-            animation: pulse 2s infinite;
-        }
+      .features-list {
+        text-align: left;
+        margin: 1em 0;
+        padding-left: 1em;
+      }
 
-        @keyframes pulse {
-            0% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1.2);
-                opacity: 0;
-            }
-        }
+      .features-list li {
+        margin: 0.3em 0;
+        font-size: 0.9em;
+      }
 
-        /* Trial Status */
-        .trial-status {
-            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
-            border-radius: 16px;
-            padding: 18px;
-            margin: 24px 0;
-            border: 2px solid #4CAF50;
-            position: relative;
-            overflow: hidden;
-        }
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1em;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+      }
 
-        .trial-status::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            transition: left 0.5s;
-        }
+      .notification.success {
+        background: #4CAF50;
+      }
 
-        .trial-status:hover::before {
-            left: 100%;
-        }
+      .notification.warning {
+        background: #ff9800;
+      }
 
-        .trial-status.expired {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border-color: #ff9800;
-        }
+      .notification.error {
+        background: #f44336;
+      }
 
-        .trial-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #2e7d32;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
+      @keyframes slideIn {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+      }
 
-        .trial-status.expired .trial-title {
-            color: #f57c00;
-        }
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+      }
 
-        .trial-info {
-            font-size: 14px;
-            color: #555;
-            font-weight: 500;
-        }
-
-        /* Modern Scan Button */
-        .scan-button {
-            background: linear-gradient(135deg, #e91e63, #ad1457);
-            color: white;
-            padding: 18px 32px;
-            border: none;
-            border-radius: 16px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            width: 100%;
-            margin: 20px 0;
-            box-shadow: 
-                0 8px 24px rgba(233, 30, 99, 0.4),
-                0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .scan-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .scan-button:hover::before {
-            left: 100%;
-        }
-
-        .scan-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 
-                0 12px 32px rgba(233, 30, 99, 0.5),
-                0 6px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .scan-button:active {
-            transform: translateY(-1px);
-        }
-
-        .scan-button:disabled {
-            background: linear-gradient(135deg, #bdbdbd, #9e9e9e);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Enhanced Loading State */
-        .loading {
-            display: none;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .spinner {
-            border: 4px solid rgba(233, 30, 99, 0.1);
-            border-top: 4px solid #e91e63;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 16px;
-            color: #666;
-            font-weight: 600;
-        }
-
-        /* Enhanced Results - Mobile First Design */
-        .result {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 20px;
-            width: 100%;
-            max-width: 420px;
-            margin-top: 24px;
-            box-shadow: 
-                0 20px 60px rgba(0, 0, 0, 0.08),
-                0 8px 32px rgba(233, 30, 99, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 1;
-        }
-
-        .result-header {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 12px;
-            margin-bottom: 20px;
-            padding: 16px 20px;
-            border-radius: 12px;
-        }
-
-        .result-header.safe {
-            background: linear-gradient(135deg, #fff8e1, #f0f4c3);
-        }
-
-        .result-header.caution {
-            background: linear-gradient(135deg, #fff8e1, #ffecb3);
-        }
-
-        .result-header.danger {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2);
-        }
-
-        .result-emoji {
-            width: 48px;
-            height: 48px;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
-            flex-shrink: 0;
-        }
-
-        .result-title {
-            font-size: 22px;
-            font-weight: 700;
-            margin: 0;
-            text-align: left;
-        }
-
-        .result-title.safe { color: #2e7d32; }
-        .result-title.caution { color: #f57c00; }
-        .result-title.danger { color: #c62828; }
-
-        .ingredients-section {
-            margin-top: 0;
-        }
-
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 16px;
-            text-align: left;
-        }
-
-        .ingredient-category {
-            margin-bottom: 12px;
-            padding: 16px;
-            border-radius: 12px;
-            text-align: left;
-            border-left: 4px solid;
-        }
-
-        .category-title {
-            font-weight: 700;
-            margin-bottom: 8px;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .ingredient-list {
-            font-size: 14px;
-            line-height: 1.6;
-            margin: 0;
-            color: #555;
-        }
-
-        .safe-ingredients {
-            background: rgba(76, 175, 80, 0.08);
-            border-left-color: #4CAF50;
-        }
-        .safe-ingredients .category-title { color: #2e7d32; }
-
-        .risky-ingredients {
-            background: rgba(244, 67, 54, 0.08);
-            border-left-color: #f44336;
-        }
-        .risky-ingredients .category-title { color: #c62828; }
-
-        .moderate-ingredients {
-            background: rgba(255, 152, 0, 0.08);
-            border-left-color: #ff9800;
-        }
-        .moderate-ingredients .category-title { color: #f57c00; }
-
-        .try-again-message {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border: 2px solid #ff9800;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 16px 0;
-            font-size: 16px;
-            color: #ef6c00;
-            font-weight: 600;
-        }
-
-        .error-message {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2);
-            color: #c62828;
-            padding: 18px;
-            border-radius: 12px;
-            margin: 20px 0;
-            border-left: 4px solid #f44336;
-            font-weight: 600;
-        }
-
-        /* Hidden Elements */
-        video, canvas, form {
-            display: none;
-        }
-
-        /* Mobile Responsiveness */
-        @media (max-width: 480px) {
-            body {
-                padding: 12px 8px;      /* Reduced from 15px 10px */
-            }
-            
-            .app-container {
-                padding: 20px 18px;     /* Reduced from 24px 20px */
-                margin: 0 3px 12px 3px; /* Reduced margins */
-            }
-
-            .app-header {
-                margin-bottom: 12px;    /* Reduced from default */
-            }
-
-            .scanner-section {
-                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
-            }
-
-            .logo-text {
-                font-size: 28px;
-            }
-
-            .scan-icon {
-                width: 160px;        /* Larger on mobile too */
-                height: 160px;       /* Larger on mobile too */
-            }
-
-            .scan-pulse {
-                width: 180px;        /* Adjusted for mobile */
-                height: 180px;       /* Adjusted for mobile */
-            }
-
-            .emoji {
-                width: 35px;
-                height: 35px;
-            }
-
-            .result {
-                margin-top: 20px;
-                padding: 24px 20px;
-            }
-
-            .result-emoji {
-                width: 48px;
-                height: 48px;
-            }
-
-            .result-title {
-                font-size: 20px;
-            }
-        }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
-</head>
-<body>
-    <!-- Enhanced Emoji Shower Container -->
-    <div class="emoji-shower" id="emojiShower"></div>
+  </head>
+  <body>
+    <h1>Food Ingredient Scanner</h1>
+    
+    <!-- Subscription Status Banner -->
+    <div id="subscriptionStatus"></div>
+    
+    <img
+      src="/static/barcode.png"
+      alt="scanner icon"
+      class="barcode"
+      onclick="checkAccessAndScan()"
+    />
+    <p class="scanner-text">📸 Take a photo of your food's ingredients</p>
 
-    <div class="app-container">
-        <!-- Modern Header -->
-        <div class="app-header">
-            <div class="app-logo">
-                <div class="logo-text">FOOD FIXR</div>
-            </div>
-            <div class="app-subtitle">Smart Ingredient Scanner</div>
-        </div>
-
-        <!-- Scanner Section -->
-        <div class="scanner-section">
-            <div class="scan-icon-container">
-                <div class="scan-pulse"></div>
-                <img src="/static/barcode.png" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
-            </div>
-        </div>
-
-        <!-- Enhanced Trial Status -->
-        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
-            <div class="trial-title" id="trialTitle">
-                {% if session.get('is_premium') %}
-                    💎 Premium Active
-                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
-                    🔒 Trial Expired
-                {% else %}
-                    🎉 Free Trial Active
-                {% endif %}
-            </div>
-            {% if not session.get('is_premium') %}
-            <div class="trial-info">
-                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
-                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Error Message -->
-        {% if error %}
-        <div class="error-message">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        <!-- Enhanced Scan Button -->
-        <button class="scan-button" id="scanButton" onclick="handleScanClick()">
-            {% if session.get('is_premium') %}
-                📸 SCAN INGREDIENTS
-            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
-                💳 UPGRADE TO CONTINUE
-            {% else %}
-                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
-            {% endif %}
-        </button>
-
-        <!-- Enhanced Loading State -->
-        <div class="loading" id="loadingState">
-            <div class="spinner"></div>
-            <div class="loading-text">🔬 Analyzing ingredients...</div>
-        </div>
-    </div>
-
-    <!-- Hidden Forms -->
-    <form id="uploadForm" method="post" enctype="multipart/form-data">
-        <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileSelected()" />
-    </form>
-
-    <form id="scanForm" method="post" enctype="multipart/form-data">
-        <input id="hiddenImage" type="file" name="image" />
-    </form>
+    <button class="start-button" id="startButton" onclick="checkAccessAndScan()">START HERE</button>
 
     <video id="webcam" autoplay playsinline></video>
     <canvas id="snapshot"></canvas>
 
-    <!-- Enhanced Results -->
-    {% if result %}
-    <div class="result result-float">
-        {% if "Danger" in result.rating %}
-        <div class="result-header danger">
-            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
-            <h2 class="result-title danger">Oh NOOOO! Danger!</h2>
-        </div>
-        {% elif "Proceed" in result.rating %}
-        <div class="result-header caution">
-            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
-            <h2 class="result-title caution">Proceed carefully</h2>
-        </div>
-        {% elif "TRY AGAIN" in result.rating %}
-        <div class="result-header caution">
-            <h2 class="result-title caution">↪️ TRY AGAIN</h2>
-        </div>
-        {% else %}
-        <div class="result-header safe">
-            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
-            <h2 class="result-title safe">Yay! Safe!</h2>
-        </div>
-        {% endif %}
+    <form id="uploadForm" method="post" enctype="multipart/form-data">
+      <input
+        type="file"
+        id="fileInput"
+        name="image"
+        accept="image/*"
+        capture="environment"
+        onchange="handleImageUpload(this)"
+        style="display: none"
+      />
+    </form>
 
-        {% if "TRY AGAIN" not in result.rating %}
-        <div class="ingredients-section">
-            <h3 class="section-title">Detected Ingredients:</h3>
+    <form
+      id="scanForm"
+      method="post"
+      enctype="multipart/form-data"
+      style="display: none"
+    >
+      <input id="hiddenImage" type="file" name="image" />
+    </form>
 
-            {% if result.matched_ingredients.safe_ingredients %}
-            <div class="ingredient-category safe-ingredients">
-                <div class="category-title">✅ Safe Ingredients:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.safe_ingredients | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if result.matched_ingredients.trans_fat %}
-            <div class="ingredient-category risky-ingredients">
-                <div class="category-title">⚠️ Trans Fat:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.trans_fat | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if result.matched_ingredients.excitotoxins %}
-            <div class="ingredient-category risky-ingredients">
-                <div class="category-title">⚠️ Excitotoxins:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.excitotoxins | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if result.matched_ingredients.corn %}
-            <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">🌽 Corn-based:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.corn | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if result.matched_ingredients.sugar %}
-            <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">🍯 Sugars:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.sugar | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if result.matched_ingredients.gmo %}
-            <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">🧬 GMO:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.gmo | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-        {% else %}
-        <div class="try-again-message">
-            Couldn't read ingredients clearly. Try better lighting and hold steady.
-        </div>
-        {% endif %}
+    <!-- Subscription expired modal -->
+    <div id="subscriptionModal" style="display: none;">
+      <div class="subscription-expired">
+        <h2>🔒 Free Trial Expired</h2>
+        <p>Your 48-hour free trial has ended. Continue enjoying unlimited ingredient scanning for just $2.99/month!</p>
+        <div class="price-info">$2.99/month</div>
+        <ul class="features-list">
+          <li>✅ Unlimited ingredient scans</li>
+          <li>✅ Advanced health risk analysis</li>
+          <li>✅ Personalized recommendations</li>
+          <li>✅ Cancel anytime</li>
+        </ul>
+        <button class="subscribe-button" onclick="initiateSubscription()">
+          <span id="subscribeText">Subscribe Now</span>
+        </button>
+      </div>
     </div>
-    {% endif %}
+
+    <!-- Results section (same as original) -->
+    <div id="resultsContainer"></div>
 
     <script>
-        // Global variables
-        let scansUsed = {{ session.get('scans_used', 0) }};
-        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
-        let trialExpired = {{ 'true' if trial_expired else 'false' }};
+      // Stripe configuration
+      const stripe = Stripe('pk_test_your_stripe_publishable_key_here'); // Replace with your Stripe publishable key
+      
+      // User session management
+      class SubscriptionManager {
+        constructor() {
+          this.userId = this.getUserId();
+          this.trialStartTime = this.getTrialStartTime();
+          this.subscriptionStatus = this.getSubscriptionStatus();
+          this.init();
+        }
 
-        // Enhanced Emoji Shower System
-        const emojiShower = {
-            container: null,
-            isActive: false,
-            emojiImages: {
-                safe: '/static/safe.png',
-                danger: '/static/danger.png',
-                caution: '/static/carefully.png'
+        getUserId() {
+          let userId = sessionStorage.getItem('userId');
+          if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('userId', userId);
+          }
+          return userId;
+        }
+
+        getTrialStartTime() {
+          let startTime = sessionStorage.getItem('trialStartTime');
+          if (!startTime) {
+            startTime = Date.now();
+            sessionStorage.setItem('trialStartTime', startTime);
+            this.notifyTrialStarted();
+          }
+          return parseInt(startTime);
+        }
+
+        getSubscriptionStatus() {
+          return sessionStorage.getItem('subscriptionStatus') || 'trial';
+        }
+
+        setSubscriptionStatus(status) {
+          this.subscriptionStatus = status;
+          sessionStorage.setItem('subscriptionStatus', status);
+        }
+
+        isTrialExpired() {
+          const now = Date.now();
+          const trialDuration = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
+          return (now - this.trialStartTime) > trialDuration;
+        }
+
+        getTimeRemaining() {
+          const now = Date.now();
+          const trialDuration = 48 * 60 * 60 * 1000; // 48 hours
+          const remaining = trialDuration - (now - this.trialStartTime);
+          return Math.max(0, remaining);
+        }
+
+        formatTimeRemaining(ms) {
+          const hours = Math.floor(ms / (1000 * 60 * 60));
+          const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+          return `${hours}h ${minutes}m`;
+        }
+
+        hasAccess() {
+          return this.subscriptionStatus === 'active' || !this.isTrialExpired();
+        }
+
+        init() {
+          this.updateUI();
+          this.startTrialCountdown();
+          
+          // Check subscription status with server
+          this.checkServerSubscriptionStatus();
+        }
+
+        updateUI() {
+          const statusContainer = document.getElementById('subscriptionStatus');
+          const startButton = document.getElementById('startButton');
+          
+          if (this.subscriptionStatus === 'active') {
+            statusContainer.innerHTML = `
+              <div class="subscription-banner">
+                <div class="trial-status">
+                  ✅ <strong>Premium Subscriber</strong> - Unlimited scans!
+                </div>
+              </div>
+            `;
+          } else if (this.isTrialExpired()) {
+            statusContainer.innerHTML = `
+              <div class="subscription-expired">
+                <h3>🔒 Free Trial Expired</h3>
+                <p>Subscribe to continue scanning ingredients!</p>
+                <div class="price-info">$2.99/month</div>
+                <button class="subscribe-button" onclick="subscriptionManager.initiateSubscription()">
+                  Subscribe Now
+                </button>
+              </div>
+            `;
+            startButton.disabled = true;
+            startButton.textContent = 'Subscribe to Continue';
+          } else {
+            const remaining = this.getTimeRemaining();
+            statusContainer.innerHTML = `
+              <div class="subscription-banner">
+                <div class="trial-status">
+                  🎉 <strong>Free Trial Active</strong>
+                  <div class="trial-countdown">
+                    Time remaining: ${this.formatTimeRemaining(remaining)}
+                  </div>
+                </div>
+                <div style="font-size: 0.9em; margin-top: 0.5em;">
+                  After trial: $2.99/month for unlimited access
+                </div>
+              </div>
+            `;
+          }
+        }
+
+        startTrialCountdown() {
+          setInterval(() => {
+            if (this.subscriptionStatus !== 'active') {
+              this.updateUI();
+              
+              // Notify when trial is about to expire (1 hour remaining)
+              const remaining = this.getTimeRemaining();
+              if (remaining <= 60 * 60 * 1000 && remaining > 59 * 60 * 1000) {
+                this.showNotification('⏰ Trial expires in 1 hour! Subscribe to continue unlimited access.', 'warning');
+              }
+            }
+          }, 60000); // Update every minute
+        }
+
+        async checkServerSubscriptionStatus() {
+          try {
+            const response = await fetch('/api/subscription-status', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId: this.userId })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.status === 'active') {
+                this.setSubscriptionStatus('active');
+                this.updateUI();
+              }
+            }
+          } catch (error) {
+            console.error('Error checking subscription status:', error);
+          }
+        }
+
+        async initiateSubscription() {
+          const subscribeButton = document.querySelector('.subscribe-button');
+          const originalText = subscribeButton.innerHTML;
+          
+          subscribeButton.innerHTML = '<div class="loading"></div>Creating subscription...';
+          subscribeButton.disabled = true;
+
+          try {
+            // Create subscription session
+            const response = await fetch('/api/create-subscription', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                userId: this.userId,
+                priceId: 'price_your_stripe_price_id_here' // Replace with your Stripe price ID
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to create subscription session');
+            }
+
+            const session = await response.json();
+            
+            // Redirect to Stripe Checkout
+            const result = await stripe.redirectToCheckout({
+              sessionId: session.sessionId
+            });
+
+            if (result.error) {
+              throw new Error(result.error.message);
+            }
+
+          } catch (error) {
+            console.error('Subscription error:', error);
+            this.showNotification('❌ Subscription failed. Please try again.', 'error');
+            subscribeButton.innerHTML = originalText;
+            subscribeButton.disabled = false;
+          }
+        }
+
+        notifyTrialStarted() {
+          // Send notification about trial start
+          fetch('/api/notify-trial-start', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-
-            init() {
-                this.container = document.getElementById('emojiShower');
-            },
-
-            start(type, duration = 4000) {
-                if (!type || this.isActive) return;
-                
-                this.isActive = true;
-                const emojiImage = this.emojiImages[type];
-                
-                if (!emojiImage) {
-                    this.isActive = false;
-                    return;
-                }
-                
-                console.log(`🎊 Starting enhanced ${type} emoji shower`);
-                
-                // More frequent emoji creation for denser shower
-                const interval = setInterval(() => {
-                    this.createEmoji(emojiImage);
-                }, 200); // Faster creation rate
-
-                // Also create bursts of emojis
-                let burstCount = 0;
-                const burstInterval = setInterval(() => {
-                    if (burstCount >= 3) {
-                        clearInterval(burstInterval);
-                        return;
-                    }
-                    
-                    // Create burst of 3-5 emojis
-                    for (let i = 0; i < 3 + Math.random() * 3; i++) {
-                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
-                    }
-                    burstCount++;
-                }, 1000);
-
-                // Stop after duration
-                setTimeout(() => {
-                    clearInterval(interval);
-                    clearInterval(burstInterval);
-                    this.isActive = false;
-                    
-                    // Clean up after additional 6 seconds
-                    setTimeout(() => {
-                        this.cleanup();
-                    }, 6000);
-                }, duration);
-            },
-
-            createEmoji(imageSrc) {
-                const emoji = document.createElement('img');
-                emoji.className = 'emoji';
-                emoji.src = imageSrc;
-                emoji.alt = 'emoji';
-                
-                // More varied horizontal positions
-                emoji.style.left = (Math.random() * 120 - 10) + '%';
-                
-                // Varied animation duration (3-7 seconds)
-                const duration = 3 + Math.random() * 4;
-                emoji.style.animationDuration = duration + 's';
-                
-                // Enhanced horizontal drift
-                const drift = (Math.random() - 0.5) * 300;
-                emoji.style.setProperty('--drift', drift + 'px');
-                
-                // More size variety (35-55px)
-                const size = 35 + Math.random() * 20;
-                emoji.style.width = size + 'px';
-                emoji.style.height = size + 'px';
-                
-                // Random delay for staggered effect
-                const delay = Math.random() * 1000;
-                emoji.style.animationDelay = delay + 'ms';
-                
-                this.container.appendChild(emoji);
-                
-                // Remove emoji after animation completes
-                setTimeout(() => {
-                    if (emoji.parentNode) {
-                        emoji.parentNode.removeChild(emoji);
-                    }
-                }, (duration * 1000) + delay + 1000);
-            },
-
-            cleanup() {
-                while (this.container.firstChild) {
-                    this.container.removeChild(this.container.firstChild);
-                }
-                console.log('🧹 Enhanced emoji shower cleaned up');
-            }
-        };
-
-        // Initialize emoji shower on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            emojiShower.init();
-            
-            // Trigger enhanced emoji shower if there's a result
-            {% if result %}
-            setTimeout(() => {
-                {% if "Danger" in result.rating %}
-                emojiShower.start('danger', 5000);
-                {% elif "Proceed" in result.rating %}
-                emojiShower.start('caution', 4000);
-                {% elif "Safe" in result.rating %}
-                emojiShower.start('safe', 4500);
-                {% endif %}
-            }, 400);
-            {% endif %}
-        });
-
-        function handleScanClick() {
-            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                return;
-            }
-
-            triggerScanner();
+            body: JSON.stringify({ 
+              userId: this.userId,
+              startTime: this.trialStartTime
+            })
+          }).catch(console.error);
         }
 
-        function triggerScanner() {
-            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
-            
-            if (isPhone) {
-                document.getElementById("fileInput").click();
-            } else {
-                startWebcam();
-            }
+        showNotification(message, type = 'success') {
+          const notification = document.createElement('div');
+          notification.className = `notification ${type}`;
+          notification.textContent = message;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            notification.remove();
+          }, 5000);
         }
+      }
 
-        function handleFileSelected() {
-            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                return;
-            }
+      // Initialize subscription manager
+      const subscriptionManager = new SubscriptionManager();
 
-            showLoading();
-            scansUsed++;
-            updateScanCount();
-            document.getElementById('uploadForm').submit();
+      // Modified scanner functions
+      function checkAccessAndScan() {
+        if (!subscriptionManager.hasAccess()) {
+          subscriptionManager.showNotification('⏰ Free trial expired! Subscribe to continue scanning.', 'warning');
+          return;
         }
+        triggerScanner();
+      }
 
-        function startWebcam() {
-            const video = document.getElementById("webcam");
-            video.style.display = "block";
-            
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                    video.play();
-                    setTimeout(() => capturePhoto(), 2000);
-                })
-                .catch(function(err) {
-                    console.error("Camera error:", err);
-                    alert("📷 Camera access denied. Please use file upload.");
-                    video.style.display = "none";
-                });
+      function handleImageUpload(input) {
+        if (!subscriptionManager.hasAccess()) {
+          subscriptionManager.showNotification('⏰ Free trial expired! Subscribe to continue scanning.', 'warning');
+          input.value = '';
+          return;
         }
+        input.form.submit();
+      }
 
-        function capturePhoto() {
-            const video = document.getElementById("webcam");
-            const canvas = document.getElementById("snapshot");
-            const form = document.getElementById("scanForm");
-            
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext("2d").drawImage(video, 0, 0);
-            
-            const stream = video.srcObject;
-            const tracks = stream.getTracks();
-            tracks.forEach(track => track.stop());
-            video.style.display = "none";
-            
-            canvas.toBlob(function (blob) {
-                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
-                const container = new DataTransfer();
-                container.items.add(file);
-                document.getElementById("hiddenImage").files = container.files;
-                
-                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                    alert('🔒 Trial expired! Please upgrade to continue scanning.');
-                    return;
-                }
+      // Original scanner functionality
+      const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      const video = document.getElementById("webcam");
+      const canvas = document.getElementById("snapshot");
 
-                showLoading();
-                scansUsed++;
-                updateScanCount();
-                form.submit();
-            }, "image/jpeg", 0.8);
+      function triggerScanner() {
+        if (isPhone) {
+          document.getElementById("fileInput").click();
+        } else {
+          video.style.display = "block";
+          navigator.mediaDevices.enumerateDevices().then((devices) => {
+            const cameras = devices.filter(
+              (device) => device.kind === "videoinput"
+            );
+            const rearCamera =
+              cameras.find((cam) => cam.label.toLowerCase().includes("back")) ||
+              cameras[0];
+            navigator.mediaDevices
+              .getUserMedia({ video: { deviceId: rearCamera.deviceId } })
+              .then(function (stream) {
+                video.srcObject = stream;
+                video.play();
+                setTimeout(() => capture(), 1500);
+              });
+          });
         }
+      }
 
-        function showLoading() {
-            document.getElementById('loadingState').style.display = 'block';
-            document.getElementById('scanButton').style.display = 'none';
-        }
+      function capture() {
+        const form = document.getElementById("scanForm");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        canvas.toBlob(function (blob) {
+          const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+          const container = new DataTransfer();
+          container.items.add(file);
+          const input = document.getElementById("hiddenImage");
+          input.files = container.files;
+          form.submit();
+        }, "image/jpeg");
+      }
 
-        function updateScanCount() {
-            const scansUsedElement = document.getElementById('scansUsed');
-            if (scansUsedElement) {
-                scansUsedElement.textContent = scansUsed;
-            }
-            
-            const scanButton = document.getElementById('scanButton');
-            if (!isPremium && scansUsed < 10) {
-                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
-            } else if (!isPremium && scansUsed >= 10) {
-                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
-                scanButton.disabled = true;
-            }
-        }
+      // Handle successful subscription (called from success page)
+      function handleSubscriptionSuccess() {
+        subscriptionManager.setSubscriptionStatus('active');
+        subscriptionManager.updateUI();
+        subscriptionManager.showNotification('🎉 Subscription activated! Enjoy unlimited scanning!', 'success');
+      }
 
-        // Auto-scroll to results when they appear
-        window.addEventListener('load', function() {
-            const result = document.querySelector('.result');
-            if (result) {
-                setTimeout(() => {
-                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 600);
-            }
-        });
+      // Check if returning from successful subscription
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('subscription') === 'success') {
+        handleSubscriptionSuccess();
+      }
     </script>
-</body>
+
+    <a class="scan-again" href="/">🔄 Scan Again</a>
+  </body>
 </html>
