@@ -166,6 +166,19 @@ def scan():
                              error="Scanning failed. Please try again.",
                              stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
+@app.route('/upgrade')
+def upgrade():
+    """Upgrade page for premium plans"""
+    init_session()
+    
+    trial_expired = is_trial_expired()
+    trial_time_left = get_trial_time_left()
+    
+    return render_template('upgrade.html',
+                         trial_expired=trial_expired,
+                         trial_time_left=trial_time_left,
+                         stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     """Create Stripe checkout session"""
@@ -173,13 +186,27 @@ def create_checkout_session():
         data = request.get_json()
         plan = data.get('plan', 'monthly')
         
-        # Define pricing
-        if plan == 'yearly':
-            price_id = os.getenv('STRIPE_YEARLY_PRICE_ID')  # Create this in Stripe Dashboard
-            success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan=yearly"
-        else:
-            price_id = os.getenv('STRIPE_MONTHLY_PRICE_ID')  # Create this in Stripe Dashboard
-            success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan=monthly"
+        # Define pricing based on your upgrade.html plans
+        prices = {
+            'weekly': {
+                'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'),
+                'amount': 3.99
+            },
+            'monthly': {
+                'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'),
+                'amount': 11.99
+            },
+            'yearly': {
+                'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'),
+                'amount': 95.00
+            }
+        }
+        
+        if plan not in prices:
+            return jsonify({'error': 'Invalid plan selected'}), 400
+        
+        price_id = prices[plan]['price_id']
+        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
         
         # Create checkout session
         checkout_session = stripe.checkout.Session.create(
@@ -190,7 +217,7 @@ def create_checkout_session():
             }],
             mode='subscription',
             success_url=success_url,
-            cancel_url=f"{DOMAIN}/",
+            cancel_url=f"{DOMAIN}/upgrade",
             metadata={
                 'user_id': session.get('user_id'),
                 'plan': plan
@@ -340,7 +367,7 @@ def log_payment(user_id, plan, session_id):
             'timestamp': datetime.now().isoformat(),
             'plan': plan,
             'stripe_session_id': session_id,
-            'amount': 2.99 if plan == 'monthly' else 29.99
+            'amount': 3.99 if plan == 'weekly' else (11.99 if plan == 'monthly' else 95.00)
         }
         
         with open('payment_logs.json', 'a') as f:
