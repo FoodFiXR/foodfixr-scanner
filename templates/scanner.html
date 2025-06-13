@@ -556,11 +556,11 @@
         <!-- Enhanced Scan Button -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
-                📸 SCAN INGREDIENTS
+                📸 START HERE
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
-                📸 SCAN INGREDIENTS ({{ 10 - session.get('scans_used', 0) }} left)
+                📸 START HERE ({{ 10 - session.get('scans_used', 0) }} left)
             {% endif %}
         </button>
 
