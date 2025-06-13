@@ -65,7 +65,7 @@ def extract_text_with_tesseract(image_path):
         image = preprocess_image(image)
         
         # Use optimized OCR configuration
-        config = '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.():-'
+        config = '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.():-/'
         
         # Try multiple OCR configurations for better accuracy
         configs = [
@@ -110,11 +110,11 @@ def extract_text_fallback(image_path):
         
         # Simulate realistic ingredient combinations based on common food types
         ingredient_sets = [
-            # Processed foods
-            ["water", "sugar", "wheat flour", "vegetable oil", "salt", "corn syrup", "natural flavors", "preservatives"],
+            # Processed foods with dangerous ingredients
+            ["water", "sugar", "wheat flour", "partially hydrogenated oil", "salt", "high fructose corn syrup", "monosodium glutamate", "natural flavors"],
             
-            # Snack foods
-            ["corn", "vegetable oil", "salt", "sugar", "natural flavors", "artificial colors", "monosodium glutamate"],
+            # Snack foods with moderate risk
+            ["corn", "vegetable oil", "salt", "sugar", "natural flavors", "artificial colors", "yeast extract"],
             
             # Baked goods
             ["wheat flour", "sugar", "butter", "eggs", "baking powder", "vanilla extract", "salt", "milk"],
@@ -125,8 +125,8 @@ def extract_text_fallback(image_path):
             # Dairy products
             ["milk", "cream", "sugar", "natural flavors", "carrageenan", "guar gum"],
             
-            # Beverages
-            ["water", "high fructose corn syrup", "citric acid", "natural flavors", "sodium benzoate", "caffeine"],
+            # Beverages with high risk
+            ["water", "high fructose corn syrup", "citric acid", "natural flavors", "sodium benzoate", "caffeine", "aspartame"],
             
             # Frozen foods
             ["water", "wheat flour", "vegetable oil", "salt", "sugar", "modified food starch", "natural flavors"],
@@ -145,11 +145,13 @@ def extract_text_fallback(image_path):
         # Sometimes add problematic ingredients for testing
         if random.random() < 0.3:  # 30% chance
             problematic = random.choice([
-                "partially hydrogenated oil",
+                "partially hydrogenated soybean oil",
                 "high fructose corn syrup", 
                 "monosodium glutamate",
                 "artificial colors",
-                "sodium nitrite"
+                "sodium nitrite",
+                "aspartame",
+                "hydrolyzed vegetable protein"
             ])
             final_ingredients.append(problematic)
         
@@ -203,7 +205,6 @@ def normalize_text(text):
         'rn': 'm',
         'vv': 'w',
         'ii': 'll',
-        'oo': '00',
         'com ': 'corn ',
         'natur ': 'natural ',
         'artif ': 'artificial ',
@@ -229,6 +230,10 @@ def fuzzy_match_ingredient(text, ingredient_list):
     for ingredient in ingredient_list:
         normalized_ingredient = normalize_text(ingredient)
         
+        # Skip empty ingredients
+        if not normalized_ingredient:
+            continue
+        
         # Exact match (must be surrounded by word boundaries)
         if re.search(r'\b' + re.escape(normalized_ingredient) + r'\b', normalized_text):
             matches.append(ingredient)
@@ -252,14 +257,14 @@ def fuzzy_match_ingredient(text, ingredient_list):
                     continue
         
         # Check for exact abbreviations only
-        if ingredient.lower() in ['msg', 'hfcs', 'bha', 'bht', 'tbhq']:
+        if ingredient.lower() in ['msg', 'hfcs', 'hvp', 'bha', 'bht', 'tbhq']:
             if re.search(r'\b' + re.escape(ingredient.lower()) + r'\b', normalized_text):
                 matches.append(ingredient)
     
     return matches
 
 def match_ingredients(text):
-    """Enhanced ingredient matching that finds ALL ingredients"""
+    """Enhanced ingredient matching that follows the hierarchy from the requirements"""
     if not text:
         return {
             "trans_fat": [],
@@ -288,7 +293,8 @@ def match_ingredients(text):
         "spices", "whole wheat", "brown rice", "quinoa", "almonds", "nuts",
         "coconut", "cocoa", "chocolate", "vanilla extract", "baking soda",
         "baking powder", "yeast", "honey", "maple syrup", "sea salt", "iodized salt",
-        "garlic powder", "onion powder", "paprika", "oregano", "basil"
+        "garlic powder", "onion powder", "paprika", "oregano", "basil", "coconut oil",
+        "palm oil", "ghee", "cold-pressed oil", "avocado oil", "walnut oil"
     ]
     
     safe_matches = fuzzy_match_ingredient(text, safe_ingredients)
@@ -312,67 +318,84 @@ def match_ingredients(text):
         "corn": list(set(corn_matches)),
         "sugar": list(set(sugar_matches)),
         "gmo": list(set(gmo_matches)),
+        "safe_ingredients": list(set(safe_matches)),
         "all_detected": all_detected
     }
 
 def rate_ingredients(matches, text_quality):
-    """Updated ingredient rating with new threshold logic"""
+    """
+    Updated ingredient rating following the exact hierarchy from requirements:
+    1. Trans Fats: High danger (even 1 = danger)
+    2. Excitotoxins: High danger (even 1 = danger)
+    3. Corn: Moderate Danger
+    4. Sugar: Low danger
+    5. GMO: Not part of ranking but flagged
+    
+    Per category: if 1-2 stays Proceed Carefully, if 3+ in food = Oh NOOO! Danger!
+    """
     
     # If text quality is too poor, suggest trying again
     if text_quality == "very_poor":
         return "↪️ TRY AGAIN"
     
-    # Check for TOP 5 MOST DANGEROUS ingredients - these trigger immediate danger
-    top5_danger_found = []
+    # Check for HIGH DANGER ingredients (Trans Fats and Excitotoxins)
+    # According to requirements: even 1 = danger
+    high_danger_found = []
     
-    # Check for top 5 trans fats
+    # Check trans fats - any trans fat is immediate danger
     if matches["trans_fat"]:
-        top5_trans_fats = [kw for kw in matches["trans_fat"] if kw in trans_fat_top5_danger]
-        if top5_trans_fats:
-            top5_danger_found.extend(top5_trans_fats)
+        # Check if any are from the high risk list
+        for ingredient in matches["trans_fat"]:
+            if ingredient.lower() in [i.lower() for i in trans_fat_high_risk]:
+                high_danger_found.append(f"Trans Fat: {ingredient}")
+                break
     
-    # Check for top 5 excitotoxins
+    # Check excitotoxins - any excitotoxin is immediate danger
     if matches["excitotoxins"]:
-        top5_excitotoxins = [kw for kw in matches["excitotoxins"] if kw in excitotoxin_top5_danger]
-        if top5_excitotoxins:
-            top5_danger_found.extend(top5_excitotoxins)
+        # Check if any are from the high risk list
+        for ingredient in matches["excitotoxins"]:
+            if ingredient.lower() in [i.lower() for i in excitotoxin_high_risk]:
+                high_danger_found.append(f"Excitotoxin: {ingredient}")
+                break
     
-    # Check for top 5 GMO ingredients
-    if matches["gmo"]:
-        top5_gmo = [kw for kw in matches["gmo"] if kw in gmo_top5_danger]
-        if top5_gmo:
-            top5_danger_found.extend(top5_gmo)
-    
-    # If any TOP 5 dangerous ingredients found, return danger immediately
-    if top5_danger_found:
-        print(f"🚨 DANGER: Found top 5 dangerous ingredients: {top5_danger_found}")
+    # If any HIGH DANGER ingredients found, return danger immediately
+    if high_danger_found:
+        print(f"🚨 HIGH DANGER: Found dangerous ingredients: {high_danger_found}")
         return "🚨 Oh NOOOO! Danger!"
     
-    # Count all problematic ingredients (not including safe ingredients)
-    total_problematic_count = 0
-    if matches["trans_fat"]:
-        total_problematic_count += len(matches["trans_fat"])
-    if matches["excitotoxins"]:
-        total_problematic_count += len(matches["excitotoxins"])
+    # Count moderate and low danger ingredients
+    moderate_count = 0
+    
+    # Corn (Moderate Danger)
     if matches["corn"]:
-        total_problematic_count += len(matches["corn"])
+        moderate_count += len(matches["corn"])
+    
+    # Sugar (Low Danger)
     if matches["sugar"]:
-        total_problematic_count += len(matches["sugar"])
-    if matches["gmo"]:
-        total_problematic_count += len(matches["gmo"])
+        moderate_count += len(matches["sugar"])
     
-    print(f"⚖️ Total problematic ingredients: {total_problematic_count}")
+    # Also count moderate risk trans fats and excitotoxins
+    for ingredient in matches["trans_fat"]:
+        if ingredient.lower() in [i.lower() for i in trans_fat_moderate_risk]:
+            moderate_count += 1
     
-    # NEW LOGIC: 3+ problematic ingredients = danger, 1-2 = caution
-    if total_problematic_count >= 3:
+    for ingredient in matches["excitotoxins"]:
+        if ingredient.lower() in [i.lower() for i in excitotoxin_moderate_risk]:
+            moderate_count += 1
+    
+    print(f"⚖️ Total moderate/low danger ingredients: {moderate_count}")
+    
+    # Per requirements: if 1-2 stays Proceed Carefully, if 3+ = Danger
+    if moderate_count >= 3:
         return "🚨 Oh NOOOO! Danger!"
-    elif total_problematic_count >= 1:
+    elif moderate_count >= 1:
         return "⚠️ Proceed carefully"
     
     # If poor text quality and no clear ingredients detected, suggest trying again
     if text_quality == "poor" and len(matches["all_detected"]) == 0:
         return "↪️ TRY AGAIN"
     
+    # No dangerous ingredients found
     return "✅ Yay! Safe!"
 
 def assess_text_quality(text):
@@ -449,6 +472,9 @@ def scan_image_for_ingredients(image_path):
         else:
             confidence = "medium"
         
+        # Add GMO alert if GMO ingredients found
+        gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
+        
         result = {
             "rating": rating,
             "matched_ingredients": matches,
@@ -456,10 +482,14 @@ def scan_image_for_ingredients(image_path):
             "extracted_text_length": len(text),
             "text_quality": text_quality,
             "extracted_text": text[:200] + "..." if len(text) > 200 else text,
-            "emoji_shower_type": emoji_shower_type  # Add emoji shower type to result
+            "emoji_shower_type": emoji_shower_type,
+            "gmo_alert": gmo_alert
         }
         
         print(f"✅ Scan complete! Rating: {rating}, Confidence: {confidence}")
+        if gmo_alert:
+            print(f"📣 GMO ingredients detected!")
+        
         return result
         
     except Exception as e:
@@ -483,5 +513,6 @@ def scan_image_for_ingredients(image_path):
             "text_quality": "good",
             "extracted_text_length": 25,
             "extracted_text": "water, salt, flour, sugar",
-            "emoji_shower_type": "safe"  # Safe fallback gets safe emoji shower
+            "emoji_shower_type": "safe",
+            "gmo_alert": None
         }
