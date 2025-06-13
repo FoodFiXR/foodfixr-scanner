@@ -102,72 +102,17 @@ def extract_text_with_tesseract(image_path):
 
 def extract_text_fallback(image_path):
     """
-    Fallback text extraction that simulates finding realistic ingredients
-    This ensures the scanner always returns results for demo/testing
+    Conservative fallback - returns empty text to trigger TRY AGAIN
+    rather than simulating ingredients that might be wrong
     """
     try:
-        print("Using fallback ingredient detection...")
-        
-        # Simulate realistic ingredient combinations based on common food types
-        ingredient_sets = [
-            # Processed foods with dangerous ingredients
-            ["water", "sugar", "wheat flour", "partially hydrogenated oil", "salt", "high fructose corn syrup", "monosodium glutamate", "natural flavors"],
-            
-            # Snack foods with moderate risk
-            ["corn", "vegetable oil", "salt", "sugar", "natural flavors", "artificial colors", "yeast extract"],
-            
-            # Baked goods
-            ["wheat flour", "sugar", "butter", "eggs", "baking powder", "vanilla extract", "salt", "milk"],
-            
-            # Canned/packaged foods
-            ["water", "tomatoes", "sugar", "salt", "citric acid", "natural flavors", "modified corn starch"],
-            
-            # Dairy products
-            ["milk", "cream", "sugar", "natural flavors", "carrageenan", "guar gum"],
-            
-            # Beverages with high risk
-            ["water", "high fructose corn syrup", "citric acid", "natural flavors", "sodium benzoate", "caffeine", "aspartame"],
-            
-            # Frozen foods
-            ["water", "wheat flour", "vegetable oil", "salt", "sugar", "modified food starch", "natural flavors"],
-            
-            # Condiments
-            ["water", "vinegar", "sugar", "salt", "modified corn starch", "natural flavors", "xanthan gum"]
-        ]
-        
-        # Randomly select an ingredient set
-        import random
-        selected_set = random.choice(ingredient_sets)
-        
-        # Add some randomness - remove 1-2 ingredients or add extras
-        final_ingredients = selected_set.copy()
-        
-        # Sometimes add problematic ingredients for testing
-        if random.random() < 0.3:  # 30% chance
-            problematic = random.choice([
-                "partially hydrogenated soybean oil",
-                "high fructose corn syrup", 
-                "monosodium glutamate",
-                "artificial colors",
-                "sodium nitrite",
-                "aspartame",
-                "hydrolyzed vegetable protein"
-            ])
-            final_ingredients.append(problematic)
-        
-        # Sometimes add more safe ingredients
-        if random.random() < 0.4:  # 40% chance
-            safe_extras = ["garlic powder", "onion powder", "spices", "herbs", "vitamin c"]
-            final_ingredients.extend(random.sample(safe_extras, random.randint(1, 2)))
-        
-        result_text = ", ".join(final_ingredients)
-        print(f"Fallback generated: {result_text}")
-        return result_text
+        print("Using fallback - unable to detect ingredients properly")
+        # Return empty text which will trigger TRY AGAIN rating
+        return ""
         
     except Exception as e:
         print(f"Fallback extraction error: {e}")
-        # Ultimate fallback
-        return "water, sugar, wheat flour, salt, vegetable oil, natural flavors"
+        return ""
 
 def extract_text_from_image(image_path):
     """Main text extraction function with comprehensive fallback"""
@@ -273,10 +218,29 @@ def match_ingredients(text):
             "sugar": [],
             "gmo": [],
             "safe_ingredients": [],
-            "all_detected": []
+            "all_detected": [],
+            "confidence_score": 0
         }
     
     print(f"🔬 Analyzing text: {text[:100]}...")
+    
+    # First, check if we can identify ANY common ingredients at all
+    # This helps us determine if the scan quality is good enough
+    common_test_ingredients = [
+        "water", "salt", "sugar", "flour", "oil", "milk", "eggs", "butter",
+        "corn", "soy", "wheat", "rice", "natural", "artificial", "flavor",
+        "color", "preservative", "acid", "sodium", "modified", "extract"
+    ]
+    
+    # Count how many common ingredient words we can find
+    common_found = 0
+    normalized_text = normalize_text(text)
+    for test_word in common_test_ingredients:
+        if re.search(r'\b' + re.escape(test_word.lower()) + r'\b', normalized_text):
+            common_found += 1
+    
+    # Calculate confidence score based on common ingredients found
+    confidence_score = min(common_found / 5.0, 1.0)  # At least 5 common words for full confidence
     
     # Use precise matching for each category
     trans_fat_matches = fuzzy_match_ingredient(text, trans_fat_high_risk + trans_fat_moderate_risk)
@@ -311,6 +275,7 @@ def match_ingredients(text):
     print(f"  • GMO: {gmo_matches}")
     print(f"  • Safe: {safe_matches}")
     print(f"  • Total: {len(all_detected)} ingredients")
+    print(f"  • Confidence: {confidence_score:.2f}")
     
     return {
         "trans_fat": list(set(trans_fat_matches)),
@@ -319,32 +284,43 @@ def match_ingredients(text):
         "sugar": list(set(sugar_matches)),
         "gmo": list(set(gmo_matches)),
         "safe_ingredients": list(set(safe_matches)),
-        "all_detected": all_detected
+        "all_detected": all_detected,
+        "confidence_score": confidence_score
     }
 
 def rate_ingredients(matches, text_quality):
     """
-    Updated ingredient rating following the exact hierarchy from requirements:
-    1. Trans Fats: High danger (even 1 = danger)
-    2. Excitotoxins: High danger (even 1 = danger)
-    3. Corn: Moderate Danger
-    4. Sugar: Low danger
-    5. GMO: Not part of ranking but flagged
-    
-    Per category: if 1-2 stays Proceed Carefully, if 3+ in food = Oh NOOO! Danger!
+    Updated ingredient rating with stricter confidence requirements.
+    If we can't confidently detect ingredients, we ask to try again.
     """
     
-    # If text quality is too poor, suggest trying again
-    if text_quality == "very_poor":
+    # Get confidence score from matches
+    confidence_score = matches.get("confidence_score", 0)
+    
+    # If text quality is poor or we have very low confidence, suggest trying again
+    if text_quality == "very_poor" or confidence_score < 0.3:
         return "↪️ TRY AGAIN"
     
+    # If we detected very few ingredients (less than 3) and text quality isn't good
+    # This likely means we couldn't read the label properly
+    total_detected = len(matches["all_detected"])
+    if total_detected < 3 and text_quality != "good":
+        return "↪️ TRY AGAIN"
+    
+    # If we have low confidence but detected some dangerous ingredients
+    # We should be cautious and ask to rescan rather than give wrong info
+    dangerous_found = len(matches["trans_fat"]) + len(matches["excitotoxins"])
+    if confidence_score < 0.5 and dangerous_found > 0:
+        # We're not confident enough about dangerous ingredients
+        return "↪️ TRY AGAIN"
+    
+    # Now proceed with normal rating if we have enough confidence
+    
     # Check for HIGH DANGER ingredients (Trans Fats and Excitotoxins)
-    # According to requirements: even 1 = danger
     high_danger_found = []
     
     # Check trans fats - any trans fat is immediate danger
     if matches["trans_fat"]:
-        # Check if any are from the high risk list
         for ingredient in matches["trans_fat"]:
             if ingredient.lower() in [i.lower() for i in trans_fat_high_risk]:
                 high_danger_found.append(f"Trans Fat: {ingredient}")
@@ -352,14 +328,13 @@ def rate_ingredients(matches, text_quality):
     
     # Check excitotoxins - any excitotoxin is immediate danger
     if matches["excitotoxins"]:
-        # Check if any are from the high risk list
         for ingredient in matches["excitotoxins"]:
             if ingredient.lower() in [i.lower() for i in excitotoxin_high_risk]:
                 high_danger_found.append(f"Excitotoxin: {ingredient}")
                 break
     
-    # If any HIGH DANGER ingredients found, return danger immediately
-    if high_danger_found:
+    # If any HIGH DANGER ingredients found with good confidence, return danger
+    if high_danger_found and confidence_score >= 0.5:
         print(f"🚨 HIGH DANGER: Found dangerous ingredients: {high_danger_found}")
         return "🚨 Oh NOOOO! Danger!"
     
@@ -384,6 +359,11 @@ def rate_ingredients(matches, text_quality):
             moderate_count += 1
     
     print(f"⚖️ Total moderate/low danger ingredients: {moderate_count}")
+    print(f"📊 Confidence score: {confidence_score:.2f}")
+    
+    # If we have low confidence and found moderate dangers, be cautious
+    if confidence_score < 0.6 and moderate_count > 0:
+        return "↪️ TRY AGAIN"
     
     # Per requirements: if 1-2 stays Proceed Carefully, if 3+ = Danger
     if moderate_count >= 3:
@@ -391,12 +371,19 @@ def rate_ingredients(matches, text_quality):
     elif moderate_count >= 1:
         return "⚠️ Proceed carefully"
     
-    # If poor text quality and no clear ingredients detected, suggest trying again
-    if text_quality == "poor" and len(matches["all_detected"]) == 0:
+    # If we only found safe ingredients with good confidence
+    if len(matches["safe_ingredients"]) > 0 and confidence_score >= 0.5:
+        return "✅ Yay! Safe!"
+    
+    # If we're not sure (low ingredients detected, medium confidence)
+    if total_detected < 5 and confidence_score < 0.7:
         return "↪️ TRY AGAIN"
     
-    # No dangerous ingredients found
-    return "✅ Yay! Safe!"
+    # Default to safe only if we have good confidence
+    if confidence_score >= 0.6:
+        return "✅ Yay! Safe!"
+    else:
+        return "↪️ TRY AGAIN"
 
 def assess_text_quality(text):
     """Assess the quality of extracted text to determine if we should suggest trying again"""
@@ -439,7 +426,7 @@ def get_emoji_shower_type(rating):
         return None
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with enhanced processing and emoji shower support"""
+    """Main scanning function with enhanced processing and stricter confidence requirements"""
     print(f"🚀 Starting ingredient scan for: {os.path.basename(image_path)}")
     
     try:
@@ -454,6 +441,9 @@ def scan_image_for_ingredients(image_path):
         # Match ingredients
         matches = match_ingredients(text)
         
+        # Get confidence score
+        confidence_score = matches.get("confidence_score", 0)
+        
         # Rate the ingredients
         rating = rate_ingredients(matches, text_quality)
         print(f"🏆 Final rating: {rating}")
@@ -462,15 +452,15 @@ def scan_image_for_ingredients(image_path):
         emoji_shower_type = get_emoji_shower_type(rating)
         print(f"🎊 Emoji shower type: {emoji_shower_type}")
         
-        # Add confidence score based on text extraction quality
-        if text_quality == "very_poor":
-            confidence = "very_low"
-        elif text_quality == "poor":
-            confidence = "low"
-        elif len(text) > 50:
+        # Determine overall confidence
+        if confidence_score >= 0.7:
             confidence = "high"
-        else:
+        elif confidence_score >= 0.5:
             confidence = "medium"
+        elif confidence_score >= 0.3:
+            confidence = "low"
+        else:
+            confidence = "very_low"
         
         # Add GMO alert if GMO ingredients found
         gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
@@ -479,6 +469,7 @@ def scan_image_for_ingredients(image_path):
             "rating": rating,
             "matched_ingredients": matches,
             "confidence": confidence,
+            "confidence_score": confidence_score,
             "extracted_text_length": len(text),
             "text_quality": text_quality,
             "extracted_text": text[:200] + "..." if len(text) > 200 else text,
@@ -486,7 +477,7 @@ def scan_image_for_ingredients(image_path):
             "gmo_alert": gmo_alert
         }
         
-        print(f"✅ Scan complete! Rating: {rating}, Confidence: {confidence}")
+        print(f"✅ Scan complete! Rating: {rating}, Confidence: {confidence} ({confidence_score:.2f})")
         if gmo_alert:
             print(f"📣 GMO ingredients detected!")
         
@@ -497,22 +488,23 @@ def scan_image_for_ingredients(image_path):
         import traceback
         traceback.print_exc()
         
-        # Return safe fallback result
+        # Return "try again" result instead of incorrect safe result
         return {
-            "rating": "✅ Yay! Safe!",
+            "rating": "↪️ TRY AGAIN",
             "matched_ingredients": {
                 "trans_fat": [],
                 "excitotoxins": [],
                 "corn": [],
-                "sugar": ["sugar"],
+                "sugar": [],
                 "gmo": [],
-                "safe_ingredients": ["water", "salt", "flour"],
-                "all_detected": ["water", "salt", "flour", "sugar"]
+                "safe_ingredients": [],
+                "all_detected": []
             },
-            "confidence": "medium",
-            "text_quality": "good",
-            "extracted_text_length": 25,
-            "extracted_text": "water, salt, flour, sugar",
-            "emoji_shower_type": "safe",
+            "confidence": "very_low",
+            "confidence_score": 0,
+            "text_quality": "very_poor",
+            "extracted_text_length": 0,
+            "extracted_text": "",
+            "emoji_shower_type": None,
             "gmo_alert": None
         }
