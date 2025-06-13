@@ -392,6 +392,42 @@
             border-left: 4px solid;
         }
 
+        <style>
+.gmo-alert {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 16px 0;
+    text-align: center;
+    font-weight: 700;
+    font-size: 18px;
+    color: #f57c00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    animation: pulse-alert 2s infinite;
+}
+
+@keyframes pulse-alert {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.gmo-alert-icon {
+    font-size: 24px;
+}
+</style>
+
+
         .category-title {
             font-weight: 700;
             margin-bottom: 8px;
@@ -657,13 +693,19 @@
             {% endif %}
 
             {% if result.matched_ingredients.gmo %}
-            <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">📣 GMO:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.gmo | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
+<div class="ingredient-category moderate-ingredients">
+    <div class="category-title">🧬 GMO Ingredients:</div>
+    <div class="ingredient-list">
+        {{ result.matched_ingredients.gmo | join(", ") }}
+    </div>
+</div>
+
+<!-- Add GMO Alert banner -->
+<div class="gmo-alert">
+    <span class="gmo-alert-icon">📣</span>
+    <span>GMO Alert! This product contains genetically modified ingredients</span>
+</div>
+{% endif %}
         </div>
         {% else %}
         <div class="try-again-message">
