@@ -1,334 +1,282 @@
-# Enhanced ingredient lists with improved detection patterns
+# scanner_config.py
+# Complete ingredient database following the hierarchy from requirements
 
-# TOP 5 MOST DANGEROUS - These trigger immediate danger regardless of count
-trans_fat_top5_danger = [
-    "partially hydrogenated",
-    "hydrogenated oil", 
+# TRANS FATS - High danger (even 1 = danger)
+trans_fat_high_risk = [
+    "partially hydrogenated oil",
+    "partially hydrogenated soybean oil",
+    "partially hydrogenated cottonseed oil",
+    "partially hydrogenated palm oil",
+    "partially hydrogenated canola oil",
     "vegetable shortening",
     "shortening",
-    "partially hydrog",  # OCR variation
-    "trans fat",
-    "trans fats"
-]
-
-excitotoxin_top5_danger = [
-    "monosodium glutamate",
-    "msg",
-    "hydrolyzed vegetable protein",
-    "hydrolyzed protein", 
-    "autolyzed yeast",
-    "glutamic acid",
-    "natural flavor"  # Most common hidden excitotoxin
-]
-
-gmo_top5_danger = [
-    "genetically modified",
-    "gmo",
-    "bioengineered", 
-    "genetically engineered",
-    "high fructose corn syrup",  # Most common GMO ingredient
-    "corn syrup",
-    "soybean oil"
-]
-
-# Enhanced trans fat detection
-trans_fat_high_risk = [
-    "partially hydrogenated",
     "hydrogenated oil",
-    "vegetable shortening", 
-    "shortening",
-    "partially hydrog",  # OCR variation
-    "part hydrogenated",
-    "trans fat",
-    "trans fats",
-    "hydrogenated fat",
-    "hydrogenated vegetable oil"
+    "interesterified fats",
+    "high-stability oil"
 ]
 
 trans_fat_moderate_risk = [
-    "hydrogenated",
+    "hydrogenated fat",
     "margarine",
-    "high-stability oil",
-    "interesterified fat",
-    "emulsifiers",
+    "vegetable oil",
+    "frying oil",
     "modified fat",
     "synthetic fat",
     "lard substitute",
     "monoglycerides",
-    "diglycerides",
-    "palm kernel oil"  # Can contain trans fats
+    "diglycerides"
 ]
 
-# Enhanced excitotoxin detection
+# Top 5 most dangerous trans fats for immediate danger trigger
+trans_fat_top5_danger = [
+    "partially hydrogenated oil",
+    "partially hydrogenated soybean oil",
+    "partially hydrogenated cottonseed oil",
+    "partially hydrogenated palm oil",
+    "partially hydrogenated canola oil"
+]
+
+# EXCITOTOXINS - High danger (even 1 = danger)
 excitotoxin_high_risk = [
     "monosodium glutamate",
     "msg",
-    "mono sodium glutamate",
+    "aspartame",
     "hydrolyzed vegetable protein",
-    "hydrolyzed protein",
-    "hydrolyzed plant protein",
-    "hydrolyzed soy protein",
-    "autolyzed yeast",
-    "yeast extract",
-    "calcium caseinate",
-    "sodium caseinate",
-    "textured protein",
-    "glutamic acid",
+    "hvp",
     "disodium inosinate",
     "disodium guanylate",
-    "natural flavor",
-    "natural flavors",
-    "natural flavoring",
-    "artificial flavor",
-    "artificial flavors",
-    "flavor enhancer",
-    "modified food starch",
-    "protein concentrate",
-    "soy protein isolate"
+    "yeast extract",
+    "autolyzed yeast",
+    "calcium caseinate",
+    "sodium caseinate",
+    "torula yeast"
 ]
 
 excitotoxin_moderate_risk = [
-    "spice extract",
+    "natural flavors",
+    "spices",
+    "seasonings",
+    "soy sauce",
+    "enzyme modified cheese",
+    "whey protein isolate",
+    "whey protein hydrolysate",
     "broth",
     "stock",
-    "bouillon",
-    "seasoning",
-    "protein isolate", 
-    "whey protein",
-    "gelatin",
-    "barley malt",
-    "malt extract",
-    "maltodextrin"
+    "bouillon"
 ]
 
-# Enhanced corn-based ingredient detection
+# Top 5 most dangerous excitotoxins for immediate danger trigger
+excitotoxin_top5_danger = [
+    "monosodium glutamate",
+    "msg",
+    "aspartame",
+    "hydrolyzed vegetable protein",
+    "hvp"
+]
+
+# CORN - Moderate danger
 corn_high_risk = [
-    "corn syrup",
     "high fructose corn syrup",
     "hfcs",
+    "corn syrup",
+    "corn syrup solids",
     "cornstarch",
-    "corn starch", 
-    "modified food starch",
+    "corn starch",
+    "modified cornstarch",
     "modified corn starch",
-    "corn oil",
-    "cornmeal",
-    "corn meal",
-    "milled corn",
-    "dextrose",
     "maltodextrin",
+    "dextrose",
+    "fructose",
+    "glucose",
     "citric acid",
     "ascorbic acid",
     "erythritol",
     "sorbitol",
     "xylitol",
-    "vanillin",
     "caramel color",
-    "caramel coloring",
-    "corn flour",
-    "corn bran",
-    "corn syrup solids",
-    "crystalline fructose"
+    "vanillin",
+    "msg",
+    "monosodium glutamate"
 ]
 
 corn_moderate_risk = [
-    "vegetable oil",  # Often corn-based
+    "natural flavors",
+    "natural flavoring",
+    "vegetable oil",
     "vegetable starch",
-    "glucose",
-    "fructose", 
+    "modified food starch",
+    "lactic acid",
     "xanthan gum",
-    "lecithin",
+    "guar gum",
     "enzymes",
+    "lecithin",
     "tocopherols",
-    "vitamin c",
-    "ascorbic",
-    "citric",
-    "dextrin",
-    "maltose",
-    "invert sugar"
+    "baking powder",
+    "polydextrose",
+    "inositol",
+    "mono- and diglycerides",
+    "calcium stearate",
+    "magnesium stearate"
 ]
 
-# Comprehensive sugar detection
+# SUGAR - Low danger
 sugar_keywords = [
-    "sugar",
-    "cane sugar",
-    "brown sugar",
-    "white sugar",
-    "raw sugar",
-    "glucose",
-    "fructose",
-    "sucrose",
-    "dextrose",
-    "maltose",
-    "lactose",
-    "corn syrup",
+    "high-fructose corn syrup",
     "high fructose corn syrup",
-    "maple syrup",
+    "hfcs",
+    "corn syrup",
+    "corn syrup solids",
+    "glucose-fructose syrup",
+    "crystalline fructose",
+    "anhydrous dextrose",
+    "invert sugar",
+    "maltodextrin",
+    "glucose solids",
+    "refiner's syrup",
     "agave syrup",
     "agave nectar",
-    "molasses",
-    "honey",
-    "artificial sweetener",
-    "aspartame",
-    "sucralose",
-    "saccharin",
-    "acesulfame potassium",
-    "ace-k",
-    "stevia",
-    "monk fruit",
-    "invert sugar",
-    "turbinado sugar",
+    "fructose",
+    "dextrose",
+    "glucose",
+    "sucrose",
+    "cane sugar",
+    "beet sugar",
+    "brown sugar",
     "coconut sugar",
     "date sugar",
-    "rice syrup",
-    "barley malt syrup",
-    "fruit juice concentrate",
+    "palm sugar",
     "evaporated cane juice",
-    "crystalline fructose",
-    "corn syrup solids"
+    "fruit juice concentrate",
+    "apple juice concentrate",
+    "grape juice concentrate",
+    "barley malt syrup",
+    "brown rice syrup",
+    "rice syrup",
+    "golden syrup",
+    "sorghum syrup",
+    "molasses",
+    "treacle",
+    "carob syrup",
+    "yacon syrup",
+    "honey",
+    "maple syrup",
+    "maple sugar",
+    "coconut nectar",
+    "date syrup",
+    "date paste"
 ]
 
-# Enhanced GMO detection
+# GMO - Not part of ranking but flagged as "GMO Alert!"
 gmo_keywords = [
-    "genetically modified",
-    "gmo",
-    "bioengineered",
-    "genetically engineered",
-    "modified",
-    "engineered",
-    "high fructose corn syrup",
     "corn syrup",
+    "high fructose corn syrup",
+    "hfcs",
+    "corn starch",
+    "modified corn starch",
     "soybean oil",
+    "soy lecithin",
+    "soy protein isolate",
     "canola oil",
     "cottonseed oil",
-    "corn oil",
-    "vegetable oil",  # Often GMO
-    "modified corn starch",
-    "soy lecithin",
-    "soy protein",
-    "corn starch",
+    "textured vegetable protein",
+    "tvp",
+    "hydrolyzed soy protein",
+    "hydrolyzed vegetable protein",
+    "sugar",  # when not labeled as "cane sugar"
+    "monoglycerides",
+    "diglycerides",
     "maltodextrin",
     "dextrose",
-    "citric acid",  # Often from GMO corn
+    "glucose",
+    "fructose",
     "ascorbic acid",
-    "vitamin c"
+    "citric acid",
+    "xanthan gum",
+    "natural flavors",
+    "yeast extract",
+    "heme",
+    "soy leghemoglobin",
+    "enzymes",
+    "glycerin",
+    "glycerol",
+    "lactic acid",
+    "sodium lactate",
+    "tocopherols",
+    "vitamin e",
+    "modified food starch",
+    "bioengineered food",
+    "contains bioengineered ingredients",
+    "genetically engineered",
+    "genetically modified organism",
+    "bioengineered",
+    "fermentation-derived proteins",
+    "synthetic biology",
+    "synbio",
+    "lab-grown",
+    "precision fermentation"
 ]
 
-# Additional harmful preservatives and additives
-preservatives_high_risk = [
-    "sodium benzoate",
-    "potassium benzoate", 
-    "sodium nitrite",
-    "sodium nitrate",
-    "potassium nitrite",
-    "potassium nitrate",
-    "sulfur dioxide",
-    "sodium sulfite",
-    "bha",
-    "bht",
-    "tbhq",
-    "propyl gallate",
-    "calcium propionate",
-    "sodium propionate",
-    "potassium sorbate",
-    "sodium erythorbate"
+# Top 5 most dangerous GMO ingredients
+gmo_top5_danger = [
+    "high fructose corn syrup",
+    "soybean oil",
+    "canola oil",
+    "corn starch",
+    "cottonseed oil"
 ]
 
-# Harmful artificial colors
-artificial_colors = [
-    "red 40",
-    "yellow 5", 
-    "yellow 6",
-    "blue 1",
-    "blue 2",
-    "red 3",
-    "green 3",
-    "fd&c",
-    "artificial color",
-    "artificial coloring",
-    "food coloring",
-    "lake",
-    "tartrazine",
-    "sunset yellow",
-    "allura red",
-    "brilliant blue",
-    "erythrosine",
-    "fast green"
+# Safe ingredients list
+safe_ingredients = [
+    "water",
+    "salt",
+    "flour",
+    "wheat flour",
+    "rice",
+    "oats",
+    "milk",
+    "eggs",
+    "butter",
+    "olive oil",
+    "vinegar",
+    "lemon juice",
+    "garlic",
+    "onion",
+    "tomatoes",
+    "cheese",
+    "cream",
+    "vanilla",
+    "cinnamon",
+    "pepper",
+    "herbs",
+    "spices",
+    "whole wheat",
+    "brown rice",
+    "quinoa",
+    "almonds",
+    "nuts",
+    "coconut",
+    "cocoa",
+    "chocolate",
+    "vanilla extract",
+    "baking soda",
+    "baking powder",
+    "yeast",
+    "honey",
+    "maple syrup",
+    "sea salt",
+    "iodized salt",
+    "garlic powder",
+    "onion powder",
+    "paprika",
+    "oregano",
+    "basil",
+    "fully hydrogenated oil",
+    "palm oil",  # non-hydrogenated
+    "coconut oil",
+    "butter",
+    "ghee",
+    "cold-pressed oils",
+    "olive oil",
+    "avocado oil",
+    "walnut oil"
 ]
-
-# Common OCR misreads and corrections
-common_ocr_corrections = {
-    # Spacing fixes
-    "com syrup": "corn syrup",
-    "com starch": "corn starch", 
-    "hydrog": "hydrogenated",
-    "nat flavor": "natural flavor",
-    "artif": "artificial",
-    "preserv": "preservative",
-    "glucos": "glucose",
-    "fructos": "fructose",
-    "sucros": "sucrose",
-    
-    # Character substitutions
-    "monosodium glutarnate": "monosodium glutamate",
-    "glutarnate": "glutamate",
-    "hydrogenated": "hydrogenated",
-    "partiaily": "partially",
-    "artifical": "artificial",
-    "naturaf": "natural",
-    "flavor": "flavor",
-    
-    # Common ingredient variations
-    "corn symp": "corn syrup",
-    "high fmctose": "high fructose",
-    "vegetabie oil": "vegetable oil",
-    "modified starcb": "modified starch",
-    "caramel coior": "caramel color"
-}
-
-# Ingredient synonyms for better matching
-ingredient_synonyms = {
-    "msg": ["monosodium glutamate", "mono sodium glutamate"],
-    "hfcs": ["high fructose corn syrup"],
-    "bha": ["butylated hydroxyanisole"],
-    "bht": ["butylated hydroxytoluene"], 
-    "tbhq": ["tertiary butylhydroquinone"],
-    "natural flavor": ["natural flavoring", "natural flavors"],
-    "artificial flavor": ["artificial flavoring", "artificial flavors"],
-    "corn syrup": ["corn syrup solids"],
-    "modified starch": ["modified food starch", "modified corn starch"],
-    "vegetable oil": ["veg oil", "vegetable oils"]
-}
-
-# Safe ingredients that should not trigger warnings
-safe_ingredients_whitelist = [
-    "water", "salt", "sea salt", "flour", "wheat flour", "whole wheat flour", 
-    "rice", "brown rice", "wild rice", "oats", "rolled oats", "quinoa", 
-    "milk", "organic milk", "eggs", "egg whites", "butter", "olive oil",
-    "coconut oil", "avocado oil", "vinegar", "apple cider vinegar",
-    "lemon juice", "lime juice", "garlic", "onion", "tomatoes", "potatoes",
-    "cheese", "cream", "yogurt", "vanilla", "vanilla extract", "pure vanilla",
-    "cinnamon", "black pepper", "white pepper", "herbs", "spices", 
-    "oregano", "basil", "thyme", "rosemary", "parsley", "cilantro",
-    "almonds", "walnuts", "pecans", "cashews", "peanuts", "sunflower seeds",
-    "pumpkin seeds", "chia seeds", "flax seeds", "sesame seeds",
-    "cocoa", "dark chocolate", "unsweetened chocolate", "baking soda",
-    "baking powder", "yeast", "active dry yeast", "honey", "pure honey",
-    "maple syrup", "pure maple syrup", "garlic powder", "onion powder",
-    "paprika", "turmeric", "ginger", "cardamom", "nutmeg", "cloves",
-    "organic", "natural", "whole grain", "stone ground", "cold pressed",
-    "extra virgin", "unrefined", "raw", "sprouted", "fermented"
-]
-
-# Weight factors for different risk levels
-risk_weights = {
-    "trans_fat_top5": 10,      # Immediate danger
-    "excitotoxin_top5": 10,    # Immediate danger
-    "gmo_top5": 10,            # Immediate danger
-    "trans_fat_high": 3,       # High risk
-    "excitotoxin_high": 3,     # High risk
-    "corn_high": 2,            # Moderate risk
-    "sugar": 1,                # Lower risk
-    "gmo": 2,                  # Moderate risk
-    "preservatives": 2,        # Moderate risk
-    "artificial_colors": 2     # Moderate risk
-}
