@@ -1,60 +1,4 @@
-# GMO - Not part of ranking but flagged as "GMO Alert!"
-gmo_keywords = [
-    "corn syrup",
-    "high fructose corn syrup",
-    "hfcs",
-    "corn starch",
-    "modified corn starch",
-    "soybean oil",
-    "soy lecithin",
-    "soy protein isolate",
-    "canola oil",
-    "cottonseed oil",
-    "textured vegetable protein",
-    "tvp",
-    "hydrolyzed soy protein",
-    "hydrolyzed vegetable protein",
-    "sugar",  # when not labeled as "cane sugar"
-    "monoglycerides",
-    "diglycerides",
-    "maltodextrin",
-    "dextrose",
-    "glucose",
-    "fructose",
-    "ascorbic acid",
-    "citric acid",
-    "xanthan gum",
-    "natural flavors",
-    "yeast extract",
-    "heme",
-    "soy leghemoglobin",
-    "enzymes",
-    "glycerin",
-    "glycerol",
-    "lactic acid",
-    "sodium lactate",
-    "tocopherols",
-    "vitamin e",
-    "modified food starch",
-    "bioengineered food",
-    "contains bioengineered ingredients",
-    "genetically engineered",
-    "genetically modified organism",
-    "bioengineered",
-    "fermentation-derived proteins",
-    "synthetic biology",
-    "synbio",
-    "lab-grown",
-    "precision fermentation",
-    "vegetable oil",
-    "corn# GMO - Not part of ranking but flagged as "GMO Alert!"
-gmo_keywords = [
-    "corn syrup",
-    "high fructose corn syrup",
-    "hfcs",
-    "corn starch",
-    "modified corn starch",
-    "soy# scanner_config.py
+# scanner_config.py
 # Complete ingredient database following the hierarchy from requirements
 
 # TRANS FATS - High danger (even 1 = danger)
@@ -230,7 +174,8 @@ sugar_keywords = [
     "maple sugar",
     "coconut nectar",
     "date syrup",
-    "date paste"
+    "date paste",
+    "sugar"
 ]
 
 # GMO - Not part of ranking but flagged as "GMO Alert!"
@@ -249,7 +194,7 @@ gmo_keywords = [
     "tvp",
     "hydrolyzed soy protein",
     "hydrolyzed vegetable protein",
-    "sugar",  # when not labeled as "cane sugar"
+    "sugar",
     "monoglycerides",
     "diglycerides",
     "maltodextrin",
@@ -280,7 +225,11 @@ gmo_keywords = [
     "synthetic biology",
     "synbio",
     "lab-grown",
-    "precision fermentation"
+    "precision fermentation",
+    "vegetable oil",
+    "corn",
+    "corn oil",
+    "corn meal"
 ]
 
 # Top 5 most dangerous GMO ingredients
@@ -338,7 +287,7 @@ safe_ingredients = [
     "oregano",
     "basil",
     "fully hydrogenated oil",
-    "palm oil",  # non-hydrogenated
+    "palm oil",
     "coconut oil",
     "butter",
     "ghee",
