@@ -1,593 +1,365 @@
+# ingredient_scanner.py
 import re
+import pytesseract
+from PIL import Image
 import os
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
-from scanner_config import *
+from typing import Dict, List, Set
 
-# Check if pytesseract is available
-try:
-    import pytesseract
-    TESSERACT_AVAILABLE = True
-    print("✅ Tesseract is available")
-except ImportError:
-    TESSERACT_AVAILABLE = False
-    print("⚠️ Tesseract not available, using fallback")
+# Risk level constants
+DANGER = "Oh NOOOO! Danger!"
+PROCEED_CAREFULLY = "Proceed carefully" 
+SAFE = "Yay! Safe!"
+TRY_AGAIN = "TRY AGAIN"
 
-def preprocess_image(image):
-    """Enhanced image preprocessing for better OCR accuracy"""
-    try:
-        # Convert to grayscale
-        if image.mode != 'L':
-            image = image.convert('L')
-        
-        # Resize if too large (helps with processing speed and memory)
-        max_size = 2000  # Increased for better quality
-        if max(image.size) > max_size:
-            ratio = max_size / max(image.size)
-            new_size = tuple(int(dim * ratio) for dim in image.size)
-            image = image.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Enhance contrast
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.0)
-        
-        # Enhance sharpness
-        enhancer = ImageEnhance.Sharpness(image)
-        image = enhancer.enhance(1.5)
-        
-        # Apply edge enhancement
-        image = image.filter(ImageFilter.EDGE_ENHANCE)
-        
-        # Auto-level the image
-        image = ImageOps.autocontrast(image)
-        
-        return image
-    except Exception as e:
-        print(f"Image preprocessing error: {e}")
-        return image
+# Trans Fats Database - High danger (flagged even if 1 is present)
+TRANS_FATS = {
+    "danger": [
+        "partially hydrogenated oil", "partially hydrogenated soybean oil",
+        "partially hydrogenated cottonseed oil", "partially hydrogenated palm oil",
+        "partially hydrogenated canola oil", "vegetable shortening", "shortening",
+        "hydrogenated oil", "interesterified fats", "high-stability oil"
+    ],
+    "caution": [
+        "hydrogenated fat", "margarine", "vegetable oil", "frying oil",
+        "modified fat", "synthetic fat", "lard substitute", "monoglycerides",
+        "diglycerides"
+    ],
+    "safe": [
+        "fully hydrogenated oil", "palm oil", "coconut oil", "butter",
+        "ghee", "cold-pressed oil", "olive oil", "avocado oil"
+    ]
+}
 
-def correct_image_orientation(image):
-    """Improved orientation correction with fallback"""
-    try:
-        if TESSERACT_AVAILABLE:
-            osd = pytesseract.image_to_osd(image)
-            rotation_match = re.search(r'(?<=Rotate: )\d+', osd)
-            if rotation_match:
-                rotation_angle = int(rotation_match.group(0))
-                if rotation_angle != 0:
-                    return image.rotate(360 - rotation_angle, expand=True)
-        return image
-    except Exception as e:
-        print(f"Orientation detection failed: {e}, using original image")
-        return image
+# Excitotoxins Database - High danger (flagged even if 1 is present)
+EXCITOTOXINS = {
+    "danger": [
+        "monosodium glutamate", "msg", "aspartame", "hydrolyzed vegetable protein",
+        "hvp", "hydrolyzed soy protein", "hydrolyzed corn protein", "disodium inosinate",
+        "disodium guanylate", "yeast extract", "natural yeast extract", "extract of yeast",
+        "autolyzed yeast", "calcium caseinate", "sodium caseinate", "torula yeast"
+    ],
+    "caution": [
+        "natural flavors", "natural flavoring", "spices", "seasoning blends",
+        "soy sauce", "non-brewed soy sauce", "hydrolyzed soy sauce", "enzyme modified cheese",
+        "whey protein isolate", "whey protein hydrolysate", "bouillon", "broth", "stock",
+        "chicken broth", "beef stock", "bouillon flavor"
+    ],
+    "low": [
+        "maltodextrin", "modified food starch", "textured vegetable protein", "tvp",
+        "corn syrup solids", "carrageenan"
+    ]
+}
 
-def extract_text_with_tesseract(image_path):
-    """Extract text using Tesseract OCR with multiple strategies"""
-    try:
-        image = Image.open(image_path)
-        image = correct_image_orientation(image)
-        image = preprocess_image(image)
-        
-        # Try multiple OCR configurations for better accuracy
-        configs = [
-            '--oem 3 --psm 6',  # Uniform block of text
-            '--oem 3 --psm 11', # Sparse text
-            '--oem 3 --psm 3',  # Fully automatic
-            '--oem 3 --psm 4',  # Single column of text
-        ]
-        
-        all_texts = []
-        for cfg in configs:
-            try:
-                text = pytesseract.image_to_string(image, config=cfg, timeout=30)
-                if text and text.strip():
-                    all_texts.append(text.strip())
-            except Exception as e:
-                print(f"OCR config {cfg} failed: {e}")
-                continue
-        
-        # Combine all extracted texts and find the longest one
-        if all_texts:
-            # Use the longest extracted text as it likely has the most information
-            combined_text = max(all_texts, key=len)
-            
-            # Clean and normalize the text
-            combined_text = re.sub(r'\n+', ' ', combined_text)  # Replace newlines with spaces
-            combined_text = re.sub(r'\s+', ' ', combined_text)  # Normalize whitespace
-            combined_text = combined_text.strip()
-            
-            print(f"Tesseract extracted: {combined_text[:300]}...")
-            return combined_text
-        
-        return ""
-        
-    except Exception as e:
-        print(f"Tesseract extraction error: {e}")
-        return ""
+# Corn Database - Moderate danger (1-2 = proceed carefully, 3-4 = danger)
+CORN = {
+    "high": [
+        "high fructose corn syrup", "hfcs", "corn syrup", "cornstarch", "modified cornstarch",
+        "maltodextrin", "dextrose", "fructose", "glucose", "citric acid", "ascorbic acid",
+        "erythritol", "sorbitol", "xylitol", "caramel color", "vanillin", "msg",
+        "monosodium glutamate"
+    ],
+    "moderate": [
+        "natural flavors", "natural flavoring", "vegetable oil", "vegetable starch",
+        "modified food starch", "lactic acid", "xanthan gum", "guar gum", "enzymes",
+        "lecithin", "tocopherols", "baking powder", "polydextrose", "inositol",
+        "mono- and diglycerides", "calcium stearate", "magnesium stearate"
+    ],
+    "low": [
+        "sodium erythorbate", "ethyl maltol", "sodium citrate", "potassium citrate",
+        "cornmeal", "corn flour", "masa harina", "corn oil", "corn alcohol",
+        "corn ethanol", "pla", "corn-based vinegars", "sorbitan monooleate",
+        "sorbitan tristearate", "zein"
+    ],
+    "suspected": [
+        "food starch", "spices", "flavor enhancer", "fermented sugar", "binder",
+        "stabilizer", "anti-caking agent"
+    ]
+}
 
-def extract_text_fallback(image_path):
-    """
-    Fallback text extraction for demo/testing purposes
-    Returns a moderate set of ingredients to test the scanner
-    """
-    try:
-        print("Using fallback ingredient detection for demo...")
-        
-        # Return a simple ingredient list that includes various categories
-        # This allows testing even when OCR fails
-        demo_ingredients = "water, wheat flour, sugar, salt, vegetable oil, yeast, natural flavors, corn syrup, modified corn starch"
-        
-        print(f"Fallback generated: {demo_ingredients}")
-        return demo_ingredients
-        
-    except Exception as e:
-        print(f"Fallback extraction error: {e}")
-        return ""
+# Sugar Database - Low danger (1-2 = proceed carefully, 3-4 = danger)
+SUGAR = {
+    "high": [
+        "high-fructose corn syrup", "corn syrup", "corn syrup solids", "glucose-fructose syrup",
+        "crystalline fructose", "anhydrous dextrose", "invert sugar", "maltodextrin",
+        "glucose solids", "refiner's syrup", "agave syrup", "agave nectar", "fructose",
+        "dextrose", "glucose", "sucrose"
+    ],
+    "low": [
+        "cane sugar", "beet sugar", "brown sugar", "coconut sugar", "date sugar", "palm sugar",
+        "evaporated cane juice", "fruit juice concentrate", "apple juice concentrate",
+        "grape juice concentrate", "barley malt syrup", "brown rice syrup", "rice syrup",
+        "golden syrup", "sorghum syrup", "molasses", "treacle", "carob syrup", "yacon syrup",
+        "honey", "maple syrup", "maple sugar", "coconut nectar", "date syrup", "date paste",
+        "banana puree", "raisin juice concentrate", "fig paste", "grape must", "apple puree",
+        "pineapple juice concentrate", "diastatic malt", "malt syrup", "malt extract", "ethyl maltol"
+    ],
+    "watch": [
+        "organic cane juice", "dehydrated cane juice", "cane juice crystals", "rice sweetener",
+        "corn sweetener", "natural sweetener", "all-natural sweetener", "naturally sweetened",
+        "naturally flavored", "natural flavor", "sweetened", "no refined sugar", "no added sugar",
+        "sugar-free"
+    ]
+}
 
-def extract_text_from_image(image_path):
-    """Main text extraction function with comprehensive fallback"""
-    print(f"🔍 Processing image: {os.path.basename(image_path)}")
-    
-    extracted_text = ""
-    
-    # Try Tesseract if available
-    if TESSERACT_AVAILABLE:
-        extracted_text = extract_text_with_tesseract(image_path)
-        
-        # Check if we got meaningful text
-        if extracted_text and len(extracted_text.strip()) > 20:
-            print(f"✅ Tesseract success: {len(extracted_text)} characters")
-            return extracted_text
-        else:
-            print("⚠️ Tesseract didn't extract enough text, using fallback")
-    
-    # Use fallback if Tesseract failed or unavailable
-    return extract_text_fallback(image_path)
+# GMO Database - Special category for alerts
+GMO_INGREDIENTS = [
+    "corn syrup", "high fructose corn syrup", "hfcs", "corn starch", "modified corn starch",
+    "soybean oil", "soy lecithin", "soy protein isolate", "canola oil", "cottonseed oil",
+    "textured vegetable protein", "tvp", "hydrolyzed soy protein", "hydrolyzed vegetable protein",
+    "sugar", "monoglycerides", "diglycerides", "maltodextrin", "dextrose", "glucose",
+    "fructose", "ascorbic acid", "citric acid", "xanthan gum", "natural flavors",
+    "yeast extract", "heme", "soy leghemoglobin", "enzymes", "glycerin", "glycerol",
+    "lactic acid", "sodium lactate", "tocopherols", "vitamin e", "modified food starch",
+    "bioengineered food", "contains bioengineered ingredients", "fermentation-derived dairy proteins",
+    "synbio vanillin", "vegetable oil", "starch", "modified starch", "lecithin",
+    "flavoring", "natural flavor", "artificial flavor", "alcohol", "ethanol", "corn alcohol",
+    "fruit juice concentrate", "papaya", "zucchini", "yellow summer squash", "arctic apple",
+    "innate potato", "pink pineapple", "genetically engineered", "genetically modified organism",
+    "bioengineered", "fermentation-derived proteins", "synthetic biology", "synbio",
+    "lab-grown", "precision fermentation"
+]
 
-def normalize_text(text):
-    """Enhanced text normalization for better matching"""
+def normalize_text(text: str) -> str:
+    """Normalize text for ingredient matching"""
     if not text:
         return ""
-    
-    # First, preserve the original text for debugging
-    original = text
-    
-    text = text.lower()
-    
-    # Fix common OCR errors and spacing issues
-    ocr_corrections = {
-        # Spacing fixes
-        'monosodiumglutamate': 'monosodium glutamate',
-        'monosodium glutamate': 'monosodium glutamate',
-        'mono sodium glutamate': 'monosodium glutamate',
-        'yeastextract': 'yeast extract',
-        'disodiumguanylate': 'disodium guanylate',
-        'disodiuminosinate': 'disodium inosinate',
-        'disodium inosinate': 'disodium inosinate',
-        'disodium guanylate': 'disodium guanylate',
-        'cornstarch': 'corn starch',
-        'cornflour': 'corn flour',
-        'cornmeal': 'corn meal',
-        'wheatflour': 'wheat flour',
-        'soybeanoll': 'soybean oil',
-        'soybeanoil': 'soybean oil',
-        'vegetableoil': 'vegetable oil',
-        'canolaoil': 'canola oil',
-        'sunfloweroil': 'sunflower oil',
-        'partiallyhydrogenated': 'partially hydrogenated',
-        'partially-hydrogenated': 'partially hydrogenated',
-        'hydrogenatedoil': 'hydrogenated oil',
-        'naturalflavors': 'natural flavors',
-        'naturalflavor': 'natural flavor',
-        'artificialcolor': 'artificial color',
-        'artificialcolors': 'artificial colors',
-        'modifiedcornstarch': 'modified corn starch',
-        'modifiedfoodstarch': 'modified food starch',
-        'highfructosecornsyrup': 'high fructose corn syrup',
-        'highfructose': 'high fructose',
-        'cornsyrup': 'corn syrup',
-        'citricacid': 'citric acid',
-        'ascorbicacid': 'ascorbic acid',
-        'lacticacid': 'lactic acid',
-        'wheyprotein': 'whey protein',
-        'wheyproteinconcentrate': 'whey protein concentrate',
-        'enrichedcornmeal': 'enriched corn meal',
-        # Common OCR errors
-        ' i ': ' l ',
-        ' ii ': ' ll ',
-        ' iii ': ' lll ',
-        'hlgh': 'high',
-        'fructos': 'fructose',
-        'com': 'corn',
-        'oll': 'oil',
-        'acld': 'acid',
-        'sodlum': 'sodium',
-        'artlflclal': 'artificial',
-        'modlfled': 'modified',
-        'glutmate': 'glutamate',
-        'msg/': 'msg',
-        '(msg)': 'msg',
-        '[msg]': 'msg',
-        'msg.': 'msg',
-    }
-    
-    for wrong, correct in ocr_corrections.items():
-        text = text.replace(wrong, correct)
-    
-    # Remove excessive punctuation but keep hyphens, commas, and parentheses
-    text = re.sub(r'[^\w\s,()-]', ' ', text)
-    
-    # Normalize whitespace
-    text = re.sub(r'\s+', ' ', text)
-    
-    return text.strip()
+    # Remove special characters, convert to lowercase, normalize whitespace
+    cleaned = re.sub(r'[^\w\s\-/()]', ' ', text.lower())
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
 
-def smart_ingredient_match(text, ingredient):
-    """
-    Smarter ingredient matching that handles variations and partial matches
-    """
+def extract_text_from_image(image_path: str) -> str:
+    """Extract text from image using OCR"""
+    try:
+        # Configure tesseract for better ingredient detection
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-./: '
+        
+        image = Image.open(image_path)
+        
+        # Enhance image for better OCR
+        image = image.convert('L')  # Convert to grayscale
+        
+        text = pytesseract.image_to_string(image, config=custom_config)
+        return text.strip()
+        
+    except Exception as e:
+        print(f"OCR Error: {e}")
+        return ""
+
+def find_ingredients_in_text(text: str, ingredient_list: List[str]) -> List[str]:
+    """Find ingredients from a list in the given text"""
+    found = []
     normalized_text = normalize_text(text)
-    normalized_ingredient = normalize_text(ingredient)
-    
-    if not normalized_ingredient:
-        return False
-    
-    # Debug print for critical ingredients
-    critical_ingredients = ['monosodium glutamate', 'msg', 'yeast extract', 'disodium inosinate', 'disodium guanylate']
-    if normalized_ingredient in critical_ingredients:
-        print(f"🔍 Checking for '{normalized_ingredient}' in text...")
-    
-    # First try exact match with word boundaries
-    if re.search(r'\b' + re.escape(normalized_ingredient) + r'\b', normalized_text):
-        if normalized_ingredient in critical_ingredients:
-            print(f"✅ Found '{normalized_ingredient}'!")
-        return True
-    
-    # Handle parentheses and variations
-    # e.g., "sugar (cane sugar)" should match "sugar"
-    if '(' in normalized_text:
-        # Remove parenthetical content and try again
-        clean_text = re.sub(r'\([^)]*\)', '', normalized_text)
-        if re.search(r'\b' + re.escape(normalized_ingredient) + r'\b', clean_text):
-            return True
-    
-    # Special handling for MSG and its variations
-    if normalized_ingredient in ['monosodium glutamate', 'msg']:
-        msg_patterns = [
-            r'\bmsg\b',
-            r'\bmonosodium\s+glutamate\b',
-            r'\bmono\s*sodium\s+glutamate\b',
-            r'\bm\.s\.g\b',
-            r'monosodium.*glutamate',
-            r'mono.*sodium.*glutamate'
-        ]
-        for pattern in msg_patterns:
-            if re.search(pattern, normalized_text):
-                print(f"✅ Found MSG via pattern: {pattern}")
-                return True
-    
-    # Special handling for yeast extract
-    if normalized_ingredient == 'yeast extract':
-        yeast_patterns = [
-            r'\byeast\s+extract\b',
-            r'\byeast\s*extract\b',
-            r'yeast.*extract'
-        ]
-        for pattern in yeast_patterns:
-            if re.search(pattern, normalized_text):
-                print(f"✅ Found yeast extract via pattern: {pattern}")
-                return True
-    
-    # Special handling for disodium compounds
-    if 'disodium' in normalized_ingredient:
-        disodium_patterns = [
-            r'\bdisodium\s+inosinate\b',
-            r'\bdisodium\s+guanylate\b',
-            r'disodium.*inosinate',
-            r'disodium.*guanylate'
-        ]
-        for pattern in disodium_patterns:
-            if re.search(pattern, normalized_text):
-                print(f"✅ Found disodium compound via pattern: {pattern}")
-                return True
-    
-    # For compound ingredients, check if all key words are present
-    ingredient_words = normalized_ingredient.split()
-    if len(ingredient_words) > 1:
-        # For ingredients with multiple words, check if all important words exist
-        key_words = [word for word in ingredient_words if len(word) > 3]  # Skip small words like "and", "or"
-        if key_words:
-            # Check if all key words appear in the text
-            all_found = all(re.search(r'\b' + re.escape(word) + r'\b', normalized_text) for word in key_words)
-            if all_found:
-                if normalized_ingredient in critical_ingredients:
-                    print(f"✅ Found '{normalized_ingredient}' by word matching!")
-                return True
-    
-    # Handle abbreviated forms
-    abbreviations = {
-        'msg': ['monosodium glutamate', 'mono sodium glutamate', 'mono-sodium glutamate'],
-        'hfcs': ['high fructose corn syrup'],
-        'hvp': ['hydrolyzed vegetable protein'],
-        'tvp': ['textured vegetable protein'],
-        'bha': ['butylated hydroxyanisole'],
-        'bht': ['butylated hydroxytoluene'],
-        'tbhq': ['tertiary butylhydroquinone']
-    }
-    
-    # Check if ingredient is an abbreviation
-    for abbr, full_names in abbreviations.items():
-        if normalized_ingredient == abbr:
-            if re.search(r'\b' + abbr + r'\b', normalized_text):
-                return True
-            # Also check for full names
-            for full_name in full_names:
-                if full_name in normalized_text:
-                    return True
-        # Check reverse - if ingredient is full name, look for abbreviation
-        elif normalized_ingredient in full_names:
-            if re.search(r'\b' + abbr + r'\b', normalized_text):
-                return True
-    
-    return False
-
-def fuzzy_match_ingredient(text, ingredient_list):
-    """Improved ingredient matching using smart matching"""
-    matches = []
     
     for ingredient in ingredient_list:
-        if smart_ingredient_match(text, ingredient):
-            matches.append(ingredient)
+        normalized_ingredient = normalize_text(ingredient)
+        
+        # Create pattern for word boundary matching
+        pattern = r'\b' + re.escape(normalized_ingredient) + r'\b'
+        
+        if re.search(pattern, normalized_text):
+            found.append(ingredient)
     
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_matches = []
-    for item in matches:
-        if item.lower() not in seen:
-            seen.add(item.lower())
-            unique_matches.append(item)
-    
-    return unique_matches
+    return found
 
-def match_ingredients(text):
-    """Enhanced ingredient matching with better detection"""
-    if not text:
-        return {
-            "trans_fat": [],
-            "excitotoxins": [],
-            "corn": [],
-            "sugar": [],
-            "gmo": [],
-            "safe_ingredients": [],
-            "all_detected": []
-        }
+def categorize_ingredients(text: str) -> Dict:
+    """Categorize all detected ingredients by type and risk level"""
     
-    print(f"🔬 Analyzing text: {text[:200]}...")
-    
-    # Match ingredients in each category
-    trans_fat_matches = fuzzy_match_ingredient(text, trans_fat_high_risk + trans_fat_moderate_risk)
-    excitotoxin_matches = fuzzy_match_ingredient(text, excitotoxin_high_risk + excitotoxin_moderate_risk)
-    corn_matches = fuzzy_match_ingredient(text, corn_high_risk + corn_moderate_risk)
-    sugar_matches = fuzzy_match_ingredient(text, sugar_keywords)
-    gmo_matches = fuzzy_match_ingredient(text, gmo_keywords)
-    
-    # Detect safe ingredients
-    safe_ingredients_list = [
-        "water", "salt", "flour", "wheat flour", "whole wheat flour", "rice", "brown rice",
-        "oats", "rolled oats", "milk", "skim milk", "eggs", "egg whites", "butter", 
-        "olive oil", "coconut oil", "avocado oil", "vinegar", "apple cider vinegar",
-        "lemon juice", "lime juice", "garlic", "onion", "tomatoes", "potatoes",
-        "cheese", "cheddar cheese", "cream", "sour cream", "yogurt", "vanilla", "vanilla extract",
-        "cinnamon", "pepper", "black pepper", "herbs", "spices", "basil", "oregano",
-        "thyme", "rosemary", "parsley", "quinoa", "almonds", "walnuts", "pecans",
-        "cashews", "peanuts", "coconut", "cocoa", "chocolate", "dark chocolate",
-        "baking soda", "baking powder", "yeast", "honey", "maple syrup", "stevia",
-        "sea salt", "himalayan salt", "garlic powder", "onion powder", "paprika",
-        "turmeric", "ginger", "mustard", "apple", "banana", "strawberry", "blueberry",
-        "whey", "buttermilk", "enzymes", "cheese cultures", "folic acid", "riboflavin",
-        "thiamine", "niacin", "ferrous sulfate"
-    ]
-    
-    safe_matches = fuzzy_match_ingredient(text, safe_ingredients_list)
-    
-    # Remove duplicates and combine all detected
-    all_detected = list(set(
-        trans_fat_matches + excitotoxin_matches + corn_matches + 
-        sugar_matches + gmo_matches + safe_matches
-    ))
-    
-    print(f"📊 Detection Results:")
-    print(f"  • Trans fat: {trans_fat_matches}")
-    print(f"  • Excitotoxins: {excitotoxin_matches}")
-    print(f"  • Corn: {corn_matches}")
-    print(f"  • Sugar: {sugar_matches}")
-    print(f"  • GMO: {gmo_matches}")
-    print(f"  • Safe: {safe_matches[:5]}..." if len(safe_matches) > 5 else f"  • Safe: {safe_matches}")
-    print(f"  • Total detected: {len(all_detected)} ingredients")
-    
-    return {
-        "trans_fat": trans_fat_matches,
-        "excitotoxins": excitotoxin_matches,
-        "corn": corn_matches,
-        "sugar": sugar_matches,
-        "gmo": gmo_matches,
-        "safe_ingredients": safe_matches,
-        "all_detected": all_detected
+    result = {
+        "trans_fat": [],
+        "excitotoxins": [], 
+        "corn": [],
+        "sugar": [],
+        "gmo": [],
+        "safe_ingredients": []
     }
+    
+    # Check Trans Fats
+    for category, ingredients in TRANS_FATS.items():
+        found = find_ingredients_in_text(text, ingredients)
+        if found:
+            if category == "danger" or category == "caution":
+                result["trans_fat"].extend(found)
+            elif category == "safe":
+                result["safe_ingredients"].extend(found)
+    
+    # Check Excitotoxins  
+    for category, ingredients in EXCITOTOXINS.items():
+        found = find_ingredients_in_text(text, ingredients)
+        if found:
+            if category == "danger" or category == "caution" or category == "low":
+                result["excitotoxins"].extend(found)
+    
+    # Check Corn
+    for category, ingredients in CORN.items():
+        found = find_ingredients_in_text(text, ingredients)
+        if found:
+            result["corn"].extend(found)
+    
+    # Check Sugar
+    for category, ingredients in SUGAR.items():
+        found = find_ingredients_in_text(text, ingredients)
+        if found:
+            result["sugar"].extend(found)
+    
+    # Check GMO
+    found_gmo = find_ingredients_in_text(text, GMO_INGREDIENTS)
+    if found_gmo:
+        result["gmo"].extend(found_gmo)
+    
+    # Remove duplicates
+    for category in result:
+        result[category] = list(set(result[category]))
+    
+    return result
 
-def rate_ingredients(matches, text_quality):
-    """
-    Rate ingredients according to the hierarchy with balanced approach
-    """
+def determine_overall_risk(categorized_ingredients: Dict) -> str:
+    """Determine overall risk level based on ingredient hierarchy"""
     
-    # Check total ingredients detected
-    total_detected = len(matches["all_detected"])
+    # 1. Trans Fats: High danger - flagged even if 1 is present
+    if categorized_ingredients["trans_fat"]:
+        return DANGER
     
-    # If we detected very few ingredients AND text quality is poor, try again
-    if total_detected < 2 and text_quality in ["very_poor", "poor"]:
-        return "↪️ TRY AGAIN"
+    # 2. Excitotoxins: High danger - flagged even if 1 is present  
+    if categorized_ingredients["excitotoxins"]:
+        return DANGER
     
-    # If text is completely unreadable
-    if text_quality == "very_poor" and total_detected == 0:
-        return "↪️ TRY AGAIN"
+    # 3. Corn: Moderate Danger - 1-2 = proceed carefully, 3-4 = danger
+    corn_count = len(categorized_ingredients["corn"])
+    if corn_count >= 3:
+        return DANGER
+    elif corn_count >= 1:
+        return PROCEED_CAREFULLY
     
-    # Now proceed with ingredient analysis
+    # 4. Sugar: Low danger - 1-2 = proceed carefully, 3-4 = danger
+    sugar_count = len(categorized_ingredients["sugar"])
+    if sugar_count >= 3:
+        return DANGER
+    elif sugar_count >= 1:
+        return PROCEED_CAREFULLY
     
-    # Check for HIGH DANGER ingredients (Trans Fats and Excitotoxins)
-    high_danger_found = []
-    
-    # Check trans fats - any high-risk trans fat is immediate danger
-    if matches["trans_fat"]:
-        for ingredient in matches["trans_fat"]:
-            if ingredient.lower() in [i.lower() for i in trans_fat_high_risk]:
-                high_danger_found.append(ingredient)
-    
-    # Check excitotoxins - any high-risk excitotoxin is immediate danger
-    if matches["excitotoxins"]:
-        for ingredient in matches["excitotoxins"]:
-            if ingredient.lower() in [i.lower() for i in excitotoxin_high_risk]:
-                high_danger_found.append(ingredient)
-    
-    # If any HIGH DANGER ingredients found, return danger
-    if high_danger_found:
-        print(f"🚨 HIGH DANGER ingredients found: {high_danger_found}")
-        return "🚨 Oh NOOOO! Danger!"
-    
-    # Count all problematic ingredients (moderate + low danger)
-    problematic_count = 0
-    
-    # Count all problematic ingredients
-    problematic_count += len(matches["corn"])
-    problematic_count += len(matches["sugar"])
-    
-    # Count moderate risk trans fats
-    for ingredient in matches["trans_fat"]:
-        if ingredient.lower() in [i.lower() for i in trans_fat_moderate_risk]:
-            problematic_count += 1
-    
-    # Count moderate risk excitotoxins
-    for ingredient in matches["excitotoxins"]:
-        if ingredient.lower() in [i.lower() for i in excitotoxin_moderate_risk]:
-            problematic_count += 1
-    
-    print(f"⚖️ Total problematic ingredients: {problematic_count}")
-    
-    # Apply the 1-2 = Caution, 3+ = Danger rule
-    if problematic_count >= 3:
-        return "🚨 Oh NOOOO! Danger!"
-    elif problematic_count >= 1:
-        return "⚠️ Proceed carefully"
-    
-    # If we detected some ingredients and none are dangerous, it's safe
-    if total_detected >= 2:
-        return "✅ Yay! Safe!"
-    
-    # If we couldn't detect enough ingredients, try again
-    return "↪️ TRY AGAIN"
+    # 5. Zero danger items = Safe
+    return SAFE
 
-def assess_text_quality(text):
-    """Assess the quality of extracted text"""
-    if not text or len(text.strip()) < 10:
-        return "very_poor"
-    
-    # Check for reasonable word-like content
-    words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
-    
-    if len(words) < 3:
-        return "poor"
-    elif len(words) < 10:
-        return "medium"
-    else:
-        return "good"
-
-def get_emoji_shower_type(rating):
-    """Determine emoji shower type based on rating"""
-    if "TRY AGAIN" in rating:
-        return None
-    elif "Danger" in rating:
-        return "danger"
-    elif "Proceed carefully" in rating:
-        return "caution"
-    elif "Safe" in rating:
-        return "safe"
-    else:
-        return None
-
-def scan_image_for_ingredients(image_path):
-    """Main scanning function with balanced detection approach"""
-    print(f"🚀 Starting ingredient scan for: {os.path.basename(image_path)}")
+def scan_image_for_ingredients(image_path: str) -> Dict:
+    """Main function to scan image and return ingredient analysis"""
     
     try:
         # Extract text from image
-        text = extract_text_from_image(image_path)
-        print(f"📝 Extracted text length: {len(text)}")
+        extracted_text = extract_text_from_image(image_path)
         
-        # Assess text quality
-        text_quality = assess_text_quality(text)
-        print(f"🎯 Text quality: {text_quality}")
+        if not extracted_text or len(extracted_text.strip()) < 10:
+            return {
+                "rating": TRY_AGAIN,
+                "confidence": "low",
+                "extracted_text": extracted_text,
+                "matched_ingredients": {
+                    "trans_fat": [],
+                    "excitotoxins": [],
+                    "corn": [],
+                    "sugar": [],
+                    "gmo": [],
+                    "safe_ingredients": []
+                }
+            }
         
-        # Match ingredients
-        matches = match_ingredients(text)
+        # Categorize ingredients
+        matched_ingredients = categorize_ingredients(extracted_text)
         
-        # Rate the ingredients
-        rating = rate_ingredients(matches, text_quality)
-        print(f"🏆 Final rating: {rating}")
+        # Determine overall risk
+        overall_risk = determine_overall_risk(matched_ingredients)
         
-        # Determine emoji shower type
-        emoji_shower_type = get_emoji_shower_type(rating)
-        print(f"🎊 Emoji shower type: {emoji_shower_type}")
-        
-        # Determine confidence based on detection results
-        total_detected = len(matches["all_detected"])
-        if total_detected >= 10:
-            confidence = "high"
-        elif total_detected >= 5:
-            confidence = "medium"
-        elif total_detected >= 2:
-            confidence = "low"
-        else:
-            confidence = "very_low"
-        
-        # Add GMO alert if GMO ingredients found
-        gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
+        # Calculate confidence based on text quality and matches
+        total_matches = sum(len(matches) for matches in matched_ingredients.values())
+        confidence = "high" if total_matches > 0 and len(extracted_text) > 50 else "medium"
         
         result = {
-            "rating": rating,
-            "matched_ingredients": matches,
+            "rating": overall_risk,
             "confidence": confidence,
-            "extracted_text_length": len(text),
-            "text_quality": text_quality,
-            "extracted_text": text[:200] + "..." if len(text) > 200 else text,
-            "emoji_shower_type": emoji_shower_type,
-            "gmo_alert": gmo_alert
+            "extracted_text": extracted_text,
+            "matched_ingredients": matched_ingredients
         }
-        
-        print(f"✅ Scan complete! Rating: {rating}, Confidence: {confidence}")
-        if gmo_alert:
-            print(f"📣 GMO ingredients detected!")
         
         return result
         
     except Exception as e:
-        print(f"❌ Critical error in scan_image_for_ingredients: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Return try again on error
+        print(f"Scanning error: {e}")
         return {
-            "rating": "↪️ TRY AGAIN",
+            "rating": TRY_AGAIN,
+            "confidence": "low",
+            "extracted_text": "",
             "matched_ingredients": {
                 "trans_fat": [],
                 "excitotoxins": [],
                 "corn": [],
                 "sugar": [],
                 "gmo": [],
-                "safe_ingredients": [],
-                "all_detected": []
+                "safe_ingredients": []
             },
-            "confidence": "very_low",
-            "text_quality": "very_poor",
-            "extracted_text_length": 0,
-            "extracted_text": "",
-            "emoji_shower_type": None,
-            "gmo_alert": None
+            "error": str(e)
         }
+
+# Additional utility functions for debugging
+def print_ingredient_databases():
+    """Print all ingredient databases for verification"""
+    print("=== TRANS FATS ===")
+    for category, ingredients in TRANS_FATS.items():
+        print(f"{category.upper()}: {len(ingredients)} ingredients")
+        for ing in ingredients[:5]:  # Show first 5
+            print(f"  - {ing}")
+        if len(ingredients) > 5:
+            print(f"  ... and {len(ingredients) - 5} more")
+        print()
+    
+    print("=== EXCITOTOXINS ===")
+    for category, ingredients in EXCITOTOXINS.items():
+        print(f"{category.upper()}: {len(ingredients)} ingredients")
+        for ing in ingredients[:5]:
+            print(f"  - {ing}")
+        if len(ingredients) > 5:
+            print(f"  ... and {len(ingredients) - 5} more")
+        print()
+    
+    print("=== CORN ===")
+    for category, ingredients in CORN.items():
+        print(f"{category.upper()}: {len(ingredients)} ingredients")
+        for ing in ingredients[:5]:
+            print(f"  - {ing}")
+        if len(ingredients) > 5:
+            print(f"  ... and {len(ingredients) - 5} more")
+        print()
+    
+    print("=== SUGAR ===")
+    for category, ingredients in SUGAR.items():
+        print(f"{category.upper()}: {len(ingredients)} ingredients")
+        for ing in ingredients[:5]:
+            print(f"  - {ing}")
+        if len(ingredients) > 5:
+            print(f"  ... and {len(ingredients) - 5} more")
+        print()
+    
+    print(f"=== GMO === {len(GMO_INGREDIENTS)} ingredients")
+    for ing in GMO_INGREDIENTS[:10]:
+        print(f"  - {ing}")
+    if len(GMO_INGREDIENTS) > 10:
+        print(f"  ... and {len(GMO_INGREDIENTS) - 10} more")
+
+if __name__ == "__main__":
+    # Test with sample text
+    test_text = "Ingredients: water, corn syrup, partially hydrogenated soybean oil, natural flavors, citric acid, msg"
+    
+    print("Testing ingredient scanner...")
+    print(f"Test text: {test_text}")
+    print()
+    
+    categorized = categorize_ingredients(test_text)
+    risk = determine_overall_risk(categorized)
+    
+    print(f"Overall Risk: {risk}")
+    print("Categorized ingredients:")
+    for category, ingredients in categorized.items():
+        if ingredients:
+            print(f"  {category}: {ingredients}")
+    
+    print("\n" + "="*50)
+    print_ingredient_databases()
