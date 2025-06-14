@@ -4,7 +4,10 @@ import pytesseract
 from PIL import Image
 import os
 from typing import Dict, List, Set
-
+import os
+if os.environ.get('RENDER'):
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+    
 # Risk level constants
 DANGER = "Oh NOOOO! Danger!"
 PROCEED_CAREFULLY = "Proceed carefully" 
