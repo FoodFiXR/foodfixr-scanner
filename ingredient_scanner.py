@@ -1,13 +1,16 @@
 # ingredient_scanner.py
 import re
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance
 import os
 from typing import Dict, List, Set
-import os
+
+# Configure tesseract path for different environments
 if os.environ.get('RENDER'):
     pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-    
+elif os.name == 'nt':  # Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
 # Risk level constants
 DANGER = "Oh NOOOO! Danger!"
 PROCEED_CAREFULLY = "Proceed carefully" 
@@ -131,37 +134,127 @@ def normalize_text(text: str) -> str:
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
-def extract_text_from_image(image_path: str) -> str:
-    """Extract text from image using OCR"""
+def enhance_image_for_ocr(image_path: str) -> Image.Image:
+    """Enhance image for better OCR recognition"""
     try:
-        # Configure tesseract for better ingredient detection
-        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-./: '
-        
         image = Image.open(image_path)
         
-        # Enhance image for better OCR
-        image = image.convert('L')  # Convert to grayscale
+        # Convert to RGB if needed
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
         
-        text = pytesseract.image_to_string(image, config=custom_config)
-        return text.strip()
+        # Resize if too small (OCR works better on larger images)
+        width, height = image.size
+        if width < 800 or height < 600:
+            scale_factor = max(800/width, 600/height)
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to grayscale
+        image = image.convert('L')
+        
+        # Enhance contrast
+        from PIL import ImageEnhance
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.0)  # Increase contrast
+        
+        # Enhance sharpness
+        enhancer = ImageEnhance.Sharpness(image)
+        image = enhancer.enhance(2.0)  # Increase sharpness
+        
+        return image
+        
+    except Exception as e:
+        print(f"Image enhancement error: {e}")
+        return Image.open(image_path).convert('L')
+
+def extract_text_from_image(image_path: str) -> str:
+    """Extract text from image using OCR with multiple attempts"""
+    try:
+        # Enhance image first
+        enhanced_image = enhance_image_for_ocr(image_path)
+        
+        # Try multiple OCR configurations
+        configs = [
+            r'--oem 3 --psm 6',  # Assume uniform block of text
+            r'--oem 3 --psm 8',  # Single word
+            r'--oem 3 --psm 7',  # Single text line
+            r'--oem 3 --psm 3',  # Fully automatic page segmentation
+            r'--oem 3 --psm 11', # Sparse text
+            r'--oem 3 --psm 13'  # Raw line
+        ]
+        
+        best_text = ""
+        max_length = 0
+        
+        for config in configs:
+            try:
+                text = pytesseract.image_to_string(enhanced_image, config=config)
+                cleaned_text = text.strip()
+                
+                # Keep the longest/best result
+                if len(cleaned_text) > max_length:
+                    max_length = len(cleaned_text)
+                    best_text = cleaned_text
+                    
+            except Exception as config_error:
+                print(f"Config {config} failed: {config_error}")
+                continue
+        
+        # If still no good result, try with original image
+        if len(best_text) < 10:
+            try:
+                original_image = Image.open(image_path).convert('L')
+                best_text = pytesseract.image_to_string(original_image, config=r'--oem 3 --psm 6')
+            except:
+                pass
+        
+        print(f"OCR extracted text: {best_text[:100]}...")  # Debug print
+        return best_text.strip()
         
     except Exception as e:
         print(f"OCR Error: {e}")
         return ""
 
 def find_ingredients_in_text(text: str, ingredient_list: List[str]) -> List[str]:
-    """Find ingredients from a list in the given text"""
+    """Find ingredients from a list in the given text with fuzzy matching"""
     found = []
     normalized_text = normalize_text(text)
     
     for ingredient in ingredient_list:
         normalized_ingredient = normalize_text(ingredient)
         
-        # Create pattern for word boundary matching
+        # Try exact word boundary match first
         pattern = r'\b' + re.escape(normalized_ingredient) + r'\b'
-        
         if re.search(pattern, normalized_text):
             found.append(ingredient)
+            continue
+            
+        # Try partial match for compound ingredients
+        if normalized_ingredient in normalized_text:
+            found.append(ingredient)
+            continue
+            
+        # Try fuzzy matching for common OCR errors
+        # Replace common OCR mistakes
+        fuzzy_ingredient = normalized_ingredient
+        fuzzy_text = normalized_text
+        
+        # Common OCR substitutions
+        ocr_fixes = {
+            'rn': 'm', 'cl': 'd', '1': 'l', '0': 'o', '5': 's',
+            'vv': 'w', 'ii': 'n', 'fi': 'h'
+        }
+        
+        for wrong, right in ocr_fixes.items():
+            fuzzy_ingredient = fuzzy_ingredient.replace(wrong, right)
+            fuzzy_text = fuzzy_text.replace(wrong, right)
+        
+        # Try the fuzzy match
+        if fuzzy_ingredient in fuzzy_text:
+            found.append(ingredient)
+            continue
     
     return found
 
@@ -251,7 +344,11 @@ def scan_image_for_ingredients(image_path: str) -> Dict:
         # Extract text from image
         extracted_text = extract_text_from_image(image_path)
         
-        if not extracted_text or len(extracted_text.strip()) < 10:
+        print(f"Extracted text length: {len(extracted_text)}")  # Debug
+        print(f"Extracted text preview: {extracted_text[:200]}")  # Debug
+        
+        # More lenient text validation
+        if not extracted_text or len(extracted_text.strip()) < 5:
             return {
                 "rating": TRY_AGAIN,
                 "confidence": "low",
@@ -269,12 +366,33 @@ def scan_image_for_ingredients(image_path: str) -> Dict:
         # Categorize ingredients
         matched_ingredients = categorize_ingredients(extracted_text)
         
+        # Debug: Print what was found
+        total_matches = sum(len(matches) for matches in matched_ingredients.values())
+        print(f"Total ingredient matches found: {total_matches}")
+        for category, matches in matched_ingredients.items():
+            if matches:
+                print(f"{category}: {matches}")
+        
         # Determine overall risk
         overall_risk = determine_overall_risk(matched_ingredients)
         
+        # If we have text but no matches, it might still be ingredients
+        # Lower the threshold for "TRY AGAIN"
+        if total_matches == 0 and len(extracted_text.strip()) < 20:
+            return {
+                "rating": TRY_AGAIN,
+                "confidence": "low", 
+                "extracted_text": extracted_text,
+                "matched_ingredients": matched_ingredients
+            }
+        
         # Calculate confidence based on text quality and matches
-        total_matches = sum(len(matches) for matches in matched_ingredients.values())
-        confidence = "high" if total_matches > 0 and len(extracted_text) > 50 else "medium"
+        if total_matches > 0:
+            confidence = "high"
+        elif len(extracted_text) > 30:
+            confidence = "medium"
+        else:
+            confidence = "low"
         
         result = {
             "rating": overall_risk,
