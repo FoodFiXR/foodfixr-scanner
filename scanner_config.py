@@ -1,5 +1,5 @@
 # scanner_config.py
-# Complete ingredient database following the hierarchy from requirements
+# Ingredient database following the exact hierarchy from requirements
 
 # TRANS FATS - High danger (even 1 = danger)
 trans_fat_high_risk = [
@@ -10,7 +10,7 @@ trans_fat_high_risk = [
     "partially hydrogenated canola oil",
     "vegetable shortening",
     "shortening",
-    "hydrogenated oil",
+    "hydrogenated oil",  # without "fully"
     "interesterified fats",
     "high-stability oil"
 ]
@@ -18,7 +18,8 @@ trans_fat_high_risk = [
 trans_fat_moderate_risk = [
     "hydrogenated fat",
     "margarine",
-    "vegetable oil",
+    "vegetable oil",  # unspecified
+    "blended vegetable oil",
     "frying oil",
     "modified fat",
     "synthetic fat",
@@ -27,14 +28,8 @@ trans_fat_moderate_risk = [
     "diglycerides"
 ]
 
-# Top 5 most dangerous trans fats for immediate danger trigger
-trans_fat_top5_danger = [
-    "partially hydrogenated oil",
-    "partially hydrogenated soybean oil",
-    "partially hydrogenated cottonseed oil",
-    "partially hydrogenated palm oil",
-    "partially hydrogenated canola oil"
-]
+# Top 5 most dangerous trans fats (not needed per new hierarchy)
+trans_fat_top5_danger = []  # Remove this as hierarchy says even 1 = danger
 
 # EXCITOTOXINS - High danger (even 1 = danger)
 excitotoxin_high_risk = [
@@ -49,12 +44,7 @@ excitotoxin_high_risk = [
     "autolyzed yeast",
     "calcium caseinate",
     "sodium caseinate",
-    "torula yeast",
-    "whey protein concentrate",
-    "whey protein isolate",
-    "textured protein",
-    "hydrolyzed protein",
-    "autolyzed yeast extract"
+    "torula yeast"
 ]
 
 excitotoxin_moderate_risk = [
@@ -70,44 +60,31 @@ excitotoxin_moderate_risk = [
     "bouillon"
 ]
 
-# Top 5 most dangerous excitotoxins for immediate danger trigger
-excitotoxin_top5_danger = [
-    "monosodium glutamate",
-    "msg",
-    "aspartame",
-    "hydrolyzed vegetable protein",
-    "hvp"
-]
+# Top 5 most dangerous excitotoxins (not needed per new hierarchy)
+excitotoxin_top5_danger = []  # Remove this as hierarchy says even 1 = danger
 
 # CORN - Moderate danger
 corn_high_risk = [
     "high fructose corn syrup",
     "hfcs",
     "corn syrup",
-    "corn syrup solids",
     "cornstarch",
     "corn starch",
     "modified cornstarch",
     "modified corn starch",
     "maltodextrin",
     "dextrose",
-    "fructose",
+    "fructose",  # not labeled as fruit-based
     "glucose",
-    "citric acid",
-    "ascorbic acid",
+    "citric acid",  # from corn
+    "ascorbic acid",  # vitamin C synthesized from corn
     "erythritol",
     "sorbitol",
     "xylitol",
     "caramel color",
     "vanillin",
-    "msg",
-    "monosodium glutamate",
-    "corn meal",
-    "enriched corn meal",
-    "corn flour",
-    "corn oil",
-    "corn dextrin",
-    "corn maltodextrin"
+    "msg",  # often fermented using corn sugar
+    "monosodium glutamate"  # may be derived from corn
 ]
 
 corn_moderate_risk = [
@@ -132,6 +109,7 @@ corn_moderate_risk = [
 
 # SUGAR - Low danger
 sugar_keywords = [
+    # High Risk Sugars (from document)
     "high-fructose corn syrup",
     "high fructose corn syrup",
     "hfcs",
@@ -150,6 +128,7 @@ sugar_keywords = [
     "dextrose",
     "glucose",
     "sucrose",
+    # Moderately Dangerous & Low Risk Sugars
     "cane sugar",
     "beet sugar",
     "brown sugar",
@@ -157,6 +136,7 @@ sugar_keywords = [
     "date sugar",
     "palm sugar",
     "evaporated cane juice",
+    "fruit juice concentrates",
     "fruit juice concentrate",
     "apple juice concentrate",
     "grape juice concentrate",
@@ -194,7 +174,7 @@ gmo_keywords = [
     "tvp",
     "hydrolyzed soy protein",
     "hydrolyzed vegetable protein",
-    "sugar",
+    "sugar",  # when not labeled as "cane sugar"
     "monoglycerides",
     "diglycerides",
     "maltodextrin",
@@ -226,23 +206,23 @@ gmo_keywords = [
     "synbio",
     "lab-grown",
     "precision fermentation",
-    "vegetable oil",
-    "corn",
-    "corn oil",
-    "corn meal"
+    "vegetable oil"
 ]
 
-# Top 5 most dangerous GMO ingredients
-gmo_top5_danger = [
-    "high fructose corn syrup",
-    "soybean oil",
-    "canola oil",
-    "corn starch",
-    "cottonseed oil"
-]
+# No top 5 for GMO - all GMOs get alert
+gmo_top5_danger = []
 
-# Safe ingredients list
+# Safe ingredients (from Trans Fats safe list + others)
 safe_ingredients = [
+    "fully hydrogenated oil",
+    "palm oil",  # non-hydrogenated
+    "coconut oil",
+    "butter",
+    "ghee",
+    "cold-pressed oils",
+    "olive oil",
+    "avocado oil",
+    "walnut oil",
     "water",
     "salt",
     "flour",
@@ -251,8 +231,6 @@ safe_ingredients = [
     "oats",
     "milk",
     "eggs",
-    "butter",
-    "olive oil",
     "vinegar",
     "lemon juice",
     "garlic",
@@ -277,22 +255,30 @@ safe_ingredients = [
     "baking soda",
     "baking powder",
     "yeast",
-    "honey",
-    "maple syrup",
     "sea salt",
     "iodized salt",
     "garlic powder",
     "onion powder",
     "paprika",
     "oregano",
-    "basil",
-    "fully hydrogenated oil",
-    "palm oil",
-    "coconut oil",
-    "butter",
-    "ghee",
-    "cold-pressed oils",
-    "olive oil",
-    "avocado oil",
-    "walnut oil"
+    "basil"
 ]
+
+# Remove these as they're not in the hierarchy document
+preservatives_high_risk = []
+artificial_colors = []
+
+# Common OCR corrections
+common_ocr_errors = {
+    "com syrup": "corn syrup",
+    "com starch": "corn starch",
+    "hydrog": "hydrogenated",
+    "nat flavor": "natural flavor",
+    "artif": "artificial",
+    "preserv": "preservative",
+    "glucos": "glucose",
+    "fructos": "fructose",
+    "sucros": "sucrose",
+    "partialy": "partially",
+    "hydrogented": "hydrogenated"
+}
