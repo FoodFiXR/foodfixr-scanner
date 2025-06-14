@@ -1,4 +1,60 @@
-# scanner_config.py
+# GMO - Not part of ranking but flagged as "GMO Alert!"
+gmo_keywords = [
+    "corn syrup",
+    "high fructose corn syrup",
+    "hfcs",
+    "corn starch",
+    "modified corn starch",
+    "soybean oil",
+    "soy lecithin",
+    "soy protein isolate",
+    "canola oil",
+    "cottonseed oil",
+    "textured vegetable protein",
+    "tvp",
+    "hydrolyzed soy protein",
+    "hydrolyzed vegetable protein",
+    "sugar",  # when not labeled as "cane sugar"
+    "monoglycerides",
+    "diglycerides",
+    "maltodextrin",
+    "dextrose",
+    "glucose",
+    "fructose",
+    "ascorbic acid",
+    "citric acid",
+    "xanthan gum",
+    "natural flavors",
+    "yeast extract",
+    "heme",
+    "soy leghemoglobin",
+    "enzymes",
+    "glycerin",
+    "glycerol",
+    "lactic acid",
+    "sodium lactate",
+    "tocopherols",
+    "vitamin e",
+    "modified food starch",
+    "bioengineered food",
+    "contains bioengineered ingredients",
+    "genetically engineered",
+    "genetically modified organism",
+    "bioengineered",
+    "fermentation-derived proteins",
+    "synthetic biology",
+    "synbio",
+    "lab-grown",
+    "precision fermentation",
+    "vegetable oil",
+    "corn# GMO - Not part of ranking but flagged as "GMO Alert!"
+gmo_keywords = [
+    "corn syrup",
+    "high fructose corn syrup",
+    "hfcs",
+    "corn starch",
+    "modified corn starch",
+    "soy# scanner_config.py
 # Complete ingredient database following the hierarchy from requirements
 
 # TRANS FATS - High danger (even 1 = danger)
@@ -49,7 +105,12 @@ excitotoxin_high_risk = [
     "autolyzed yeast",
     "calcium caseinate",
     "sodium caseinate",
-    "torula yeast"
+    "torula yeast",
+    "whey protein concentrate",
+    "whey protein isolate",
+    "textured protein",
+    "hydrolyzed protein",
+    "autolyzed yeast extract"
 ]
 
 excitotoxin_moderate_risk = [
@@ -96,7 +157,13 @@ corn_high_risk = [
     "caramel color",
     "vanillin",
     "msg",
-    "monosodium glutamate"
+    "monosodium glutamate",
+    "corn meal",
+    "enriched corn meal",
+    "corn flour",
+    "corn oil",
+    "corn dextrin",
+    "corn maltodextrin"
 ]
 
 corn_moderate_risk = [
