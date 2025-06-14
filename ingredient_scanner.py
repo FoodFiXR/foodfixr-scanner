@@ -20,7 +20,7 @@ def preprocess_image(image):
             image = image.convert('L')
         
         # Resize if too large (helps with processing speed and memory)
-        max_size = 1500
+        max_size = 2000  # Increased for better quality
         if max(image.size) > max_size:
             ratio = max_size / max(image.size)
             new_size = tuple(int(dim * ratio) for dim in image.size)
@@ -39,9 +39,6 @@ def preprocess_image(image):
         
         # Auto-level the image
         image = ImageOps.autocontrast(image)
-        
-        # Apply slight blur to reduce noise
-        image = image.filter(ImageFilter.MedianFilter(size=3))
         
         return image
     except Exception as e:
@@ -74,9 +71,8 @@ def extract_text_with_tesseract(image_path):
         configs = [
             '--oem 3 --psm 6',  # Uniform block of text
             '--oem 3 --psm 11', # Sparse text
-            '--oem 3 --psm 12', # Sparse text with OSD
-            '--oem 3 --psm 4',  # Single column of text
             '--oem 3 --psm 3',  # Fully automatic
+            '--oem 3 --psm 4',  # Single column of text
         ]
         
         all_texts = []
@@ -99,7 +95,7 @@ def extract_text_with_tesseract(image_path):
             combined_text = re.sub(r'\s+', ' ', combined_text)  # Normalize whitespace
             combined_text = combined_text.strip()
             
-            print(f"Tesseract extracted: {combined_text[:200]}...")
+            print(f"Tesseract extracted: {combined_text[:300]}...")
             return combined_text
         
         return ""
@@ -152,17 +148,53 @@ def normalize_text(text):
     if not text:
         return ""
     
+    # First, preserve the original text for debugging
+    original = text
+    
     text = text.lower()
     
-    # Fix common OCR errors
+    # Fix common OCR errors and spacing issues
     ocr_corrections = {
-        ' i ': ' l ',  # Common OCR error
-        ' ii ': ' ll ',
-        ' iii ': ' lll ',
+        # Spacing fixes
+        'monosodiumglutamate': 'monosodium glutamate',
+        'monosodium glutamate': 'monosodium glutamate',
+        'mono sodium glutamate': 'monosodium glutamate',
+        'yeastextract': 'yeast extract',
+        'disodiumguanylate': 'disodium guanylate',
+        'disodiuminosinate': 'disodium inosinate',
+        'disodium inosinate': 'disodium inosinate',
+        'disodium guanylate': 'disodium guanylate',
         'cornstarch': 'corn starch',
         'cornflour': 'corn flour',
+        'cornmeal': 'corn meal',
         'wheatflour': 'wheat flour',
         'soybeanoll': 'soybean oil',
+        'soybeanoil': 'soybean oil',
+        'vegetableoil': 'vegetable oil',
+        'canolaoil': 'canola oil',
+        'sunfloweroil': 'sunflower oil',
+        'partiallyhydrogenated': 'partially hydrogenated',
+        'partially-hydrogenated': 'partially hydrogenated',
+        'hydrogenatedoil': 'hydrogenated oil',
+        'naturalflavors': 'natural flavors',
+        'naturalflavor': 'natural flavor',
+        'artificialcolor': 'artificial color',
+        'artificialcolors': 'artificial colors',
+        'modifiedcornstarch': 'modified corn starch',
+        'modifiedfoodstarch': 'modified food starch',
+        'highfructosecornsyrup': 'high fructose corn syrup',
+        'highfructose': 'high fructose',
+        'cornsyrup': 'corn syrup',
+        'citricacid': 'citric acid',
+        'ascorbicacid': 'ascorbic acid',
+        'lacticacid': 'lactic acid',
+        'wheyprotein': 'whey protein',
+        'wheyproteinconcentrate': 'whey protein concentrate',
+        'enrichedcornmeal': 'enriched corn meal',
+        # Common OCR errors
+        ' i ': ' l ',
+        ' ii ': ' ll ',
+        ' iii ': ' lll ',
         'hlgh': 'high',
         'fructos': 'fructose',
         'com': 'corn',
@@ -171,22 +203,18 @@ def normalize_text(text):
         'sodlum': 'sodium',
         'artlflclal': 'artificial',
         'modlfled': 'modified',
-        'hydrogenatedoil': 'hydrogenated oil',
-        'partially-hydrogenated': 'partially hydrogenated',
-        'mono-and': 'mono and',
-        'mono&': 'mono and',
-        'highfructose': 'high fructose',
-        'cornsyrup': 'corn syrup',
+        'glutmate': 'glutamate',
         'msg/': 'msg',
         '(msg)': 'msg',
         '[msg]': 'msg',
+        'msg.': 'msg',
     }
     
     for wrong, correct in ocr_corrections.items():
         text = text.replace(wrong, correct)
     
-    # Remove excessive punctuation but keep hyphens and commas
-    text = re.sub(r'[^\w\s,-]', ' ', text)
+    # Remove excessive punctuation but keep hyphens, commas, and parentheses
+    text = re.sub(r'[^\w\s,()-]', ' ', text)
     
     # Normalize whitespace
     text = re.sub(r'\s+', ' ', text)
@@ -203,8 +231,15 @@ def smart_ingredient_match(text, ingredient):
     if not normalized_ingredient:
         return False
     
+    # Debug print for critical ingredients
+    critical_ingredients = ['monosodium glutamate', 'msg', 'yeast extract', 'disodium inosinate', 'disodium guanylate']
+    if normalized_ingredient in critical_ingredients:
+        print(f"🔍 Checking for '{normalized_ingredient}' in text...")
+    
     # First try exact match with word boundaries
     if re.search(r'\b' + re.escape(normalized_ingredient) + r'\b', normalized_text):
+        if normalized_ingredient in critical_ingredients:
+            print(f"✅ Found '{normalized_ingredient}'!")
         return True
     
     # Handle parentheses and variations
@@ -215,18 +250,62 @@ def smart_ingredient_match(text, ingredient):
         if re.search(r'\b' + re.escape(normalized_ingredient) + r'\b', clean_text):
             return True
     
+    # Special handling for MSG and its variations
+    if normalized_ingredient in ['monosodium glutamate', 'msg']:
+        msg_patterns = [
+            r'\bmsg\b',
+            r'\bmonosodium\s+glutamate\b',
+            r'\bmono\s*sodium\s+glutamate\b',
+            r'\bm\.s\.g\b',
+            r'monosodium.*glutamate',
+            r'mono.*sodium.*glutamate'
+        ]
+        for pattern in msg_patterns:
+            if re.search(pattern, normalized_text):
+                print(f"✅ Found MSG via pattern: {pattern}")
+                return True
+    
+    # Special handling for yeast extract
+    if normalized_ingredient == 'yeast extract':
+        yeast_patterns = [
+            r'\byeast\s+extract\b',
+            r'\byeast\s*extract\b',
+            r'yeast.*extract'
+        ]
+        for pattern in yeast_patterns:
+            if re.search(pattern, normalized_text):
+                print(f"✅ Found yeast extract via pattern: {pattern}")
+                return True
+    
+    # Special handling for disodium compounds
+    if 'disodium' in normalized_ingredient:
+        disodium_patterns = [
+            r'\bdisodium\s+inosinate\b',
+            r'\bdisodium\s+guanylate\b',
+            r'disodium.*inosinate',
+            r'disodium.*guanylate'
+        ]
+        for pattern in disodium_patterns:
+            if re.search(pattern, normalized_text):
+                print(f"✅ Found disodium compound via pattern: {pattern}")
+                return True
+    
     # For compound ingredients, check if all key words are present
     ingredient_words = normalized_ingredient.split()
     if len(ingredient_words) > 1:
-        # For "high fructose corn syrup", check if all words exist
-        key_words = [word for word in ingredient_words if len(word) > 3]  # Skip small words
+        # For ingredients with multiple words, check if all important words exist
+        key_words = [word for word in ingredient_words if len(word) > 3]  # Skip small words like "and", "or"
         if key_words:
-            if all(word in normalized_text for word in key_words):
+            # Check if all key words appear in the text
+            all_found = all(re.search(r'\b' + re.escape(word) + r'\b', normalized_text) for word in key_words)
+            if all_found:
+                if normalized_ingredient in critical_ingredients:
+                    print(f"✅ Found '{normalized_ingredient}' by word matching!")
                 return True
     
     # Handle abbreviated forms
     abbreviations = {
-        'msg': ['monosodium glutamate', 'mono sodium glutamate'],
+        'msg': ['monosodium glutamate', 'mono sodium glutamate', 'mono-sodium glutamate'],
         'hfcs': ['high fructose corn syrup'],
         'hvp': ['hydrolyzed vegetable protein'],
         'tvp': ['textured vegetable protein'],
@@ -259,7 +338,15 @@ def fuzzy_match_ingredient(text, ingredient_list):
         if smart_ingredient_match(text, ingredient):
             matches.append(ingredient)
     
-    return matches
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_matches = []
+    for item in matches:
+        if item.lower() not in seen:
+            seen.add(item.lower())
+            unique_matches.append(item)
+    
+    return unique_matches
 
 def match_ingredients(text):
     """Enhanced ingredient matching with better detection"""
@@ -274,7 +361,7 @@ def match_ingredients(text):
             "all_detected": []
         }
     
-    print(f"🔬 Analyzing text: {text[:150]}...")
+    print(f"🔬 Analyzing text: {text[:200]}...")
     
     # Match ingredients in each category
     trans_fat_matches = fuzzy_match_ingredient(text, trans_fat_high_risk + trans_fat_moderate_risk)
@@ -284,21 +371,23 @@ def match_ingredients(text):
     gmo_matches = fuzzy_match_ingredient(text, gmo_keywords)
     
     # Detect safe ingredients
-    safe_ingredients = [
+    safe_ingredients_list = [
         "water", "salt", "flour", "wheat flour", "whole wheat flour", "rice", "brown rice",
         "oats", "rolled oats", "milk", "skim milk", "eggs", "egg whites", "butter", 
         "olive oil", "coconut oil", "avocado oil", "vinegar", "apple cider vinegar",
         "lemon juice", "lime juice", "garlic", "onion", "tomatoes", "potatoes",
-        "cheese", "cream", "sour cream", "yogurt", "vanilla", "vanilla extract",
+        "cheese", "cheddar cheese", "cream", "sour cream", "yogurt", "vanilla", "vanilla extract",
         "cinnamon", "pepper", "black pepper", "herbs", "spices", "basil", "oregano",
         "thyme", "rosemary", "parsley", "quinoa", "almonds", "walnuts", "pecans",
         "cashews", "peanuts", "coconut", "cocoa", "chocolate", "dark chocolate",
         "baking soda", "baking powder", "yeast", "honey", "maple syrup", "stevia",
         "sea salt", "himalayan salt", "garlic powder", "onion powder", "paprika",
-        "turmeric", "ginger", "mustard", "apple", "banana", "strawberry", "blueberry"
+        "turmeric", "ginger", "mustard", "apple", "banana", "strawberry", "blueberry",
+        "whey", "buttermilk", "enzymes", "cheese cultures", "folic acid", "riboflavin",
+        "thiamine", "niacin", "ferrous sulfate"
     ]
     
-    safe_matches = fuzzy_match_ingredient(text, safe_ingredients)
+    safe_matches = fuzzy_match_ingredient(text, safe_ingredients_list)
     
     # Remove duplicates and combine all detected
     all_detected = list(set(
@@ -316,12 +405,12 @@ def match_ingredients(text):
     print(f"  • Total detected: {len(all_detected)} ingredients")
     
     return {
-        "trans_fat": list(set(trans_fat_matches)),
-        "excitotoxins": list(set(excitotoxin_matches)),
-        "corn": list(set(corn_matches)),
-        "sugar": list(set(sugar_matches)),
-        "gmo": list(set(gmo_matches)),
-        "safe_ingredients": list(set(safe_matches)),
+        "trans_fat": trans_fat_matches,
+        "excitotoxins": excitotoxin_matches,
+        "corn": corn_matches,
+        "sugar": sugar_matches,
+        "gmo": gmo_matches,
+        "safe_ingredients": safe_matches,
         "all_detected": all_detected
     }
 
