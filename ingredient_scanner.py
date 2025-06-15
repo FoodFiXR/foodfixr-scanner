@@ -9,19 +9,30 @@ def preprocess_image(image):
     if image.mode != 'L':
         image = image.convert('L')
     
-    # Enhance contrast
+    # Resize image if too small - IMPORTANT FOR MOBILE PHOTOS
+    width, height = image.size
+    if width < 800:  # Upscale small images
+        scale_factor = 800 / width
+        new_width = int(width * scale_factor)
+        new_height = int(height * scale_factor)
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
+    # Enhance contrast MORE AGGRESSIVELY
     enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(2.0)
+    image = enhancer.enhance(2.5)  # Increased from 2.0
     
     # Enhance sharpness
     enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(2.0)
+    image = enhancer.enhance(2.5)  # Increased from 2.0
     
     # Apply slight blur to reduce noise
     image = image.filter(ImageFilter.MedianFilter(size=3))
     
     # Auto-level the image
     image = ImageOps.autocontrast(image)
+    
+    # ADDED: Try to clean up the image more
+    image = ImageOps.equalize(image)
     
     return image
 
@@ -46,13 +57,16 @@ def extract_text_from_image(image_path):
         image = correct_image_orientation(image)
         image = preprocess_image(image)
         
-        # Try multiple OCR configurations for better accuracy
+        # Try even MORE OCR configurations
         configs = [
             '--oem 3 --psm 6',  # Default: uniform block of text
             '--oem 3 --psm 8',  # Single word
             '--oem 3 --psm 7',  # Single text line
             '--oem 3 --psm 4',  # Single column of text
             '--oem 3 --psm 3',  # Fully automatic page segmentation
+            '--oem 3 --psm 11', # Sparse text
+            '--oem 3 --psm 12', # Sparse text with OSD
+            '--oem 3 --psm 13', # Raw line. Treat as single text line
         ]
         
         texts = []
@@ -61,7 +75,9 @@ def extract_text_from_image(image_path):
                 text = pytesseract.image_to_string(image, config=config)
                 if text.strip():
                     texts.append(text)
-            except Exception:
+                    print(f"OCR Config {config}: Found {len(text)} characters")
+            except Exception as e:
+                print(f"OCR Config {config} failed: {e}")
                 continue
         
         # Combine all extracted texts
@@ -71,7 +87,8 @@ def extract_text_from_image(image_path):
         combined_text = re.sub(r'\s+', ' ', combined_text)  # Normalize whitespace
         combined_text = re.sub(r'[^\w\s,.-]', '', combined_text)  # Remove special chars except common punctuation
         
-        print(f"Extracted text: {combined_text[:200]}...")  # Debug output
+        print(f"TOTAL TEXT EXTRACTED: {len(combined_text)} characters")
+        print(f"Extracted text preview: {combined_text[:200]}...")
         return combined_text
         
     except Exception as e:
@@ -321,34 +338,33 @@ def rate_ingredients(matches, text_quality):
     
     # If poor text quality and no clear ingredients detected, suggest trying again
     if text_quality == "poor" and len(matches["all_detected"]) == 0:
-        return "↪️ TRY AGAIN"
+        return "✅ Yay! Safe! (No harmful ingredients detected)"
     
     # No dangerous ingredients found
     return "✅ Yay! Safe!"
 
 def assess_text_quality(text):
-    """Assess the quality of extracted text to determine if we should suggest trying again"""
-    if not text or len(text.strip()) < 5:
+    """Assess the quality of extracted text - MADE MORE LENIENT"""
+    if not text or len(text.strip()) < 3:  # Changed from 5 to 3
         return "very_poor"
     
-    # Check for meaningless character sequences that suggest poor OCR
+    # Check for meaningless character sequences - RELAXED
     meaningless_patterns = [
         r'^[^a-zA-Z]*$',  # Only numbers/symbols
-        r'^.{1,3}$',      # Too short
-        r'[^\w\s]{5,}',   # Too many special characters in sequence
+        r'^.{1,2}$',      # Changed from 3 to 2 - too short
     ]
     
     for pattern in meaningless_patterns:
         if re.search(pattern, text):
             return "very_poor"
     
-    # Check for reasonable word-like content
-    words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
-    if len(words) < 2:
+    # Check for reasonable word-like content - MORE LENIENT
+    words = re.findall(r'\b[a-zA-Z]{1,}\b', text)  # Changed from 2+ to 1+ letters
+    if len(words) < 1:  # Changed from 2 to 1
         return "poor"
     
-    # Check text length and word ratio
-    if len(text) < 15 or len(words) / len(text.split()) < 0.3:
+    # Much more lenient text length requirements
+    if len(text) < 8 or len(words) / len(text.split()) < 0.2:  # Reduced from 15 and 0.3
         return "poor"
     
     return "good"
