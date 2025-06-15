@@ -18,7 +18,7 @@ STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner.onrender.com')
 
 # Configuration
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
@@ -26,7 +26,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 # Ensure upload directory exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
@@ -131,10 +131,10 @@ def scan():
     try:
         # Save uploaded file
         filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{filename}"
+    filepath = os.path.join(tempfile.gettempdir(), filename)
+    file.save(filepath)
         
         # Increment scan count for non-premium users
         if not session.get('is_premium'):
@@ -360,6 +360,31 @@ def reset_trial():
     """Reset trial for testing purposes (remove in production)"""
     session.clear()
     return redirect(url_for('index'))
+
+@app.route('/debug')
+def debug():
+    """Debug endpoint to check system status"""
+    import sys
+    import platform
+    
+    debug_info = {
+        "Python version": sys.version,
+        "Platform": platform.platform(),
+        "Tesseract available": False,
+        "Upload folder": app.config['UPLOAD_FOLDER'],
+        "Upload folder exists": os.path.exists(app.config['UPLOAD_FOLDER']),
+        "Upload folder writable": os.access(app.config['UPLOAD_FOLDER'], os.W_OK)
+    }
+    
+    try:
+        import pytesseract
+        version = pytesseract.image_to_string(Image.new('RGB', (100, 30), color='white'))
+        debug_info["Tesseract available"] = True
+        debug_info["Tesseract test"] = "Success"
+    except Exception as e:
+        debug_info["Tesseract error"] = str(e)
+    
+    return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 
 def log_scan_result(user_id, result, scan_count):
     """Log scan results for analytics"""
