@@ -399,14 +399,55 @@ def scan_image_for_ingredients(image_path):
         
         text = extract_text_from_image(image_path)
         print(f"DEBUG: Extracted text length: {len(text)}")
+        print(f"DEBUG: Text preview: {text[:100]}...")
         
         text_quality = assess_text_quality(text)
         print(f"DEBUG: Text quality: {text_quality}")
         
         matches = match_ingredients(text)
-        rating = rate_ingredients(matches, text_quality)
+        print(f"DEBUG: Matches found: {matches}")
         
-        # Rest of your existing function...
+        rating = rate_ingredients(matches, text_quality)
+        print(f"DEBUG: Final rating: {rating}")
+        
+        # Add confidence score based on text extraction quality
+        if text_quality == "very_poor":
+            confidence = "very_low"
+        elif text_quality == "poor":
+            confidence = "low"
+        elif len(text) > 50:
+            confidence = "high"
+        else:
+            confidence = "medium"
+        
+        # Check for GMO Alert (separate from rating)
+        gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
+        
+        result = {
+            "rating": rating,
+            "matched_ingredients": matches,
+            "confidence": confidence,
+            "extracted_text_length": len(text),
+            "text_quality": text_quality,
+            "extracted_text": text[:200] + "..." if len(text) > 200 else text,
+            "gmo_alert": gmo_alert
+        }
+        
+        print(f"\n{'='*60}")
+        print(f"SCAN RESULT: {rating}")
+        print(f"Confidence: {confidence}, Text quality: {text_quality}")
+        print(f"\nDetected ingredients by category:")
+        print(f"  - Trans Fat: {len(matches.get('trans_fat', []))}")
+        print(f"  - Excitotoxins: {len(matches.get('excitotoxins', []))}")
+        print(f"  - Corn: {len(matches.get('corn', []))}")
+        print(f"  - Sugar: {len(matches.get('sugar', []))}")
+        print(f"  - GMO: {len(matches.get('gmo', []))}")
+        print(f"  - Safe: {len(matches.get('safe_ingredients', []))}")
+        if gmo_alert:
+            print(f"\n{gmo_alert} - Contains GMO ingredients")
+        print(f"{'='*60}\n")
+        
+        return result
         
     except Exception as e:
         print(f"❌ Error in scan_image_for_ingredients: {e}")
