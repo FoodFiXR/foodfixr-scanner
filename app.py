@@ -433,24 +433,46 @@ def debug():
     import sys
     import platform
     
-    debug_info = {
-        "Python version": sys.version,
-        "Platform": platform.platform(),
-        "Tesseract available": False,
-        "Upload folder": app.config['UPLOAD_FOLDER'],
-        "Upload folder exists": os.path.exists(app.config['UPLOAD_FOLDER']),
-        "Upload folder writable": os.access(app.config['UPLOAD_FOLDER'], os.W_OK)
-    }
+    debug_info = []
+    debug_info.append(f"Python version: {sys.version}")
+    debug_info.append(f"Platform: {platform.platform()}")
+    debug_info.append(f"Upload folder: {app.config['UPLOAD_FOLDER']}")
+    debug_info.append(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
     
     try:
         import pytesseract
-        version = pytesseract.image_to_string(Image.new('RGB', (100, 30), color='white'))
-        debug_info["Tesseract available"] = True
-        debug_info["Tesseract test"] = "Success"
+        from PIL import Image
+        test_img = Image.new('RGB', (100, 30), color='white')
+        result = pytesseract.image_to_string(test_img)
+        debug_info.append("✅ Tesseract: Working")
     except Exception as e:
-        debug_info["Tesseract error"] = str(e)
+        debug_info.append(f"❌ Tesseract: Failed - {str(e)}")
     
-    return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
+    try:
+        from ingredient_scanner import scan_image_for_ingredients
+        from scanner_config import safe_ingredients
+        debug_info.append("✅ Modules: All imported successfully")
+    except Exception as e:
+        debug_info.append(f"❌ Modules: Import failed - {str(e)}")
+    
+    debug_info.append(f"Templates folder exists: {os.path.exists('templates')}")
+    debug_info.append(f"Scanner.html exists: {os.path.exists('templates/scanner.html')}")
+    debug_info.append(f"Static folder exists: {os.path.exists('static')}")
+    
+    html = f"""
+    <html>
+    <head><title>FoodFixr Debug</title></head>
+    <body style="font-family: monospace; padding: 20px;">
+    <h1>🔍 FoodFixr Debug Info</h1>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+    {'<br>'.join(debug_info)}
+    </div>
+    <br>
+    <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to Scanner</a>
+    </body>
+    </html>
+    """
+    return html
 
 def log_scan_result(user_id, result, scan_count):
     """Log scan results for analytics"""
