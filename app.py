@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import os
+import tempfile
 from werkzeug.utils import secure_filename
 from ingredient_scanner import scan_image_for_ingredients
 import json
@@ -95,77 +96,142 @@ def index():
 @app.route('/', methods=['POST'])
 def scan():
     """Handle image scanning with trial limits"""
-    init_session()
-    
-    # Check if user can scan
-    if not can_scan():
-        return render_template('scanner.html',
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             error="Trial limit reached. Please upgrade to continue scanning.",
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-    
-    # Check if image was uploaded
-    if 'image' not in request.files:
-        return render_template('scanner.html',
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             error="No image uploaded.",
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-    
-    file = request.files['image']
-    if file.filename == '':
-        return render_template('scanner.html',
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             error="No image selected.",
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-    
-    if not allowed_file(file.filename):
-        return render_template('scanner.html',
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             error="Invalid file type. Please upload an image.",
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-    
     try:
-        # Save uploaded file
-        filename = secure_filename(file.filename)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{timestamp}_{filename}"
-    filepath = os.path.join(tempfile.gettempdir(), filename)
-    file.save(filepath)
+        init_session()
         
-        # Increment scan count for non-premium users
-        if not session.get('is_premium'):
-            session['scans_used'] = session.get('scans_used', 0) + 1
+        # Check if user can scan
+        if not can_scan():
+            return render_template('scanner.html',
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 error="Trial limit reached. Please upgrade to continue scanning.",
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
         
-        # Scan the image
-        result = scan_image_for_ingredients(filepath)
+        # Check if image was uploaded
+        if 'image' not in request.files:
+            return render_template('scanner.html',
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 error="No image uploaded.",
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
         
-        # Clean up uploaded file
+        file = request.files['image']
+        if file.filename == '':
+            return render_template('scanner.html',
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 error="No image selected.",
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+        
+        if not allowed_file(file.filename):
+            return render_template('scanner.html',
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 error="Invalid file type. Please upload an image.",
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+        
         try:
-            os.remove(filepath)
-        except:
-            pass
+            # Save uploaded file to temp directory
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{timestamp}_{filename}"
+            
+            # Use temp directory instead of uploads folder
+            import tempfile
+            filepath = os.path.join(tempfile.gettempdir(), filename)
+            file.save(filepath)
+            
+            print(f"DEBUG: File saved to {filepath}")
+            print(f"DEBUG: File exists: {os.path.exists(filepath)}")
+            
+            # Increment scan count for non-premium users
+            if not session.get('is_premium'):
+                session['scans_used'] = session.get('scans_used', 0) + 1
+            
+            # Scan the image
+            print("DEBUG: Starting image scan...")
+            result = scan_image_for_ingredients(filepath)
+            print(f"DEBUG: Scan result: {result}")
+            
+            # Clean up uploaded file
+            try:
+                os.remove(filepath)
+                print("DEBUG: Temp file cleaned up")
+            except Exception as cleanup_error:
+                print(f"DEBUG: Cleanup error: {cleanup_error}")
+            
+            # Log scan for analytics
+            log_scan_result(session.get('user_id'), result, session.get('scans_used', 0))
+            
+            return render_template('scanner.html',
+                                 result=result,
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+            
+        except Exception as scan_error:
+            print(f"DEBUG: Scanning error: {scan_error}")
+            import traceback
+            traceback.print_exc()
+            
+            return render_template('scanner.html',
+                                 trial_expired=is_trial_expired(),
+                                 trial_time_left=get_trial_time_left(),
+                                 error=f"Scanning failed: {str(scan_error)}. Please try again.",
+                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+    
+    except Exception as outer_error:
+        print(f"DEBUG: Outer error in scan route: {outer_error}")
+        import traceback
+        traceback.print_exc()
         
-        # Log scan for analytics
-        log_scan_result(session.get('user_id'), result, session.get('scans_used', 0))
-        
-        return render_template('scanner.html',
-                             result=result,
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-        
-    except Exception as e:
-        print(f"Scanning error: {e}")
-        return render_template('scanner.html',
-                             trial_expired=is_trial_expired(),
-                             trial_time_left=get_trial_time_left(),
-                             error="Scanning failed. Please try again.",
-                             stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+        # Return a basic error page if template rendering fails
+        return f"""
+        <html>
+        <head><title>FoodFixr Error</title></head>
+        <body>
+        <h1>Error occurred</h1>
+        <p>Error: {str(outer_error)}</p>
+        <a href="/">Try Again</a>
+        </body>
+        </html>
+        """, 500
 
+@app.route('/test-scan')
+def test_scan():
+    """Test scanning without actual image"""
+    try:
+        # Test if all imports work
+        from ingredient_scanner import scan_image_for_ingredients
+        from scanner_config import safe_ingredients
+        
+        # Create a dummy result
+        test_result = {
+            "rating": "✅ Yay! Safe!",
+            "matched_ingredients": {
+                "trans_fat": [],
+                "excitotoxins": [],
+                "corn": [],
+                "sugar": [],
+                "gmo": [],
+                "safe_ingredients": ["water", "salt"],
+                "all_detected": ["water", "salt"]
+            },
+            "confidence": "high",
+            "text_quality": "good",
+            "extracted_text_length": 20,
+            "gmo_alert": None
+        }
+        
+        return render_template('scanner.html',
+                             result=test_result,
+                             trial_expired=False,
+                             trial_time_left="48h 0m",
+                             stripe_publishable_key="test")
+                             
+    except Exception as e:
+        return f"Test failed: {str(e)}<br><a href='/'>Back to Scanner</a>"
+        
 @app.route('/upgrade')
 def upgrade():
     """Upgrade page for premium plans"""
