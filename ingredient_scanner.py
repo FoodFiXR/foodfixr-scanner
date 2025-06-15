@@ -1,6 +1,7 @@
 import pytesseract
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import re
+import os
 from scanner_config import *
 
 def preprocess_image(image):
