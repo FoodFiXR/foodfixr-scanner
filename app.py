@@ -474,6 +474,49 @@ def debug():
     """
     return html
 
+@app.route('/debug-ocr', methods=['POST'])
+def debug_ocr():
+    """Debug what OCR is actually reading"""
+    if 'image' not in request.files:
+        return "No image uploaded"
+    
+    file = request.files['image']
+    if file.filename == '':
+        return "No image selected"
+    
+    try:
+        import tempfile
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(tempfile.gettempdir(), filename)
+        file.save(filepath)
+        
+        # Extract text using your function
+        from ingredient_scanner import extract_text_from_image, assess_text_quality
+        text = extract_text_from_image(filepath)
+        quality = assess_text_quality(text)
+        
+        # Clean up
+        os.remove(filepath)
+        
+        return f"""
+        <html>
+        <head><title>OCR Debug</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>🔍 OCR Debug Results</h1>
+        <h3>Text Quality: {quality}</h3>
+        <h3>Raw Text Extracted ({len(text)} characters):</h3>
+        <div style="border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; background: #f5f5f5;">
+        {text or "NO TEXT DETECTED"}
+        </div>
+        <br>
+        <a href="/">Back to Scanner</a>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+        
 def log_scan_result(user_id, result, scan_count):
     """Log scan results for analytics"""
     try:
