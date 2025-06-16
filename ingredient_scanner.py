@@ -3,6 +3,8 @@ from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import re
 import os
 from scanner_config import *
+import requests
+import time
 
 # Add this function to your ingredient_scanner.py
 # Replace the existing preprocess_image_advanced function
