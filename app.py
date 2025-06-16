@@ -197,6 +197,220 @@ def scan():
         </html>
         """, 500
 
+@app.route('/debug-ocr', methods=['GET', 'POST'])
+def debug_ocr():
+    """Debug what OCR is actually reading - Enhanced version"""
+    if request.method == 'GET':
+        return '''
+        <html>
+        <head>
+            <title>OCR Debug Tool</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                .upload-area { border: 2px dashed #e91e63; border-radius: 10px; padding: 40px; text-align: center; margin: 20px 0; }
+                .upload-area:hover { background: #fafafa; }
+                input[type="file"] { margin: 10px 0; }
+                button { background: #e91e63; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+                button:hover { background: #c2185b; }
+                .back-link { color: #666; text-decoration: none; margin-top: 20px; display: inline-block; }
+                .back-link:hover { color: #e91e63; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔍 OCR Debug Tool</h1>
+                <p>Upload an image with ingredient text to see exactly what the OCR system detects and how it's processed.</p>
+                
+                <form method="post" enctype="multipart/form-data">
+                    <div class="upload-area">
+                        <h3>📸 Select Image</h3>
+                        <input type="file" name="image" accept="image/*" required>
+                        <br><br>
+                        <button type="submit">🔬 Analyze Image</button>
+                    </div>
+                </form>
+                
+                <a href="/" class="back-link">← Back to Main Scanner</a>
+            </div>
+        </body>
+        </html>
+        '''
+    
+    if 'image' not in request.files:
+        return "No image uploaded"
+    
+    file = request.files['image']
+    if file.filename == '':
+        return "No image selected"
+    
+    try:
+        import tempfile
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"debug_{timestamp}_{filename}"
+        filepath = os.path.join(tempfile.gettempdir(), filename)
+        file.save(filepath)
+        
+        print(f"DEBUG OCR: Processing {filepath}")
+        
+        # Use the enhanced extraction functions
+        from ingredient_scanner import extract_text_from_image, assess_text_quality, match_ingredients, rate_ingredients
+        
+        # Extract text with full debug output
+        text = extract_text_from_image(filepath)
+        quality = assess_text_quality(text)
+        matches = match_ingredients(text)
+        rating = rate_ingredients(matches, quality)
+        
+        # Clean up
+        os.remove(filepath)
+        
+        # Format matches for display
+        matches_display = ""
+        total_ingredients = 0
+        for category, ingredients in matches.items():
+            if ingredients and category != 'all_detected':
+                matches_display += f"<div style='margin: 10px 0; padding: 10px; background: #f0f8ff; border-left: 4px solid #e91e63;'>"
+                matches_display += f"<strong style='color: #e91e63;'>{category.replace('_', ' ').title()}:</strong><br>"
+                matches_display += f"<span style='color: #333;'>{', '.join(ingredients)}</span>"
+                matches_display += f"</div>"
+                total_ingredients += len(ingredients)
+        
+        if not matches_display:
+            matches_display = "<div style='padding: 20px; background: #fff3e0; border-radius: 5px; color: #f57c00;'>❌ No ingredients detected</div>"
+        
+        # Color code the rating
+        rating_color = "#4CAF50"  # Green for safe
+        if "Danger" in rating:
+            rating_color = "#f44336"  # Red for danger
+        elif "Proceed" in rating:
+            rating_color = "#ff9800"  # Orange for caution
+        elif "TRY AGAIN" in rating:
+            rating_color = "#2196F3"  # Blue for try again
+        
+        return f"""
+        <html>
+        <head>
+            <title>OCR Debug Results</title>
+            <style>
+                body {{ font-family: 'Courier New', monospace; padding: 20px; background: #f5f5f5; line-height: 1.6; }}
+                .container {{ max-width: 900px; margin: 0 auto; }}
+                .section {{ background: white; margin: 20px 0; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .rating {{ font-size: 24px; font-weight: bold; color: {rating_color}; text-align: center; padding: 20px; background: rgba(0,0,0,0.05); border-radius: 10px; }}
+                .stats {{ display: flex; justify-content: space-around; background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+                .stat {{ text-align: center; }}
+                .stat-number {{ font-size: 24px; font-weight: bold; color: #2e7d32; }}
+                .stat-label {{ color: #666; font-size: 12px; }}
+                .text-box {{ border: 1px solid #ddd; padding: 15px; background: #fafafa; border-radius: 5px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 14px; }}
+                .nav-buttons {{ text-align: center; margin: 30px 0; }}
+                .nav-buttons a {{ background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 0 10px; display: inline-block; }}
+                .nav-buttons a:hover {{ background: #c2185b; }}
+                .nav-buttons a.secondary {{ background: #666; }}
+                .nav-buttons a.secondary:hover {{ background: #555; }}
+                h1 {{ color: #e91e63; text-align: center; }}
+                h3 {{ color: #333; border-bottom: 2px solid #e91e63; padding-bottom: 5px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔍 OCR Debug Results</h1>
+                
+                <div class="section">
+                    <div class="rating">Final Rating: {rating}</div>
+                    
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-number">{len(text)}</div>
+                            <div class="stat-label">Characters</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">{quality}</div>
+                            <div class="stat-label">Quality</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">{total_ingredients}</div>
+                            <div class="stat-label">Ingredients</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">{len(matches.get('all_detected', []))}</div>
+                            <div class="stat-label">Total Detected</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h3>📝 Raw Text Extracted</h3>
+                    <div class="text-box">{text or "❌ NO TEXT DETECTED - Try a clearer image with better lighting"}</div>
+                </div>
+                
+                <div class="section">
+                    <h3>🧬 Ingredient Analysis</h3>
+                    {matches_display}
+                    
+                    {'<div style="margin: 15px 0; padding: 15px; background: #fff3e0; border-radius: 5px;"><strong style="color: #f57c00;">📣 GMO Alert!</strong><br>This product contains genetically modified ingredients: ' + ', '.join(matches.get('gmo', [])) + '</div>' if matches.get('gmo') else ''}
+                </div>
+                
+                {'<div class="section"><h3>🔧 Troubleshooting Tips</h3><ul><li>Ensure good lighting when taking the photo</li><li>Hold the camera steady and close enough to read the text clearly</li><li>Make sure the ingredient list is flat and not wrinkled</li><li>Try scanning just the ingredient section, not the entire package</li><li>Clean the camera lens before taking the photo</li></ul></div>' if quality == 'very_poor' or len(text) < 10 else ''}
+                
+                <div class="nav-buttons">
+                    <a href="/debug-ocr">🔬 Test Another Image</a>
+                    <a href="/" class="secondary">← Back to Main Scanner</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"DEBUG OCR Error: {e}")
+        print(f"Full traceback: {error_details}")
+        
+        return f"""
+        <html>
+        <head>
+            <title>OCR Debug Error</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }}
+                .error {{ background: #ffebee; border: 1px solid #f44336; border-radius: 5px; padding: 20px; margin: 20px 0; }}
+                .error-details {{ background: #fafafa; border-radius: 5px; padding: 15px; font-family: monospace; overflow-x: auto; }}
+                a {{ color: #e91e63; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>❌ OCR Debug Error</h1>
+                
+                <div class="error">
+                    <p><strong>Error:</strong> {str(e)}</p>
+                </div>
+                
+                <h3>🔧 Full Error Details:</h3>
+                <div class="error-details">
+                    <pre>{error_details}</pre>
+                </div>
+                
+                <p><strong>Common Solutions:</strong></p>
+                <ul>
+                    <li>Make sure you uploaded a valid image file</li>
+                    <li>Try a smaller image file (under 16MB)</li>
+                    <li>Check that Tesseract OCR is properly installed</li>
+                    <li>Ensure OpenCV dependencies are available</li>
+                </ul>
+                
+                <br>
+                <a href="/debug-ocr">← Try Again</a> | 
+                <a href="/">Main Scanner</a> | 
+                <a href="/debug">System Debug</a>
+            </div>
+        </body>
+        </html>
+        """
+
 @app.route('/test-scan')
 def test_scan():
     """Test scanning without actual image"""
@@ -449,6 +663,15 @@ def debug():
         debug_info.append(f"❌ Tesseract: Failed - {str(e)}")
     
     try:
+        import cv2
+        import numpy as np
+        test_array = np.zeros((100, 100, 3), dtype=np.uint8)
+        gray = cv2.cvtColor(test_array, cv2.COLOR_BGR2GRAY)
+        debug_info.append("✅ OpenCV: Working")
+    except Exception as e:
+        debug_info.append(f"❌ OpenCV: Failed - {str(e)}")
+    
+    try:
         from ingredient_scanner import scan_image_for_ingredients
         from scanner_config import safe_ingredients
         debug_info.append("✅ Modules: All imported successfully")
@@ -468,54 +691,13 @@ def debug():
     {'<br>'.join(debug_info)}
     </div>
     <br>
+    <a href="/debug-ocr" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔬 Test OCR</a>
     <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to Scanner</a>
+    </div>
     </body>
     </html>
     """
     return html
-
-@app.route('/debug-ocr', methods=['POST'])
-def debug_ocr():
-    """Debug what OCR is actually reading"""
-    if 'image' not in request.files:
-        return "No image uploaded"
-    
-    file = request.files['image']
-    if file.filename == '':
-        return "No image selected"
-    
-    try:
-        import tempfile
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(tempfile.gettempdir(), filename)
-        file.save(filepath)
-        
-        # Extract text using your function
-        from ingredient_scanner import extract_text_from_image, assess_text_quality
-        text = extract_text_from_image(filepath)
-        quality = assess_text_quality(text)
-        
-        # Clean up
-        os.remove(filepath)
-        
-        return f"""
-        <html>
-        <head><title>OCR Debug</title></head>
-        <body style="font-family: monospace; padding: 20px;">
-        <h1>🔍 OCR Debug Results</h1>
-        <h3>Text Quality: {quality}</h3>
-        <h3>Raw Text Extracted ({len(text)} characters):</h3>
-        <div style="border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; background: #f5f5f5;">
-        {text or "NO TEXT DETECTED"}
-        </div>
-        <br>
-        <a href="/">Back to Scanner</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
         
 def log_scan_result(user_id, result, scan_count):
     """Log scan results for analytics"""
