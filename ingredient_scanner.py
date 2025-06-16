@@ -315,7 +315,7 @@ def extract_text_pytesseract_fallback(image_path):
         return ""
 
 def normalize_ingredient_text(text):
-    """Enhanced text normalization with comprehensive OCR error correction"""
+    """CONSERVATIVE text normalization - only fix obvious OCR errors"""
     if not text:
         return ""
     
@@ -325,68 +325,37 @@ def normalize_ingredient_text(text):
     # Remove excessive whitespace and newlines
     text = re.sub(r'\s+', ' ', text)
     
-    # Remove common OCR artifacts
+    # Remove common OCR artifacts but be conservative
     text = re.sub(r'[^\w\s\-\(\),.]', ' ', text)
     
-    # Comprehensive OCR error corrections
-    corrections = {
-        # Numbers to letters
-        '0': 'o', '1': 'l', '5': 's', '8': 'b', '6': 'g', '3': 'e',
-        
-        # Common character combinations
-        'rn': 'm', 'vv': 'w', 'ii': 'll', 'cl': 'd', 'ri': 'n',
-        
-        # Specific ingredient corrections
-        'corn5yrup': 'corn syrup',
-        'cornsynup': 'corn syrup',
-        'com syrup': 'corn syrup',
-        'hfc5': 'hfcs',
-        'hfc3': 'hfcs',
-        'm5g': 'msg',
-        'ms9': 'msg',
-        'rns9': 'msg',
-        'aspartame': 'aspartame',
-        'aspertame': 'aspartame',
-        'aspartarne': 'aspartame',
-        'naturalflavors': 'natural flavors',
-        'naturalflavor': 'natural flavor',
-        'naturalflavoring': 'natural flavoring',
-        'partiallyhydrogenated': 'partially hydrogenated',
-        'hydrogenatedoil': 'hydrogenated oil',
-        'modifiedstarch': 'modified starch',
-        'modifiedcornstarch': 'modified corn starch',
-        'soylecithin': 'soy lecithin',
-        'canolaoil': 'canola oil',
-        'cottonseedoil': 'cottonseed oil',
-        'maltodextrin': 'maltodextrin',
-        'maltodextnn': 'maltodextrin',
-        'yeastextract': 'yeast extract',
-        'monosodiumglutamate': 'monosodium glutamate',
-        'highfructose': 'high fructose',
-        'highfructosecornsyrup': 'high fructose corn syrup',
-        'vegetableoil': 'vegetable oil',
-        'vegetableprotein': 'vegetable protein',
-        'texturedvegetableprotein': 'textured vegetable protein',
-        'hydrolyzedprotein': 'hydrolyzed protein',
-        'hydrolyzedvegetableprotein': 'hydrolyzed vegetable protein',
-        'disodiuminosinate': 'disodium inosinate',
-        'disodiumguanylate': 'disodium guanylate',
-        'calciumcaseinate': 'calcium caseinate',
-        'sodiumcaseinate': 'sodium caseinate',
+    # ONLY fix the most obvious OCR errors - be very conservative
+    obvious_corrections = {
+        # Only fix clear number-to-letter mistakes that are obvious
+        'rn': 'm',  # common OCR error
+        'cornsynup': 'corn syrup',  # specific known error
+        'com syrup': 'corn syrup',  # specific known error
+        'hfc5': 'hfcs',  # specific known error
+        'naturalflavors': 'natural flavors',  # compound word fix
+        'naturalflavor': 'natural flavor',  # compound word fix
+        'soylecithin': 'soy lecithin',  # compound word fix
+        'monosodiumglutamate': 'monosodium glutamate',  # compound word fix
+        'highfructose': 'high fructose',  # compound word fix
+        'vegetableoil': 'vegetable oil',  # compound word fix
     }
     
-    # Apply corrections
-    for wrong, correct in corrections.items():
+    # Apply only obvious corrections
+    for wrong, correct in obvious_corrections.items():
         text = text.replace(wrong, correct)
     
     return text
 
-def advanced_ingredient_matching(text, ingredient_list, category_name=""):
-    """Advanced fuzzy matching with multiple strategies"""
+def precise_ingredient_matching(text, ingredient_list, category_name=""):
+    """MUCH MORE PRECISE matching - avoid false positives"""
     matches = []
     normalized_text = normalize_ingredient_text(text)
     
-    print(f"DEBUG: Searching for {category_name} ingredients in normalized text: {normalized_text[:200]}...")
+    print(f"DEBUG: Searching for {category_name} ingredients in normalized text")
+    print(f"DEBUG: Text preview: {normalized_text[:200]}...")
     
     for ingredient in ingredient_list:
         normalized_ingredient = normalize_ingredient_text(ingredient)
@@ -394,61 +363,61 @@ def advanced_ingredient_matching(text, ingredient_list, category_name=""):
         if len(normalized_ingredient) < 2:
             continue
         
-        # Strategy 1: Exact match
-        if normalized_ingredient in normalized_text:
-            matches.append(ingredient)
-            print(f"DEBUG: ✅ EXACT MATCH: '{normalized_ingredient}' -> '{ingredient}'")
-            continue
-        
-        # Strategy 2: Word boundary match
+        # Strategy 1: EXACT word boundary match (most reliable)
         pattern = r'\b' + re.escape(normalized_ingredient) + r'\b'
         if re.search(pattern, normalized_text):
             matches.append(ingredient)
-            print(f"DEBUG: ✅ WORD BOUNDARY MATCH: '{normalized_ingredient}' -> '{ingredient}'")
+            print(f"DEBUG: ✅ EXACT WORD MATCH: '{normalized_ingredient}' -> '{ingredient}'")
             continue
         
-        # Strategy 3: Partial match for compound ingredients
+        # Strategy 2: For multi-word ingredients, check if ALL words are present nearby
         if ' ' in normalized_ingredient:
             words = normalized_ingredient.split()
             if len(words) >= 2:
-                # Check if all significant words are present
-                significant_words = [w for w in words if len(w) > 2]
-                found_words = 0
-                word_positions = []
+                # ALL words must be found within 50 characters of each other
+                all_word_positions = []
+                all_words_found = True
                 
-                for word in significant_words:
+                for word in words:
+                    if len(word) <= 2:  # Skip very short words
+                        continue
                     word_pattern = r'\b' + re.escape(word) + r'\b'
-                    match = re.search(word_pattern, normalized_text)
-                    if match:
-                        found_words += 1
-                        word_positions.append(match.start())
+                    matches_found = list(re.finditer(word_pattern, normalized_text))
+                    if matches_found:
+                        all_word_positions.extend([m.start() for m in matches_found])
+                    else:
+                        all_words_found = False
+                        break
                 
-                # If all significant words found within reasonable distance
-                if found_words == len(significant_words):
-                    if len(word_positions) == 1 or (max(word_positions) - min(word_positions) < 100):
+                if all_words_found and all_word_positions:
+                    # Check if words are reasonably close together (within 50 chars)
+                    min_pos = min(all_word_positions)
+                    max_pos = max(all_word_positions)
+                    if max_pos - min_pos <= 50:
                         matches.append(ingredient)
-                        print(f"DEBUG: ✅ COMPOUND MATCH: '{normalized_ingredient}' -> '{ingredient}'")
+                        print(f"DEBUG: ✅ MULTI-WORD MATCH: '{normalized_ingredient}' -> '{ingredient}'")
                         continue
         
-        # Strategy 4: Fuzzy matching for critical ingredients
-        critical_keywords = ['msg', 'aspartame', 'corn syrup', 'hfcs', 'partially hydrogenated', 
-                           'trans fat', 'natural flavor', 'maltodextrin', 'yeast extract']
-        
-        if any(keyword in normalized_ingredient for keyword in critical_keywords):
-            # More lenient matching for critical ingredients
-            main_words = [w for w in normalized_ingredient.split() if len(w) > 3]
-            if main_words:
-                main_word = max(main_words, key=len)
-                if main_word in normalized_text:
+        # Strategy 3: For single critical ingredients only, allow partial matching
+        # But ONLY for ingredients longer than 5 characters to avoid false positives
+        if (' ' not in normalized_ingredient and 
+            len(normalized_ingredient) > 5 and
+            normalized_ingredient in normalized_text):
+            
+            # Double-check this isn't a substring of a larger word
+            # Find all occurrences and check word boundaries
+            for match in re.finditer(re.escape(normalized_ingredient), normalized_text):
+                start, end = match.span()
+                
+                # Check characters before and after
+                char_before = normalized_text[start-1] if start > 0 else ' '
+                char_after = normalized_text[end] if end < len(normalized_text) else ' '
+                
+                # Only match if surrounded by non-letter characters
+                if not char_before.isalpha() and not char_after.isalpha():
                     matches.append(ingredient)
-                    print(f"DEBUG: ✅ CRITICAL FUZZY MATCH: '{main_word}' in '{normalized_ingredient}' -> '{ingredient}'")
-                    continue
-        
-        # Strategy 5: Substring match for single important words
-        if ' ' not in normalized_ingredient and len(normalized_ingredient) > 4:
-            if normalized_ingredient in normalized_text:
-                matches.append(ingredient)
-                print(f"DEBUG: ✅ SUBSTRING MATCH: '{normalized_ingredient}' -> '{ingredient}'")
+                    print(f"DEBUG: ✅ PARTIAL MATCH: '{normalized_ingredient}' -> '{ingredient}'")
+                    break
     
     unique_matches = list(set(matches))
     print(f"DEBUG: {category_name} category found {len(unique_matches)} matches: {unique_matches}")
@@ -483,7 +452,7 @@ def assess_text_quality_enhanced(text):
         return "fair"
 
 def match_all_ingredients(text):
-    """Enhanced ingredient matching with comprehensive categories"""
+    """Enhanced ingredient matching with precise categories"""
     if not text:
         print("DEBUG: No text provided for ingredient matching")
         return {
@@ -497,14 +466,15 @@ def match_all_ingredients(text):
         }
     
     print(f"DEBUG: Matching ingredients in text of {len(text)} characters")
+    print(f"DEBUG: Text sample: {text[:200]}...")
     
-    # Match each category using advanced matching
-    trans_fat_matches = advanced_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
-    excitotoxin_matches = advanced_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
-    corn_matches = advanced_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
-    sugar_matches = advanced_ingredient_matching(text, sugar_keywords, "Sugar")
-    gmo_matches = advanced_ingredient_matching(text, gmo_keywords, "GMO")
-    safe_matches = advanced_ingredient_matching(text, safe_ingredients, "Safe")
+    # Match each category using PRECISE matching
+    trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
+    excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
+    corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
+    sugar_matches = precise_ingredient_matching(text, sugar_keywords, "Sugar")
+    gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
+    safe_matches = precise_ingredient_matching(text, safe_ingredients, "Safe")
     
     # Combine all detected ingredients
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
@@ -520,7 +490,7 @@ def match_all_ingredients(text):
         "all_detected": all_detected
     }
     
-    print(f"DEBUG: INGREDIENT MATCHING RESULTS:")
+    print(f"DEBUG: PRECISE INGREDIENT MATCHING RESULTS:")
     for category, ingredients in result.items():
         if ingredients:
             print(f"  ✅ {category}: {ingredients}")
@@ -629,10 +599,10 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with OCR.space integration"""
+    """Main scanning function with precise OCR.space integration"""
     try:
         print(f"\n{'='*80}")
-        print(f"🔬 STARTING OCR.SPACE INGREDIENT SCAN: {image_path}")
+        print(f"🔬 STARTING PRECISE INGREDIENT SCAN: {image_path}")
         print(f"{'='*80}")
         print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
@@ -642,7 +612,7 @@ def scan_image_for_ingredients(image_path):
         print(f"📝 Extracted text length: {len(text)} characters")
         
         if text:
-            print(f"📋 Text preview (first 500 chars):\n{text[:500]}...")
+            print(f"📋 EXTRACTED TEXT:\n{text}")
         else:
             print("❌ No text extracted!")
         
@@ -650,8 +620,8 @@ def scan_image_for_ingredients(image_path):
         text_quality = assess_text_quality_enhanced(text)
         print(f"📊 Text quality assessment: {text_quality}")
         
-        # Match ingredients using enhanced system
-        print("🧬 Starting ingredient matching...")
+        # Match ingredients using PRECISE system
+        print("🧬 Starting PRECISE ingredient matching...")
         matches = match_all_ingredients(text)
         
         # Rate ingredients according to hierarchy
@@ -672,7 +642,7 @@ def scan_image_for_ingredients(image_path):
             "confidence": confidence,
             "extracted_text_length": len(text),
             "text_quality": text_quality,
-            "extracted_text": text[:500] + "..." if len(text) > 500 else text,
+            "extracted_text": text,
             "gmo_alert": gmo_alert
         }
         
