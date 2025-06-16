@@ -5,12 +5,17 @@ services:
     region: oregon
     plan: starter
     buildCommand: |
+      echo "🔧 Starting build process..."
       apt-get update -y
-      apt-get install -y tesseract-ocr tesseract-ocr-eng
+      apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev libleptonica-dev
+      echo "📦 Tesseract packages installed"
       which tesseract
       tesseract --version
+      echo "✅ Tesseract verification complete"
       pip install --upgrade pip
       pip install -r requirements.txt
+      echo "🐍 Python packages installed"
+      echo "🎉 Build complete!"
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
