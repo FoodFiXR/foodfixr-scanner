@@ -131,8 +131,8 @@ def extract_text_with_multiple_methods(image_path):
             print(f"DEBUG: OCR.space enhanced successful - extracted {len(text)} characters")
             return text
         
-        print("DEBUG: All OCR.space methods failed")
-        return ""
+        print("DEBUG: OCR.space failed, trying basic pytesseract fallback...")
+        return extract_text_pytesseract_fallback(image_path)
         
     except Exception as e:
         print(f"DEBUG: All OCR methods failed: {e}")
@@ -282,6 +282,36 @@ def parse_ocr_space_response(result):
     except Exception as e:
         print(f"DEBUG: Error parsing OCR.space response: {e}")
         print(f"DEBUG: Raw response: {result}")
+        return ""
+
+def extract_text_pytesseract_fallback(image_path):
+    """Fallback to pytesseract if available"""
+    try:
+        print("DEBUG: Attempting pytesseract fallback...")
+        import pytesseract
+        from PIL import Image
+        
+        image = Image.open(image_path)
+        
+        # Simple preprocessing
+        if image.mode != 'L':
+            image = image.convert('L')
+            
+        # Try basic OCR
+        text = pytesseract.image_to_string(image, config='--psm 6')
+        
+        if text and len(text.strip()) > 0:
+            print(f"DEBUG: Pytesseract fallback worked: {len(text)} chars")
+            return text.strip()
+        else:
+            print("DEBUG: Pytesseract fallback returned empty")
+            return ""
+            
+    except ImportError:
+        print("DEBUG: Pytesseract not available")
+        return ""
+    except Exception as e:
+        print(f"DEBUG: Pytesseract fallback failed: {e}")
         return ""
 
 def normalize_ingredient_text(text):
