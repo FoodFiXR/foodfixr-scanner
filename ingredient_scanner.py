@@ -1,97 +1,80 @@
-import pytesseract
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import re
 import os
 from scanner_config import *
 import requests
-import time
+from PIL import Image, ImageOps, ImageEnhance
 
-# Add this function to your ingredient_scanner.py
-# Replace the existing preprocess_image_advanced function
-
-def preprocess_image_advanced(image):
-    """Advanced image preprocessing specifically for challenging images like curved cans"""
+def compress_image_for_ocr(image_path, max_size_kb=900):
+    """Compress image to stay under OCR.space 1MB limit"""
     try:
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
+        print(f"DEBUG: Checking image size for {image_path}")
         
-        processed_images = []
+        # Check current file size
+        current_size_kb = os.path.getsize(image_path) / 1024
+        print(f"DEBUG: Current image size: {current_size_kb:.1f} KB")
         
-        # Method 1: Original grayscale approach
-        gray = image.convert('L')
-        width, height = gray.size
-        if width < 1200:  # Increase minimum size
-            scale_factor = 1200 / width
-            new_width = int(width * scale_factor)
-            new_height = int(height * scale_factor)
-            gray = gray.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            print(f"DEBUG: Resized image from {width}x{height} to {new_width}x{new_height}")
+        if current_size_kb <= max_size_kb:
+            print(f"DEBUG: Image size OK ({current_size_kb:.1f} KB), no compression needed")
+            return image_path
         
-        # Standard processing
-        enhancer = ImageEnhance.Contrast(gray)
-        enhanced = enhancer.enhance(3.0)
-        enhancer = ImageEnhance.Sharpness(enhanced)
-        enhanced = enhancer.enhance(2.0)
-        processed_images.append(("standard_enhanced", enhanced))
+        print(f"DEBUG: Image too large ({current_size_kb:.1f} KB), compressing...")
         
-        # Method 2: Invert colors (for white text on dark background)
-        inverted = ImageOps.invert(gray)
-        enhancer = ImageEnhance.Contrast(inverted)
-        inverted_enhanced = enhancer.enhance(3.5)
-        processed_images.append(("inverted_enhanced", inverted_enhanced))
-        
-        # Method 3: Extreme contrast for curved surfaces
-        extreme = ImageOps.autocontrast(gray, cutoff=20)
-        enhancer = ImageEnhance.Contrast(extreme)
-        extreme_contrast = enhancer.enhance(5.0)
-        processed_images.append(("extreme_contrast", extreme_contrast))
-        
-        # Method 4: Color channel separation (sometimes better for colored backgrounds)
-        try:
-            rgb_img = image if image.mode == 'RGB' else image.convert('RGB')
-            r, g, b = rgb_img.split()
+        # Open and process image
+        with Image.open(image_path) as img:
+            # Convert to RGB if needed
+            if img.mode in ('RGBA', 'LA', 'P'):
+                print(f"DEBUG: Converting from {img.mode} to RGB")
+                img = img.convert('RGB')
             
-            # Try each color channel
-            for channel_name, channel in [("red", r), ("green", g), ("blue", b)]:
-                # Resize channel if needed
-                if channel.size[0] < 1200:
-                    scale_factor = 1200 / channel.size[0]
-                    new_size = (int(channel.size[0] * scale_factor), int(channel.size[1] * scale_factor))
-                    channel = channel.resize(new_size, Image.Resampling.LANCZOS)
+            original_width, original_height = img.size
+            print(f"DEBUG: Original dimensions: {original_width}x{original_height}")
+            
+            # Calculate compression ratio needed
+            size_ratio = max_size_kb / current_size_kb
+            dimension_ratio = (size_ratio ** 0.5)  # Square root for 2D compression
+            
+            new_width = int(original_width * dimension_ratio * 0.9)  # Extra 10% buffer
+            new_height = int(original_height * dimension_ratio * 0.9)
+            
+            print(f"DEBUG: Resizing to: {new_width}x{new_height}")
+            
+            # Resize image
+            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Create compressed filename
+            base_name, ext = os.path.splitext(image_path)
+            compressed_path = f"{base_name}_compressed{ext}"
+            
+            # Save with optimization
+            quality = 85  # Start with high quality
+            for attempt in range(3):  # Try up to 3 times with lower quality
+                img_resized.save(compressed_path, 'JPEG', 
+                               quality=quality, optimize=True)
                 
-                enhancer = ImageEnhance.Contrast(channel)
-                channel_enhanced = enhancer.enhance(4.0)
-                processed_images.append((f"{channel_name}_channel", channel_enhanced))
-        except Exception as e:
-            print(f"DEBUG: Color channel processing failed: {e}")
-        
-        # Method 5: High-pass filter effect (edge enhancement)
-        try:
-            from PIL import ImageFilter
-            edges = gray.filter(ImageFilter.EDGE_ENHANCE_MORE)
-            enhancer = ImageEnhance.Contrast(edges)
-            edge_enhanced = enhancer.enhance(3.0)
-            processed_images.append(("edge_enhanced", edge_enhanced))
-        except Exception as e:
-            print(f"DEBUG: Edge enhancement failed: {e}")
-        
-        # Method 6: Threshold-based binary conversion
-        try:
-            # Try multiple threshold values
-            for threshold in [100, 128, 150, 180]:
-                binary = gray.point(lambda x: 0 if x < threshold else 255, '1')
-                binary_rgb = binary.convert('L')
-                processed_images.append((f"binary_{threshold}", binary_rgb))
-        except Exception as e:
-            print(f"DEBUG: Binary conversion failed: {e}")
-        
-        print(f"DEBUG: Created {len(processed_images)} processed versions")
-        return processed_images
-        
+                compressed_size_kb = os.path.getsize(compressed_path) / 1024
+                print(f"DEBUG: Attempt {attempt+1}: Quality {quality}, Size: {compressed_size_kb:.1f} KB")
+                
+                if compressed_size_kb <= max_size_kb:
+                    print(f"✅ Successfully compressed to {compressed_size_kb:.1f} KB")
+                    return compressed_path
+                
+                quality -= 15  # Reduce quality for next attempt
+            
+            # If still too large, try more aggressive compression
+            print("DEBUG: Trying more aggressive compression...")
+            new_width = int(new_width * 0.7)
+            new_height = int(new_height * 0.7)
+            img_aggressive = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            img_aggressive.save(compressed_path, 'JPEG', quality=70, optimize=True)
+            
+            final_size_kb = os.path.getsize(compressed_path) / 1024
+            print(f"DEBUG: Final compressed size: {final_size_kb:.1f} KB")
+            
+            return compressed_path
+            
     except Exception as e:
-        print(f"DEBUG: Advanced preprocessing failed: {e}, using original")
-        return [("original", image)]
+        print(f"DEBUG: Image compression failed: {e}")
+        return image_path  # Return original path if compression fails
 
 def extract_text_with_multiple_methods(image_path):
     """Extract text using OCR.space API with fallback options"""
@@ -113,22 +96,26 @@ def extract_text_with_multiple_methods(image_path):
             print(f"DEBUG: OCR.space enhanced successful - extracted {len(text)} characters")
             return text
         
-        print("DEBUG: OCR.space failed, trying basic pytesseract fallback...")
-        return extract_text_pytesseract_fallback(image_path)
+        print("DEBUG: All OCR.space methods failed")
+        return ""
         
     except Exception as e:
         print(f"DEBUG: All OCR methods failed: {e}")
         return ""
 
 def extract_text_ocr_space(image_path):
-    """Extract text using OCR.space API - standard settings"""
+    """Extract text using OCR.space API - standard settings with compression"""
     try:
-        api_url = 'https://api.ocr.space/parse/image'
+        # Compress image if needed
+        processed_image_path = compress_image_for_ocr(image_path)
         
-        # Use free API key (or set OCR_SPACE_API_KEY environment variable for your own)
+        api_url = 'https://api.ocr.space/parse/image'
         api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
         
-        with open(image_path, 'rb') as f:
+        print(f"DEBUG: Using image: {processed_image_path}")
+        print(f"DEBUG: Final file size: {os.path.getsize(processed_image_path)/1024:.1f} KB")
+        
+        with open(processed_image_path, 'rb') as f:
             files = {'file': f}
             
             data = {
@@ -141,14 +128,23 @@ def extract_text_ocr_space(image_path):
                 'isTable': False
             }
             
-            print("DEBUG: Sending request to OCR.space API (standard)...")
+            print("DEBUG: Sending compressed image to OCR.space API (standard)...")
             response = requests.post(api_url, files=files, data=data, timeout=60)
+            
+            # Clean up compressed file if it's different from original
+            if processed_image_path != image_path:
+                try:
+                    os.remove(processed_image_path)
+                    print("DEBUG: Cleaned up compressed image file")
+                except:
+                    pass
             
             if response.status_code == 200:
                 result = response.json()
                 return parse_ocr_space_response(result)
             else:
                 print(f"DEBUG: OCR.space API returned status {response.status_code}")
+                print(f"DEBUG: Response: {response.text[:500]}")
                 return ""
                 
     except Exception as e:
@@ -156,12 +152,15 @@ def extract_text_ocr_space(image_path):
         return ""
 
 def extract_text_ocr_space_enhanced(image_path):
-    """Extract text using OCR.space API - enhanced settings for difficult images"""
+    """Extract text using OCR.space API - enhanced settings with compression"""
     try:
+        # Compress image if needed
+        processed_image_path = compress_image_for_ocr(image_path)
+        
         api_url = 'https://api.ocr.space/parse/image'
         api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
         
-        with open(image_path, 'rb') as f:
+        with open(processed_image_path, 'rb') as f:
             files = {'file': f}
             
             # Enhanced settings for challenging images
@@ -176,14 +175,23 @@ def extract_text_ocr_space_enhanced(image_path):
                 'isSearchablePdfHideTextLayer': False
             }
             
-            print("DEBUG: Sending request to OCR.space API (enhanced)...")
+            print("DEBUG: Sending compressed image to OCR.space API (enhanced)...")
             response = requests.post(api_url, files=files, data=data, timeout=60)
+            
+            # Clean up compressed file if it's different from original
+            if processed_image_path != image_path:
+                try:
+                    os.remove(processed_image_path)
+                    print("DEBUG: Cleaned up compressed image file")
+                except:
+                    pass
             
             if response.status_code == 200:
                 result = response.json()
                 return parse_ocr_space_response(result)
             else:
                 print(f"DEBUG: OCR.space enhanced API returned status {response.status_code}")
+                print(f"DEBUG: Response: {response.text[:500]}")
                 return ""
                 
     except Exception as e:
@@ -191,10 +199,16 @@ def extract_text_ocr_space_enhanced(image_path):
         return ""
 
 def parse_ocr_space_response(result):
-    """Parse OCR.space API response"""
+    """Parse OCR.space API response with better error handling"""
     try:
+        print(f"DEBUG: OCR.space response keys: {list(result.keys())}")
+        
         if result.get('IsErroredOnProcessing', True):
-            error_msg = result.get('ErrorMessage', 'Unknown error')
+            error_messages = result.get('ErrorMessage', ['Unknown error'])
+            if isinstance(error_messages, list):
+                error_msg = ', '.join(error_messages)
+            else:
+                error_msg = str(error_messages)
             print(f"DEBUG: OCR.space processing error: {error_msg}")
             return ""
         
@@ -204,7 +218,10 @@ def parse_ocr_space_response(result):
             return ""
         
         # Get text from first result
-        extracted_text = parsed_results[0].get('ParsedText', '')
+        first_result = parsed_results[0]
+        print(f"DEBUG: First result keys: {list(first_result.keys())}")
+        
+        extracted_text = first_result.get('ParsedText', '')
         
         if extracted_text and len(extracted_text.strip()) > 0:
             # Clean up the text
@@ -216,41 +233,16 @@ def parse_ocr_space_response(result):
             return cleaned_text
         else:
             print("DEBUG: OCR.space returned empty text")
+            # Check if there's an error in the parsed result
+            if 'ErrorMessage' in first_result:
+                print(f"DEBUG: ParsedResult error: {first_result['ErrorMessage']}")
             return ""
             
     except Exception as e:
         print(f"DEBUG: Error parsing OCR.space response: {e}")
+        print(f"DEBUG: Raw response: {result}")
         return ""
 
-def extract_text_pytesseract_fallback(image_path):
-    """Fallback to pytesseract if available"""
-    try:
-        print("DEBUG: Attempting pytesseract fallback...")
-        import pytesseract
-        from PIL import Image
-        
-        image = Image.open(image_path)
-        
-        # Simple preprocessing
-        if image.mode != 'L':
-            image = image.convert('L')
-            
-        # Try basic OCR
-        text = pytesseract.image_to_string(image, config='--psm 6')
-        
-        if text and len(text.strip()) > 0:
-            print(f"DEBUG: Pytesseract fallback worked: {len(text)} chars")
-            return text.strip()
-        else:
-            print("DEBUG: Pytesseract fallback returned empty")
-            return ""
-            
-    except ImportError:
-        print("DEBUG: Pytesseract not available")
-        return ""
-    except Exception as e:
-        print(f"DEBUG: Pytesseract fallback failed: {e}")
-        return ""
 def normalize_ingredient_text(text):
     """Enhanced text normalization with comprehensive OCR error correction"""
     if not text:
