@@ -197,6 +197,119 @@ def scan():
         </html>
         """, 500
 
+# Add this route to your app.py for immediate testing
+
+@app.route('/test-manual', methods=['GET', 'POST'])
+def test_manual():
+    """Manual text input for testing ingredient detection"""
+    if request.method == 'GET':
+        return '''
+        <html>
+        <head>
+            <title>Manual Ingredient Test</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #e91e63; border-radius: 5px; font-size: 16px; }
+                button { background: #e91e63; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+                button:hover { background: #c2185b; }
+                .preset { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; cursor: pointer; }
+                .preset:hover { background: #e0e0e0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🧪 Manual Ingredient Testing</h1>
+                <p>Enter ingredient text to test the detection system:</p>
+                
+                <form method="post">
+                    <textarea name="ingredients" placeholder="Enter ingredients here... e.g., corn syrup, monosodium glutamate, natural flavors"></textarea>
+                    <br><br>
+                    <button type="submit">🔬 Test Ingredients</button>
+                </form>
+                
+                <h3>Quick Test Presets:</h3>
+                <div class="preset" onclick="fillText('corn syrup, monosodium glutamate, natural flavors, salt')">
+                    🚨 High Risk Test: corn syrup, monosodium glutamate, natural flavors, salt
+                </div>
+                <div class="preset" onclick="fillText('partially hydrogenated soybean oil, sugar, salt')">
+                    🚨 Trans Fat Test: partially hydrogenated soybean oil, sugar, salt
+                </div>
+                <div class="preset" onclick="fillText('water, salt, olive oil, garlic, black pepper')">
+                    ✅ Safe Test: water, salt, olive oil, garlic, black pepper
+                </div>
+                <div class="preset" onclick="fillText('chicken stock, modified cornstarch, vegetable oil, wheat flour, cream, chicken meat, chicken fat, salt, whey, dried chicken, monosodium glutamate, soy protein concentrate, water, natural flavoring, yeast extract, beta carotene for color, soy protein isolate, sodium phosphate, celery extract, onion extract, butter, garlic juice concentrate')">
+                    📸 Campbell's Soup Test (from your image)
+                </div>
+                
+                <script>
+                function fillText(text) {
+                    document.querySelector('textarea[name="ingredients"]').value = text;
+                }
+                </script>
+                
+                <p><a href="/">← Back to Main Scanner</a></p>
+            </div>
+        </body>
+        </html>
+        '''
+    
+    # Handle POST request
+    ingredients_text = request.form.get('ingredients', '').strip()
+    
+    if not ingredients_text:
+        return redirect('/test-manual')
+    
+    try:
+        # Test the ingredient detection system directly
+        from ingredient_scanner import match_all_ingredients, rate_ingredients_according_to_hierarchy, assess_text_quality_enhanced
+        
+        print(f"DEBUG: Manual test with text: {ingredients_text}")
+        
+        # Assess quality
+        quality = assess_text_quality_enhanced(ingredients_text)
+        print(f"DEBUG: Text quality: {quality}")
+        
+        # Match ingredients
+        matches = match_all_ingredients(ingredients_text)
+        print(f"DEBUG: Matches: {matches}")
+        
+        # Rate ingredients
+        rating = rate_ingredients_according_to_hierarchy(matches, quality)
+        print(f"DEBUG: Rating: {rating}")
+        
+        # Create result object
+        result = {
+            "rating": rating,
+            "matched_ingredients": matches,
+            "confidence": "high",
+            "text_quality": quality,
+            "extracted_text_length": len(ingredients_text),
+            "gmo_alert": "📣 GMO Alert!" if matches["gmo"] else None
+        }
+        
+        # Render result using the same template as main scanner
+        return render_template('scanner.html',
+                             result=result,
+                             trial_expired=False,
+                             trial_time_left="Manual Test",
+                             stripe_publishable_key="test")
+                             
+    except Exception as e:
+        print(f"ERROR in manual test: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return f'''
+        <html>
+        <body>
+        <h1>❌ Test Error</h1>
+        <p>Error: {str(e)}</p>
+        <a href="/test-manual">← Try Again</a>
+        </body>
+        </html>
+        '''
+        
 @app.route('/debug-ocr', methods=['GET', 'POST'])
 def debug_ocr():
     """Debug what OCR is actually reading - Enhanced version"""
