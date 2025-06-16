@@ -5,9 +5,11 @@ services:
     region: oregon
     plan: starter
     buildCommand: |
-      apt-get update && 
-      apt-get install -y tesseract-ocr tesseract-ocr-eng && 
-      apt-get install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 &&
+      apt-get update -y
+      apt-get install -y tesseract-ocr tesseract-ocr-eng
+      which tesseract
+      tesseract --version
+      pip install --upgrade pip
       pip install -r requirements.txt
     startCommand: python app.py
     envVars:
