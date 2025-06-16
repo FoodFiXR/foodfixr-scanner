@@ -530,7 +530,14 @@ def match_all_ingredients(text):
     return result
 
 def rate_ingredients_according_to_hierarchy(matches, text_quality):
-    """Rating system following exact hierarchy rules from document"""
+    """
+    Rating system following EXACT hierarchy rules from document:
+    
+    1. HIGH RISK TRANS FATS - ANY ONE = immediate danger
+    2. HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
+    3. Count ALL other problematic ingredients (moderate trans fats, moderate excitotoxins, corn, sugar)
+    4. If total count >= 3 = danger, if >= 1 = proceed carefully
+    """
     
     print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
     
@@ -538,64 +545,74 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     if text_quality == "very_poor":
         return "↪️ TRY AGAIN"
     
-    # HIGH RISK TRANS FATS - ANY ONE = immediate danger (ranks 1-10)
-    high_risk_trans_fat_keywords = [
-        "partially hydrogenated", "vegetable shortening", "shortening", 
-        "interesterified", "high-stability"
-    ]
-    
+    # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
+    high_risk_trans_fat_found = []
     for ingredient in matches["trans_fat"]:
-        if any(keyword in ingredient.lower() for keyword in high_risk_trans_fat_keywords):
-            print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
-            return "🚨 Oh NOOOO! Danger!"
+        # Check against high risk trans fat list from scanner_config
+        for high_risk_item in trans_fat_high_risk:
+            if high_risk_item.lower() in ingredient.lower():
+                high_risk_trans_fat_found.append(ingredient)
+                print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
+                return "🚨 Oh NOOOO! Danger!"
     
-    # HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger (ranks 1-10)
-    high_risk_excitotoxin_keywords = [
-        "monosodium glutamate", "msg", "aspartame", "hydrolyzed", 
-        "disodium inosinate", "disodium guanylate", "yeast extract", 
-        "autolyzed", "caseinate", "torula"
-    ]
-    
+    # RULE 2: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
+    high_risk_excitotoxin_found = []
     for ingredient in matches["excitotoxins"]:
-        if any(keyword in ingredient.lower() for keyword in high_risk_excitotoxin_keywords):
-            print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
-            return "🚨 Oh NOOOO! Danger!"
+        # Check against high risk excitotoxin list from scanner_config
+        for high_risk_item in excitotoxin_high_risk:
+            if high_risk_item.lower() in ingredient.lower():
+                high_risk_excitotoxin_found.append(ingredient)
+                print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
+                return "🚨 Oh NOOOO! Danger!"
     
-    # COUNT ALL OTHER PROBLEMATIC INGREDIENTS
+    # RULE 3: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
     total_problematic_count = 0
     
-    # Count moderate trans fats
-    moderate_trans_fat_keywords = [
-        "hydrogenated fat", "margarine", "vegetable oil", "frying oil",
-        "modified fat", "synthetic fat", "monoglycerides", "diglycerides"
-    ]
-    
+    # Count moderate trans fats (not already counted as high risk)
+    moderate_trans_fat_count = 0
     for ingredient in matches["trans_fat"]:
-        if any(keyword in ingredient.lower() for keyword in moderate_trans_fat_keywords):
-            total_problematic_count += 1
-            print(f"⚠️ Moderate trans fat counted: {ingredient}")
+        if ingredient not in high_risk_trans_fat_found:
+            # Check if it's a moderate risk trans fat
+            for moderate_item in trans_fat_moderate_risk:
+                if moderate_item.lower() in ingredient.lower():
+                    moderate_trans_fat_count += 1
+                    print(f"⚠️ Moderate trans fat counted: {ingredient}")
+                    break
     
-    # Count moderate excitotoxins
-    moderate_excitotoxin_keywords = [
-        "natural flavor", "spices", "seasoning", "soy sauce", 
-        "enzyme modified", "whey protein", "bouillon", "broth", "stock"
-    ]
-    
+    # Count moderate excitotoxins (not already counted as high risk)  
+    moderate_excitotoxin_count = 0
     for ingredient in matches["excitotoxins"]:
-        if any(keyword in ingredient.lower() for keyword in moderate_excitotoxin_keywords):
-            total_problematic_count += 1
-            print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
+        if ingredient not in high_risk_excitotoxin_found:
+            # Check if it's a moderate risk excitotoxin
+            for moderate_item in excitotoxin_moderate_risk:
+                if moderate_item.lower() in ingredient.lower():
+                    moderate_excitotoxin_count += 1
+                    print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
+                    break
+            # Also check low risk excitotoxins
+            for low_item in excitotoxin_low_risk:
+                if low_item.lower() in ingredient.lower():
+                    moderate_excitotoxin_count += 1
+                    print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
+                    break
     
-    # Count ALL corn and sugar ingredients
+    # Count ALL corn ingredients (as per document: all corn counts)
     corn_count = len(matches["corn"])
+    
+    # Count ALL sugar ingredients (as per document: all sugar counts)  
     sugar_count = len(matches["sugar"])
-    total_problematic_count += corn_count + sugar_count
+    
+    # Calculate total problematic count
+    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
     
     print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
+    print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
+    print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
     print(f"   - Corn ingredients: {corn_count}")
     print(f"   - Sugar ingredients: {sugar_count}")
     
-    # Apply hierarchy rules
+    # RULE 4: Apply hierarchy rules per document
+    # "Per category: if 1-2 stays Proceed Carefully, if 3-4 in food = Oh NOOO! Danger!"
     if total_problematic_count >= 3:
         return "🚨 Oh NOOOO! Danger!"
     elif total_problematic_count >= 1:
