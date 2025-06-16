@@ -1,11 +1,12 @@
 import re
 import os
+import gc
 from scanner_config import *
 import requests
 from PIL import Image, ImageOps, ImageEnhance
 
 def compress_image_for_ocr(image_path, max_size_kb=900):
-    """Compress image to stay under OCR.space 1MB limit"""
+    """Memory-efficient image compression for OCR.space 1MB limit"""
     try:
         print(f"DEBUG: Checking image size for {image_path}")
         
@@ -19,58 +20,92 @@ def compress_image_for_ocr(image_path, max_size_kb=900):
         
         print(f"DEBUG: Image too large ({current_size_kb:.1f} KB), compressing...")
         
-        # Open and process image
+        # Memory-efficient approach: Get dimensions first without loading full image
         with Image.open(image_path) as img:
-            # Convert to RGB if needed
-            if img.mode in ('RGBA', 'LA', 'P'):
-                print(f"DEBUG: Converting from {img.mode} to RGB")
-                img = img.convert('RGB')
-            
             original_width, original_height = img.size
-            print(f"DEBUG: Original dimensions: {original_width}x{original_height}")
-            
-            # Calculate compression ratio needed
+            img_mode = img.mode
+        
+        print(f"DEBUG: Original dimensions: {original_width}x{original_height}")
+        
+        # Calculate safe target dimensions to prevent memory issues
+        # Limit max dimension to 2000px for memory safety
+        max_dimension = 2000
+        if max(original_width, original_height) > max_dimension:
+            if original_width > original_height:
+                target_width = max_dimension
+                target_height = int(original_height * max_dimension / original_width)
+            else:
+                target_height = max_dimension
+                target_width = int(original_width * max_dimension / original_height)
+        else:
+            # Calculate compression ratio for file size
             size_ratio = max_size_kb / current_size_kb
-            dimension_ratio = (size_ratio ** 0.5)  # Square root for 2D compression
+            dimension_ratio = (size_ratio ** 0.5) * 0.8  # Conservative factor
             
-            new_width = int(original_width * dimension_ratio * 0.9)  # Extra 10% buffer
-            new_height = int(original_height * dimension_ratio * 0.9)
-            
-            print(f"DEBUG: Resizing to: {new_width}x{new_height}")
-            
-            # Resize image
-            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Create compressed filename
-            base_name, ext = os.path.splitext(image_path)
-            compressed_path = f"{base_name}_compressed{ext}"
-            
-            # Save with optimization
-            quality = 85  # Start with high quality
-            for attempt in range(3):  # Try up to 3 times with lower quality
-                img_resized.save(compressed_path, 'JPEG', 
-                               quality=quality, optimize=True)
+            target_width = max(int(original_width * dimension_ratio), 800)  # Min 800px width
+            target_height = max(int(original_height * dimension_ratio), 600)  # Min 600px height
+        
+        print(f"DEBUG: Target dimensions: {target_width}x{target_height}")
+        
+        # Create compressed filename
+        base_name, ext = os.path.splitext(image_path)
+        compressed_path = f"{base_name}_compressed.jpg"
+        
+        # Memory-efficient processing with immediate cleanup
+        try:
+            with Image.open(image_path) as img:
+                # Convert mode if needed
+                if img_mode in ('RGBA', 'LA', 'P'):
+                    print(f"DEBUG: Converting from {img_mode} to RGB")
+                    img = img.convert('RGB')
                 
-                compressed_size_kb = os.path.getsize(compressed_path) / 1024
-                print(f"DEBUG: Attempt {attempt+1}: Quality {quality}, Size: {compressed_size_kb:.1f} KB")
+                # Resize with memory management
+                print(f"DEBUG: Resizing image...")
+                img_resized = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 
-                if compressed_size_kb <= max_size_kb:
-                    print(f"✅ Successfully compressed to {compressed_size_kb:.1f} KB")
-                    return compressed_path
+                # Try different quality levels
+                for quality in [85, 75, 65, 55]:
+                    print(f"DEBUG: Trying quality {quality}...")
+                    img_resized.save(compressed_path, 'JPEG', 
+                                   quality=quality, optimize=True, progressive=True)
+                    
+                    compressed_size_kb = os.path.getsize(compressed_path) / 1024
+                    print(f"DEBUG: Quality {quality}: Size {compressed_size_kb:.1f} KB")
+                    
+                    if compressed_size_kb <= max_size_kb:
+                        print(f"✅ Successfully compressed to {compressed_size_kb:.1f} KB")
+                        return compressed_path
                 
-                quality -= 15  # Reduce quality for next attempt
+                # If still too large, try smaller dimensions
+                print("DEBUG: Still too large, reducing dimensions further...")
+                smaller_width = int(target_width * 0.7)
+                smaller_height = int(target_height * 0.7)
+                
+                img_smaller = img_resized.resize((smaller_width, smaller_height), Image.Resampling.LANCZOS)
+                img_smaller.save(compressed_path, 'JPEG', quality=60, optimize=True, progressive=True)
+                
+                final_size_kb = os.path.getsize(compressed_path) / 1024
+                print(f"DEBUG: Final aggressive compression: {final_size_kb:.1f} KB")
+                
+                return compressed_path
+                
+        except MemoryError:
+            print("DEBUG: Memory error during compression, trying more aggressive approach...")
+            # Fallback: Very conservative dimensions
+            safe_width = min(1200, original_width // 2)
+            safe_height = min(900, original_height // 2)
             
-            # If still too large, try more aggressive compression
-            print("DEBUG: Trying more aggressive compression...")
-            new_width = int(new_width * 0.7)
-            new_height = int(new_height * 0.7)
-            img_aggressive = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            img_aggressive.save(compressed_path, 'JPEG', quality=70, optimize=True)
-            
-            final_size_kb = os.path.getsize(compressed_path) / 1024
-            print(f"DEBUG: Final compressed size: {final_size_kb:.1f} KB")
-            
-            return compressed_path
+            with Image.open(image_path) as img:
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                
+                img_safe = img.resize((safe_width, safe_height), Image.Resampling.LANCZOS)
+                img_safe.save(compressed_path, 'JPEG', quality=50, optimize=True)
+                
+                fallback_size_kb = os.path.getsize(compressed_path) / 1024
+                print(f"DEBUG: Memory-safe fallback: {fallback_size_kb:.1f} KB")
+                
+                return compressed_path
             
     except Exception as e:
         print(f"DEBUG: Image compression failed: {e}")
@@ -109,6 +144,9 @@ def extract_text_ocr_space(image_path):
         # Compress image if needed
         processed_image_path = compress_image_for_ocr(image_path)
         
+        # Force garbage collection after compression
+        gc.collect()
+        
         api_url = 'https://api.ocr.space/parse/image'
         api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
         
@@ -138,6 +176,9 @@ def extract_text_ocr_space(image_path):
                     print("DEBUG: Cleaned up compressed image file")
                 except:
                     pass
+            
+            # Force garbage collection after API call
+            gc.collect()
             
             if response.status_code == 200:
                 result = response.json()
