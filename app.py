@@ -254,14 +254,14 @@ def debug_ocr():
         
         print(f"DEBUG OCR: Processing {filepath}")
         
-        # Use the enhanced extraction functions
-        from ingredient_scanner import extract_text_from_image, assess_text_quality, match_ingredients, rate_ingredients
+        # Use the NEW function names from updated ingredient_scanner
+        from ingredient_scanner import extract_text_with_multiple_methods, assess_text_quality_enhanced, match_all_ingredients, rate_ingredients_according_to_hierarchy
         
         # Extract text with full debug output
-        text = extract_text_from_image(filepath)
-        quality = assess_text_quality(text)
-        matches = match_ingredients(text)
-        rating = rate_ingredients(matches, quality)
+        text = extract_text_with_multiple_methods(filepath)
+        quality = assess_text_quality_enhanced(text)
+        matches = match_all_ingredients(text)
+        rating = rate_ingredients_according_to_hierarchy(matches, quality)
         
         # Clean up
         os.remove(filepath)
@@ -410,7 +410,6 @@ def debug_ocr():
         </body>
         </html>
         """
-
 @app.route('/test-scan')
 def test_scan():
     """Test scanning without actual image"""
