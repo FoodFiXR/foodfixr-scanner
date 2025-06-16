@@ -1,8 +1,7 @@
-# scanner_config.py
-# Updated configuration file based on hierarchy document
+# scanner_config.py - Exact hierarchy from document
 
-# ===== TRANS FATS =====
-# High Risk (ranks 1-10) - ANY ONE = immediate danger
+# TRANS FATS - From hierarchy document
+# 🔴 High Risk (ranks 1-10) - ANY ONE = immediate danger
 trans_fat_high_risk = [
     "partially hydrogenated oil",
     "partially hydrogenated soybean oil", 
@@ -10,92 +9,78 @@ trans_fat_high_risk = [
     "partially hydrogenated palm oil",
     "partially hydrogenated canola oil",
     "vegetable shortening",
-    "shortening",
+    "shortening", 
     "hydrogenated oil",
     "interesterified fats",
     "high-stability oil"
 ]
 
-# Moderate Risk (ranks 11-18) - Count toward total
+# 🟡 Moderate Risk (ranks 11-18) - Count toward total
 trans_fat_moderate_risk = [
     "hydrogenated fat",
     "margarine",
     "vegetable oil",
-    "blended vegetable oil",
-    "frying oil",
+    "frying oil", 
     "modified fat",
     "synthetic fat",
     "lard substitute",
     "monoglycerides",
-    "diglycerides",
-    "monoglycerides/diglycerides",
-    "mono- and diglycerides"
+    "diglycerides"
 ]
 
-# Safe (ranks 19-23)
+# ✅ Safe trans fats (don't count as problematic)
 trans_fat_safe = [
     "fully hydrogenated oil",
     "palm oil",
-    "palm oil (non-hydrogenated)",
-    "coconut oil",
+    "coconut oil", 
     "butter",
     "ghee",
-    "butter/ghee",
     "cold-pressed oil",
-    "cold-pressed oils",
     "olive oil",
-    "extra virgin olive oil",
-    "avocado oil",
-    "walnut oil"
+    "avocado oil"
 ]
 
-# ===== EXCITOTOXINS =====
-# High Risk (ranks 1-10) - ANY ONE = immediate danger
+# EXCITOTOXINS - From hierarchy document  
+# 🔴 High Risk (ranks 1-10) - ANY ONE = immediate danger
 excitotoxin_high_risk = [
     "monosodium glutamate",
     "msg",
-    "aspartame",
-    "equal",
-    "nutrasweet",
+    "aspartame", 
     "hydrolyzed vegetable protein",
     "hvp",
     "hydrolyzed soy protein",
     "hydrolyzed corn protein",
-    "hydrolyzed protein",
     "disodium inosinate",
-    "disodium guanylate",
+    "disodium guanylate", 
     "yeast extract",
-    "natural yeast extract",
-    "extract of yeast",
     "autolyzed yeast",
     "calcium caseinate",
     "sodium caseinate",
     "torula yeast"
 ]
 
-# Moderate Risk (ranks 11-16) - Count toward total
+# 🟡 Moderate Risk (ranks 11-16) - Count toward total
 excitotoxin_moderate_risk = [
     "natural flavors",
-    "natural flavoring",
+    "natural flavoring", 
     "spices",
     "seasonings",
-    "spices/seasonings",
     "seasoning blends",
     "soy sauce",
-    "non-brewed soy sauce",
+    "non-brewed soy sauce", 
     "hydrolyzed soy sauce",
     "enzyme modified cheese",
     "whey protein isolate",
     "whey protein hydrolysate",
     "bouillon",
-    "broth",
+    "broth", 
     "stock",
     "chicken broth",
     "beef stock",
     "bouillon flavor"
 ]
 
-# Low Risk/Ambiguous (ranks 17-21)
+# Low Risk/Ambiguous (ranks 17-21) - Count toward total  
 excitotoxin_low_risk = [
     "maltodextrin",
     "modified food starch",
@@ -105,20 +90,18 @@ excitotoxin_low_risk = [
     "carrageenan"
 ]
 
-# ===== CORN =====
-# High Risk (ranks 1-16) - Count toward total
+# CORN - From hierarchy document
+# 🔴 High Risk - Count toward total
 corn_high_risk = [
     "high fructose corn syrup",
-    "hfcs",
+    "hfcs", 
     "corn syrup",
     "cornstarch",
-    "corn starch",
     "modified cornstarch",
-    "modified corn starch",
     "maltodextrin",
     "dextrose",
     "fructose",
-    "glucose",
+    "glucose", 
     "citric acid",
     "ascorbic acid",
     "erythritol",
@@ -126,18 +109,15 @@ corn_high_risk = [
     "xylitol",
     "caramel color",
     "vanillin",
-    "corn syrup solids",
-    "glucose-fructose syrup",
-    "crystalline fructose",
-    "anhydrous dextrose",
-    "glucose solids"
+    "msg",
+    "monosodium glutamate"
 ]
 
-# Moderate Risk (ranks 17-30) - Count toward total
+# 🟡 Moderate Risk - Count toward total
 corn_moderate_risk = [
     "natural flavors",
     "natural flavoring",
-    "vegetable oil",
+    "vegetable oil", 
     "vegetable starch",
     "modified food starch",
     "lactic acid",
@@ -146,45 +126,39 @@ corn_moderate_risk = [
     "enzymes",
     "lecithin",
     "tocopherols",
-    "vitamin e",
     "baking powder",
-    "polydextrose",
+    "polydextrose", 
     "inositol",
     "mono- and diglycerides",
-    "monoglycerides",
-    "diglycerides",
     "calcium stearate",
     "magnesium stearate"
 ]
 
-# Low Risk (ranks 31-39)
+# Low Risk - Count toward total
 corn_low_risk = [
     "sodium erythorbate",
     "ethyl maltol",
     "sodium citrate",
     "potassium citrate",
     "masa harina",
-    "corn meal",
     "corn flour",
+    "cornmeal",
     "corn oil",
     "corn alcohol",
     "corn ethanol",
-    "pla",
+    "pla", 
     "corn-based vinegars",
-    "white vinegar",
     "sorbitan monooleate",
     "sorbitan tristearate",
     "zein"
 ]
 
-# ===== SUGAR =====
-# All sugar ingredients count as problematic according to hierarchy
-sugar_keywords = [
-    # High Risk Sugars (1-15) - Most dangerous
+# SUGAR - From hierarchy document  
+# 🔴 High Risk - Count toward total
+sugar_high_risk = [
     "high-fructose corn syrup",
-    "high fructose corn syrup",
     "hfcs",
-    "corn syrup",
+    "corn syrup", 
     "corn syrup solids",
     "glucose-fructose syrup",
     "crystalline fructose",
@@ -193,27 +167,26 @@ sugar_keywords = [
     "maltodextrin",
     "glucose solids",
     "refiner's syrup",
-    "refiners syrup",
     "agave syrup",
-    "agave nectar",
+    "agave nectar", 
     "fructose",
     "dextrose",
     "glucose",
-    "sucrose",
-    
-    # Moderate Risk Sugars (16-48)
+    "sucrose"
+]
+
+# 🟡 Moderate Risk - Count toward total
+sugar_moderate_risk = [
     "cane sugar",
     "beet sugar",
     "brown sugar",
     "coconut sugar",
     "date sugar",
-    "palm sugar",
+    "palm sugar", 
     "evaporated cane juice",
-    "fruit juice concentrate",
     "fruit juice concentrates",
     "apple juice concentrate",
     "grape juice concentrate",
-    "pear juice concentrate",
     "barley malt syrup",
     "brown rice syrup",
     "rice syrup",
@@ -221,14 +194,18 @@ sugar_keywords = [
     "sorghum syrup",
     "molasses",
     "treacle",
-    "carob syrup",
+    "carob syrup", 
     "yacon syrup",
-    "honey",
+    "honey"
+]
+
+# Low Risk - Count toward total
+sugar_low_risk = [
     "maple syrup",
     "maple sugar",
     "coconut nectar",
     "date syrup",
-    "date paste",
+    "date paste", 
     "banana puree",
     "raisin juice concentrate",
     "fig paste",
@@ -238,30 +215,19 @@ sugar_keywords = [
     "diastatic malt",
     "malt syrup",
     "malt extract",
-    "ethyl maltol",
-    
-    # Ambiguous/Marketing terms
-    "organic cane juice",
-    "dehydrated cane juice",
-    "cane juice crystals",
-    "rice sweetener",
-    "natural sweetener",
-    "all-natural sweetener",
-    "naturally sweetened",
-    "sweetened",
-    "sugar"
+    "ethyl maltol"
 ]
 
-# ===== GMO INGREDIENTS =====
-# These trigger GMO Alert but don't count in danger rating
+# Combine all sugar categories for easier processing
+sugar_keywords = sugar_high_risk + sugar_moderate_risk + sugar_low_risk
+
+# GMO ALERT - From hierarchy document (NOT part of ranking)
 gmo_keywords = [
     "corn syrup",
-    "high fructose corn syrup",
+    "high fructose corn syrup", 
     "hfcs",
     "corn starch",
-    "cornstarch",
     "modified corn starch",
-    "modified cornstarch",
     "soybean oil",
     "soy lecithin",
     "soy protein isolate",
@@ -271,11 +237,10 @@ gmo_keywords = [
     "tvp",
     "hydrolyzed soy protein",
     "hydrolyzed vegetable protein",
-    "sugar",  # when not specified as cane sugar
+    "sugar",
     "monoglycerides",
     "diglycerides",
-    "mono- and diglycerides",
-    "maltodextrin",
+    "maltodextrin", 
     "dextrose",
     "glucose",
     "fructose",
@@ -300,7 +265,7 @@ gmo_keywords = [
     "synbio vanillin",
     "vegetable oil",
     "starch",
-    "modified starch",
+    "modified starch", 
     "lecithin",
     "flavoring",
     "natural flavor",
@@ -317,7 +282,6 @@ gmo_keywords = [
     "pink pineapple",
     "genetically engineered",
     "genetically modified organism",
-    "gmo",
     "bioengineered",
     "fermentation-derived proteins",
     "synthetic biology",
@@ -326,296 +290,63 @@ gmo_keywords = [
     "precision fermentation"
 ]
 
-# ===== SAFE INGREDIENTS =====
+# SAFE INGREDIENTS - Generally safe
 safe_ingredients = [
-    # Safe fats and oils
-    "fully hydrogenated oil",
-    "palm oil",
-    "palm oil (non-hydrogenated)",
-    "coconut oil",
-    "butter",
-    "ghee",
-    "butter/ghee",
-    "cold-pressed oil",
-    "cold-pressed oils",
-    "olive oil",
-    "extra virgin olive oil",
-    "avocado oil",
-    "walnut oil",
-    "almond oil",
-    "sesame oil",
-    "sunflower oil",
-    "safflower oil",
-    
-    # Basic ingredients
     "water",
-    "salt",
+    "salt", 
     "sea salt",
-    "himalayan salt",
     "black pepper",
     "white pepper",
     "garlic",
     "onion",
-    "ginger",
-    "turmeric",
-    "cinnamon",
-    "paprika",
-    "cumin",
-    "coriander",
-    "basil",
-    "oregano",
-    "thyme",
-    "rosemary",
-    "sage",
-    "parsley",
-    "cilantro",
-    "mint",
-    "dill",
-    "bay leaves",
-    "vanilla",
-    "vanilla bean",
-    "cocoa",
-    "cacao",
-    "coffee",
-    "tea",
-    
-    # Safe additives and vitamins
-    "vitamin d",
-    "vitamin d3",
-    "vitamin c",
-    "vitamin b12",
-    "calcium carbonate",
-    "iron",
-    "zinc",
-    "magnesium",
-    "potassium",
-    "sodium bicarbonate",
-    "baking soda",
-    "cream of tartar",
-    "pectin",
-    "gelatin",
-    "agar",
-    "psyllium",
-    "flax",
-    "chia",
-    
-    # Whole grains and seeds
-    "oats",
-    "quinoa",
-    "brown rice",
-    "wild rice",
-    "millet",
-    "buckwheat",
-    "amaranth",
-    "teff",
-    "sorghum",
-    "barley",
-    "rye",
-    "spelt",
-    "kamut",
-    "wheat",
-    "whole wheat",
-    
-    # Nuts and seeds
-    "almonds",
-    "walnuts",
-    "pecans",
-    "cashews",
-    "pistachios",
-    "macadamia",
-    "hazelnuts",
-    "brazil nuts",
-    "pine nuts",
-    "pumpkin seeds",
-    "sunflower seeds",
-    "sesame seeds",
-    "flax seeds",
-    "chia seeds",
-    "hemp seeds",
-    
-    # Dairy
-    "milk",
+    "olive oil",
+    "coconut oil",
+    "avocado oil",
+    "butter",
     "cream",
-    "yogurt",
-    "cheese",
-    "cottage cheese",
-    "ricotta",
-    "mozzarella",
-    "cheddar",
-    "parmesan",
-    "feta",
-    
-    # Proteins
+    "milk",
     "eggs",
-    "egg whites",
     "chicken",
-    "turkey",
     "beef",
     "pork",
-    "lamb",
     "fish",
     "salmon",
-    "tuna",
-    "shrimp",
-    "crab",
-    "lobster",
-    
-    # Vegetables
+    "tuna", 
+    "turkey",
+    "rice",
+    "quinoa",
+    "oats",
+    "wheat",
+    "flour",
+    "bread",
+    "tomato",
+    "potato",
+    "carrot",
+    "celery",
     "spinach",
     "kale",
-    "lettuce",
-    "arugula",
     "broccoli",
-    "cauliflower",
-    "cabbage",
-    "brussels sprouts",
-    "carrots",
-    "celery",
-    "cucumber",
-    "tomatoes",
-    "bell peppers",
-    "mushrooms",
-    "asparagus",
-    "green beans",
-    "peas",
-    "corn",  # whole corn
-    "potatoes",
-    "sweet potatoes",
-    "squash",
-    "pumpkin",
-    "eggplant",
-    "beets",
-    "radishes",
-    "turnips",
-    
-    # Fruits
-    "apples",
-    "bananas",
-    "oranges",
-    "lemons",
-    "limes",
-    "grapefruit",
-    "berries",
-    "strawberries",
-    "blueberries",
-    "raspberries",
-    "blackberries",
-    "grapes",
-    "melons",
-    "watermelon",
-    "cantaloupe",
-    "honeydew",
-    "pineapple",
-    "mango",
-    "papaya",
-    "kiwi",
-    "peaches",
-    "plums",
-    "apricots",
-    "cherries",
-    "pears",
-    "figs",
-    "dates",
-    "raisins",
-    "cranberries",
-    "pomegranate",
-    "avocado",
-    
-    # Legumes
-    "beans",
-    "black beans",
-    "pinto beans",
-    "kidney beans",
-    "navy beans",
-    "chickpeas",
-    "lentils",
-    "split peas",
-    "soybeans",
-    "edamame",
-    "tofu",
-    "tempeh"
+    "apple",
+    "banana",
+    "orange",
+    "lemon",
+    "lime",
+    "vinegar",
+    "apple cider vinegar",
+    "baking soda",
+    "vanilla extract",
+    "cinnamon",
+    "paprika",
+    "oregano",
+    "basil",
+    "thyme",
+    "rosemary",
+    "parsley",
+    "bay leaves",
+    "turmeric",
+    "ginger",
+    "mustard seed",
+    "fennel",
+    "cumin",
+    "coriander"
 ]
-
-# ===== COMMON OCR ERROR CORRECTIONS =====
-common_ocr_errors = {
-    # Corn syrup variations
-    "corn5yrup": "corn syrup",
-    "cornsynup": "corn syrup", 
-    "com syrup": "corn syrup",
-    "cornsyrup": "corn syrup",
-    "corn synup": "corn syrup",
-    
-    # HFCS variations
-    "hfc5": "hfcs",
-    "hfc3": "hfcs",
-    "high fructose com syrup": "high fructose corn syrup",
-    "highfructosecornsyrup": "high fructose corn syrup",
-    
-    # MSG variations
-    "m5g": "msg",
-    "ms9": "msg",
-    "rns9": "msg",
-    "monosodiumglutamate": "monosodium glutamate",
-    "mono sodium glutamate": "monosodium glutamate",
-    
-    # Aspartame variations
-    "aspertame": "aspartame",
-    "aspartarne": "aspartame",
-    "asparteme": "aspartame",
-    
-    # Natural flavors variations
-    "naturalflavors": "natural flavors",
-    "naturalflavor": "natural flavor",
-    "naturalflavoring": "natural flavoring",
-    "natural flavonng": "natural flavoring",
-    
-    # Hydrogenated oil variations
-    "partiallyhydrogenated": "partially hydrogenated",
-    "hydrogenatedoil": "hydrogenated oil",
-    "partially hydrogenated oil": "partially hydrogenated oil",
-    
-    # Starch variations
-    "modifiedstarch": "modified starch",
-    "modifiedcornstarch": "modified corn starch",
-    "modified com starch": "modified corn starch",
-    
-    # Lecithin variations
-    "soylecithin": "soy lecithin",
-    "soy lecrthin": "soy lecithin",
-    
-    # Oil variations
-    "canolaoil": "canola oil",
-    "cottonseedoil": "cottonseed oil",
-    "vegetableoil": "vegetable oil",
-    
-    # Protein variations
-    "texturedvegetableprotein": "textured vegetable protein",
-    "hydrolyzedprotein": "hydrolyzed protein",
-    "hydrolyzedvegetableprotein": "hydrolyzed vegetable protein",
-    "vegetableprotein": "vegetable protein",
-    
-    # Yeast extract variations
-    "yeastextract": "yeast extract",
-    "yeast extract": "yeast extract",
-    "autolyzedyeast": "autolyzed yeast",
-    
-    # Disodium variations
-    "disodiuminosinate": "disodium inosinate",
-    "disodiumguanylate": "disodium guanylate",
-    "disodium inosmate": "disodium inosinate",
-    
-    # Caseinate variations
-    "calciumcaseinate": "calcium caseinate",
-    "sodiumcaseinate": "sodium caseinate",
-    
-    # Maltodextrin variations
-    "maltodextnn": "maltodextrin",
-    "maltodextrin": "maltodextrin",
-    "malto dextrin": "maltodextrin",
-    
-    # Common character replacements
-    "rn": "m",
-    "vv": "w", 
-    "ii": "ll",
-    "cl": "d"
-}
