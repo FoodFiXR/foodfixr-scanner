@@ -4,58 +4,94 @@ import re
 import os
 from scanner_config import *
 
+# Add this function to your ingredient_scanner.py
+# Replace the existing preprocess_image_advanced function
+
 def preprocess_image_advanced(image):
-    """Advanced image preprocessing with multiple techniques"""
+    """Advanced image preprocessing specifically for challenging images like curved cans"""
     try:
         # Convert to RGB if needed
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # Convert to grayscale
-        gray = image.convert('L')
+        processed_images = []
         
-        # Resize if too small (critical for mobile photos)
+        # Method 1: Original grayscale approach
+        gray = image.convert('L')
         width, height = gray.size
-        if width < 1000:
-            scale_factor = 1000 / width
+        if width < 1200:  # Increase minimum size
+            scale_factor = 1200 / width
             new_width = int(width * scale_factor)
             new_height = int(height * scale_factor)
             gray = gray.resize((new_width, new_height), Image.Resampling.LANCZOS)
             print(f"DEBUG: Resized image from {width}x{height} to {new_width}x{new_height}")
         
-        # Multiple preprocessing approaches
-        processed_images = []
-        
-        # Method 1: High contrast with sharpening
+        # Standard processing
         enhancer = ImageEnhance.Contrast(gray)
-        high_contrast = enhancer.enhance(3.5)
-        enhancer = ImageEnhance.Sharpness(high_contrast)
-        sharpened = enhancer.enhance(2.5)
-        processed_images.append(("high_contrast_sharp", sharpened))
+        enhanced = enhancer.enhance(3.0)
+        enhancer = ImageEnhance.Sharpness(enhanced)
+        enhanced = enhancer.enhance(2.0)
+        processed_images.append(("standard_enhanced", enhanced))
         
-        # Method 2: Auto-level and equalize
-        auto_level = ImageOps.autocontrast(gray)
-        equalized = ImageOps.equalize(auto_level)
-        processed_images.append(("auto_equalized", equalized))
+        # Method 2: Invert colors (for white text on dark background)
+        inverted = ImageOps.invert(gray)
+        enhancer = ImageEnhance.Contrast(inverted)
+        inverted_enhanced = enhancer.enhance(3.5)
+        processed_images.append(("inverted_enhanced", inverted_enhanced))
         
-        # Method 3: Extreme contrast for bold text
-        extreme_contrast = ImageOps.autocontrast(gray, cutoff=15)
-        enhancer = ImageEnhance.Contrast(extreme_contrast)
-        extreme = enhancer.enhance(4.0)
-        processed_images.append(("extreme_contrast", extreme))
+        # Method 3: Extreme contrast for curved surfaces
+        extreme = ImageOps.autocontrast(gray, cutoff=20)
+        enhancer = ImageEnhance.Contrast(extreme)
+        extreme_contrast = enhancer.enhance(5.0)
+        processed_images.append(("extreme_contrast", extreme_contrast))
         
-        # Method 4: Noise reduction then enhance
-        denoised = gray.filter(ImageFilter.MedianFilter(size=3))
-        enhancer = ImageEnhance.Contrast(denoised)
-        clean_contrast = enhancer.enhance(2.8)
-        processed_images.append(("clean_contrast", clean_contrast))
+        # Method 4: Color channel separation (sometimes better for colored backgrounds)
+        try:
+            rgb_img = image if image.mode == 'RGB' else image.convert('RGB')
+            r, g, b = rgb_img.split()
+            
+            # Try each color channel
+            for channel_name, channel in [("red", r), ("green", g), ("blue", b)]:
+                # Resize channel if needed
+                if channel.size[0] < 1200:
+                    scale_factor = 1200 / channel.size[0]
+                    new_size = (int(channel.size[0] * scale_factor), int(channel.size[1] * scale_factor))
+                    channel = channel.resize(new_size, Image.Resampling.LANCZOS)
+                
+                enhancer = ImageEnhance.Contrast(channel)
+                channel_enhanced = enhancer.enhance(4.0)
+                processed_images.append((f"{channel_name}_channel", channel_enhanced))
+        except Exception as e:
+            print(f"DEBUG: Color channel processing failed: {e}")
         
+        # Method 5: High-pass filter effect (edge enhancement)
+        try:
+            from PIL import ImageFilter
+            edges = gray.filter(ImageFilter.EDGE_ENHANCE_MORE)
+            enhancer = ImageEnhance.Contrast(edges)
+            edge_enhanced = enhancer.enhance(3.0)
+            processed_images.append(("edge_enhanced", edge_enhanced))
+        except Exception as e:
+            print(f"DEBUG: Edge enhancement failed: {e}")
+        
+        # Method 6: Threshold-based binary conversion
+        try:
+            # Try multiple threshold values
+            for threshold in [100, 128, 150, 180]:
+                binary = gray.point(lambda x: 0 if x < threshold else 255, '1')
+                binary_rgb = binary.convert('L')
+                processed_images.append((f"binary_{threshold}", binary_rgb))
+        except Exception as e:
+            print(f"DEBUG: Binary conversion failed: {e}")
+        
+        print(f"DEBUG: Created {len(processed_images)} processed versions")
         return processed_images
         
     except Exception as e:
         print(f"DEBUG: Advanced preprocessing failed: {e}, using original")
         return [("original", image)]
 
+# Also update the OCR configuration list
 def extract_text_with_multiple_methods(image_path):
     """Extract text using multiple OCR configurations and image processing"""
     try:
@@ -70,17 +106,22 @@ def extract_text_with_multiple_methods(image_path):
         # Get processed images
         processed_images = preprocess_image_advanced(image)
         
-        # OCR configurations to try
+        # Enhanced OCR configurations - especially for challenging text
         ocr_configs = [
-            '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-. ',
-            '--oem 3 --psm 4',
-            '--oem 3 --psm 3',
-            '--oem 3 --psm 6',
-            '--oem 3 --psm 8',
-            '--oem 3 --psm 7',
-            '--oem 3 --psm 11',
-            '--oem 3 --psm 12',
-            '--oem 1 --psm 6',
+            '--oem 3 --psm 6',  # Uniform block of text
+            '--oem 3 --psm 4',  # Single column of text
+            '--oem 3 --psm 3',  # Fully automatic page segmentation
+            '--oem 3 --psm 8',  # Single word
+            '--oem 3 --psm 7',  # Single text line
+            '--oem 3 --psm 11', # Sparse text
+            '--oem 3 --psm 12', # Sparse text with OSD
+            '--oem 3 --psm 13', # Raw line
+            '--oem 1 --psm 6',  # Neural nets LSTM engine
+            '--oem 2 --psm 6',  # Legacy + LSTM engines
+            # Add configurations specifically for challenging text
+            '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-.:; ',
+            '--oem 3 --psm 4 -c preserve_interword_spaces=1',
+            '--oem 3 --psm 6 -c tessedit_do_invert=1',  # Invert image
         ]
         
         # Try each processed image with each OCR config
@@ -89,14 +130,14 @@ def extract_text_with_multiple_methods(image_path):
                 try:
                     text = pytesseract.image_to_string(processed_img, config=config)
                     text = text.strip()
-                    if text and len(text) > 3:
+                    if text and len(text) > 5:  # Require at least 5 characters
                         all_extracted_texts.append({
                             'text': text,
                             'method': f"{method_name}_config_{i+1}",
                             'length': len(text),
                             'word_count': len(text.split())
                         })
-                        print(f"DEBUG: {method_name} config {i+1} extracted {len(text)} chars")
+                        print(f"DEBUG: {method_name} config {i+1} extracted {len(text)} chars: {text[:100]}...")
                 except Exception as e:
                     print(f"DEBUG: {method_name} config {i+1} failed: {e}")
         
@@ -105,8 +146,11 @@ def extract_text_with_multiple_methods(image_path):
             # Sort by length (longer is usually better)
             all_extracted_texts.sort(key=lambda x: x['length'], reverse=True)
             
+            print(f"DEBUG: Got {len(all_extracted_texts)} successful extractions")
+            
             # Take the longest text as base
             best_text = all_extracted_texts[0]['text']
+            print(f"DEBUG: Best extraction from {all_extracted_texts[0]['method']}: {len(best_text)} chars")
             
             # Extract all unique words from all extractions
             all_words = set()
@@ -120,9 +164,10 @@ def extract_text_with_multiple_methods(image_path):
             
             if missing_words:
                 best_text += " " + " ".join(missing_words)
+                print(f"DEBUG: Added {len(missing_words)} missing words")
             
-            print(f"DEBUG: COMBINED TEXT LENGTH: {len(best_text)} characters")
-            print(f"DEBUG: COMBINED TEXT PREVIEW: {best_text[:300]}...")
+            print(f"DEBUG: FINAL COMBINED TEXT LENGTH: {len(best_text)} characters")
+            print(f"DEBUG: FINAL TEXT PREVIEW: {best_text[:500]}...")
             return best_text
         else:
             print("DEBUG: No text extracted by any method")
