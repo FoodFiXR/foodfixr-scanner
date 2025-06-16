@@ -1,10 +1,11 @@
 # scanner_config.py
-# Configuration file containing all ingredient lists based on hierarchy document
+# Updated configuration file based on hierarchy document
 
-# Trans Fats - High Risk (ranks 1-10)
+# ===== TRANS FATS =====
+# High Risk (ranks 1-10) - ANY ONE = immediate danger
 trans_fat_high_risk = [
     "partially hydrogenated oil",
-    "partially hydrogenated soybean oil",
+    "partially hydrogenated soybean oil", 
     "partially hydrogenated cottonseed oil",
     "partially hydrogenated palm oil",
     "partially hydrogenated canola oil",
@@ -15,7 +16,7 @@ trans_fat_high_risk = [
     "high-stability oil"
 ]
 
-# Trans Fats - Moderate Risk (ranks 11-18)
+# Moderate Risk (ranks 11-18) - Count toward total
 trans_fat_moderate_risk = [
     "hydrogenated fat",
     "margarine",
@@ -31,7 +32,7 @@ trans_fat_moderate_risk = [
     "mono- and diglycerides"
 ]
 
-# Trans Fats - Safe (ranks 19-23)
+# Safe (ranks 19-23)
 trans_fat_safe = [
     "fully hydrogenated oil",
     "palm oil",
@@ -43,11 +44,13 @@ trans_fat_safe = [
     "cold-pressed oil",
     "cold-pressed oils",
     "olive oil",
+    "extra virgin olive oil",
     "avocado oil",
     "walnut oil"
 ]
 
-# Excitotoxins - High Risk (ranks 1-10)
+# ===== EXCITOTOXINS =====
+# High Risk (ranks 1-10) - ANY ONE = immediate danger
 excitotoxin_high_risk = [
     "monosodium glutamate",
     "msg",
@@ -58,6 +61,7 @@ excitotoxin_high_risk = [
     "hvp",
     "hydrolyzed soy protein",
     "hydrolyzed corn protein",
+    "hydrolyzed protein",
     "disodium inosinate",
     "disodium guanylate",
     "yeast extract",
@@ -69,7 +73,7 @@ excitotoxin_high_risk = [
     "torula yeast"
 ]
 
-# Excitotoxins - Moderate Risk (ranks 11-16)
+# Moderate Risk (ranks 11-16) - Count toward total
 excitotoxin_moderate_risk = [
     "natural flavors",
     "natural flavoring",
@@ -91,7 +95,7 @@ excitotoxin_moderate_risk = [
     "bouillon flavor"
 ]
 
-# Excitotoxins - Low Risk/Ambiguous (ranks 17-21)
+# Low Risk/Ambiguous (ranks 17-21)
 excitotoxin_low_risk = [
     "maltodextrin",
     "modified food starch",
@@ -101,7 +105,8 @@ excitotoxin_low_risk = [
     "carrageenan"
 ]
 
-# Corn - High Risk (ranks 1-16)
+# ===== CORN =====
+# High Risk (ranks 1-16) - Count toward total
 corn_high_risk = [
     "high fructose corn syrup",
     "hfcs",
@@ -121,11 +126,14 @@ corn_high_risk = [
     "xylitol",
     "caramel color",
     "vanillin",
-    "msg",  # when derived from corn
-    "monosodium glutamate"  # when derived from corn
+    "corn syrup solids",
+    "glucose-fructose syrup",
+    "crystalline fructose",
+    "anhydrous dextrose",
+    "glucose solids"
 ]
 
-# Corn - Moderate Risk (ranks 17-30)
+# Moderate Risk (ranks 17-30) - Count toward total
 corn_moderate_risk = [
     "natural flavors",
     "natural flavoring",
@@ -149,7 +157,7 @@ corn_moderate_risk = [
     "magnesium stearate"
 ]
 
-# Corn - Low Risk (ranks 31-39)
+# Low Risk (ranks 31-39)
 corn_low_risk = [
     "sodium erythorbate",
     "ethyl maltol",
@@ -169,9 +177,10 @@ corn_low_risk = [
     "zein"
 ]
 
-# Sugar - All sugar ingredients count as problematic
+# ===== SUGAR =====
+# All sugar ingredients count as problematic according to hierarchy
 sugar_keywords = [
-    # High Risk Sugars (1-15)
+    # High Risk Sugars (1-15) - Most dangerous
     "high-fructose corn syrup",
     "high fructose corn syrup",
     "hfcs",
@@ -192,7 +201,7 @@ sugar_keywords = [
     "glucose",
     "sucrose",
     
-    # Moderate/Low Risk Sugars (16-58)
+    # Moderate Risk Sugars (16-48)
     "cane sugar",
     "beet sugar",
     "brown sugar",
@@ -243,7 +252,8 @@ sugar_keywords = [
     "sugar"
 ]
 
-# GMO ingredients (not part of ranking but flagged separately)
+# ===== GMO INGREDIENTS =====
+# These trigger GMO Alert but don't count in danger rating
 gmo_keywords = [
     "corn syrup",
     "high fructose corn syrup",
@@ -316,9 +326,9 @@ gmo_keywords = [
     "precision fermentation"
 ]
 
-# Safe ingredients
+# ===== SAFE INGREDIENTS =====
 safe_ingredients = [
-    # Safe fats
+    # Safe fats and oils
     "fully hydrogenated oil",
     "palm oil",
     "palm oil (non-hydrogenated)",
@@ -337,7 +347,7 @@ safe_ingredients = [
     "sunflower oil",
     "safflower oil",
     
-    # Natural whole foods
+    # Basic ingredients
     "water",
     "salt",
     "sea salt",
@@ -369,9 +379,11 @@ safe_ingredients = [
     "coffee",
     "tea",
     
-    # Safe additives
+    # Safe additives and vitamins
     "vitamin d",
     "vitamin d3",
+    "vitamin c",
+    "vitamin b12",
     "calcium carbonate",
     "iron",
     "zinc",
@@ -524,32 +536,86 @@ safe_ingredients = [
     "tempeh"
 ]
 
-# Common OCR errors to fix
+# ===== COMMON OCR ERROR CORRECTIONS =====
 common_ocr_errors = {
+    # Corn syrup variations
     "corn5yrup": "corn syrup",
-    "cornsynup": "corn syrup",
+    "cornsynup": "corn syrup", 
     "com syrup": "corn syrup",
+    "cornsyrup": "corn syrup",
+    "corn synup": "corn syrup",
+    
+    # HFCS variations
     "hfc5": "hfcs",
+    "hfc3": "hfcs",
+    "high fructose com syrup": "high fructose corn syrup",
+    "highfructosecornsyrup": "high fructose corn syrup",
+    
+    # MSG variations
     "m5g": "msg",
     "ms9": "msg",
-    "aspartame": "aspartame",
-    "aspertame": "aspartame",
-    "hydrogenatedoil": "hydrogenated oil",
-    "naturalflavors": "natural flavors",
-    "modifiedstarch": "modified starch",
-    "highfructose": "high fructose",
-    "partiallyhydrogenated": "partially hydrogenated",
+    "rns9": "msg",
     "monosodiumglutamate": "monosodium glutamate",
-    "yeastextract": "yeast extract",
+    "mono sodium glutamate": "monosodium glutamate",
+    
+    # Aspartame variations
+    "aspertame": "aspartame",
+    "aspartarne": "aspartame",
+    "asparteme": "aspartame",
+    
+    # Natural flavors variations
+    "naturalflavors": "natural flavors",
+    "naturalflavor": "natural flavor",
+    "naturalflavoring": "natural flavoring",
+    "natural flavonng": "natural flavoring",
+    
+    # Hydrogenated oil variations
+    "partiallyhydrogenated": "partially hydrogenated",
+    "hydrogenatedoil": "hydrogenated oil",
+    "partially hydrogenated oil": "partially hydrogenated oil",
+    
+    # Starch variations
+    "modifiedstarch": "modified starch",
+    "modifiedcornstarch": "modified corn starch",
+    "modified com starch": "modified corn starch",
+    
+    # Lecithin variations
     "soylecithin": "soy lecithin",
+    "soy lecrthin": "soy lecithin",
+    
+    # Oil variations
     "canolaoil": "canola oil",
     "cottonseedoil": "cottonseed oil",
-    "cornsyrup": "corn syrup",
-    "cornstarch": "corn starch",
-    "dextrose": "dextrose",
+    "vegetableoil": "vegetable oil",
+    
+    # Protein variations
+    "texturedvegetableprotein": "textured vegetable protein",
+    "hydrolyzedprotein": "hydrolyzed protein",
+    "hydrolyzedvegetableprotein": "hydrolyzed vegetable protein",
+    "vegetableprotein": "vegetable protein",
+    
+    # Yeast extract variations
+    "yeastextract": "yeast extract",
+    "yeast extract": "yeast extract",
+    "autolyzedyeast": "autolyzed yeast",
+    
+    # Disodium variations
+    "disodiuminosinate": "disodium inosinate",
+    "disodiumguanylate": "disodium guanylate",
+    "disodium inosmate": "disodium inosinate",
+    
+    # Caseinate variations
+    "calciumcaseinate": "calcium caseinate",
+    "sodiumcaseinate": "sodium caseinate",
+    
+    # Maltodextrin variations
+    "maltodextnn": "maltodextrin",
     "maltodextrin": "maltodextrin",
-    "naturalflavor": "natural flavor",
-    "artificalflavor": "artificial flavor",
-    "modifiedcornstarch": "modified corn starch",
-    "highfructosecornsyrup": "high fructose corn syrup"
+    "malto dextrin": "maltodextrin",
+    
+    # Common character replacements
+    "rn": "m",
+    "vv": "w", 
+    "ii": "ll",
+    "cl": "d"
 }
