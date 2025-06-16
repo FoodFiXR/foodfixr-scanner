@@ -91,94 +91,164 @@ def preprocess_image_advanced(image):
         print(f"DEBUG: Advanced preprocessing failed: {e}, using original")
         return [("original", image)]
 
-# Also update the OCR configuration list
 def extract_text_with_multiple_methods(image_path):
-    """Extract text using multiple OCR configurations and image processing"""
+    """Extract text using OCR.space API with fallback options"""
     try:
-        print(f"DEBUG: Starting enhanced text extraction from {image_path}")
+        print(f"DEBUG: Starting OCR.space API text extraction from {image_path}")
         
-        # Load image
-        image = Image.open(image_path)
-        print(f"DEBUG: Original image size: {image.size}, mode: {image.mode}")
+        # Try OCR.space API first
+        text = extract_text_ocr_space(image_path)
         
-        all_extracted_texts = []
+        if text and len(text.strip()) > 5:
+            print(f"DEBUG: OCR.space successful - extracted {len(text)} characters")
+            return text
         
-        # Get processed images
-        processed_images = preprocess_image_advanced(image)
+        # If OCR.space fails, try with different settings
+        print("DEBUG: First attempt failed, trying with enhanced settings...")
+        text = extract_text_ocr_space_enhanced(image_path)
         
-        # Enhanced OCR configurations - especially for challenging text
-        ocr_configs = [
-            '--oem 3 --psm 6',  # Uniform block of text
-            '--oem 3 --psm 4',  # Single column of text
-            '--oem 3 --psm 3',  # Fully automatic page segmentation
-            '--oem 3 --psm 8',  # Single word
-            '--oem 3 --psm 7',  # Single text line
-            '--oem 3 --psm 11', # Sparse text
-            '--oem 3 --psm 12', # Sparse text with OSD
-            '--oem 3 --psm 13', # Raw line
-            '--oem 1 --psm 6',  # Neural nets LSTM engine
-            '--oem 2 --psm 6',  # Legacy + LSTM engines
-            # Add configurations specifically for challenging text
-            '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-.:; ',
-            '--oem 3 --psm 4 -c preserve_interword_spaces=1',
-            '--oem 3 --psm 6 -c tessedit_do_invert=1',  # Invert image
-        ]
+        if text and len(text.strip()) > 5:
+            print(f"DEBUG: OCR.space enhanced successful - extracted {len(text)} characters")
+            return text
         
-        # Try each processed image with each OCR config
-        for method_name, processed_img in processed_images:
-            for i, config in enumerate(ocr_configs):
-                try:
-                    text = pytesseract.image_to_string(processed_img, config=config)
-                    text = text.strip()
-                    if text and len(text) > 5:  # Require at least 5 characters
-                        all_extracted_texts.append({
-                            'text': text,
-                            'method': f"{method_name}_config_{i+1}",
-                            'length': len(text),
-                            'word_count': len(text.split())
-                        })
-                        print(f"DEBUG: {method_name} config {i+1} extracted {len(text)} chars: {text[:100]}...")
-                except Exception as e:
-                    print(f"DEBUG: {method_name} config {i+1} failed: {e}")
+        print("DEBUG: OCR.space failed, trying basic pytesseract fallback...")
+        return extract_text_pytesseract_fallback(image_path)
         
-        # If we have multiple extractions, combine them intelligently
-        if all_extracted_texts:
-            # Sort by length (longer is usually better)
-            all_extracted_texts.sort(key=lambda x: x['length'], reverse=True)
+    except Exception as e:
+        print(f"DEBUG: All OCR methods failed: {e}")
+        return ""
+
+def extract_text_ocr_space(image_path):
+    """Extract text using OCR.space API - standard settings"""
+    try:
+        api_url = 'https://api.ocr.space/parse/image'
+        
+        # Use free API key (or set OCR_SPACE_API_KEY environment variable for your own)
+        api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
+        
+        with open(image_path, 'rb') as f:
+            files = {'file': f}
             
-            print(f"DEBUG: Got {len(all_extracted_texts)} successful extractions")
+            data = {
+                'apikey': api_key,
+                'language': 'eng',
+                'isOverlayRequired': False,
+                'detectOrientation': True,
+                'scale': True,
+                'OCREngine': 2,  # Engine 2 is more accurate
+                'isTable': False
+            }
             
-            # Take the longest text as base
-            best_text = all_extracted_texts[0]['text']
-            print(f"DEBUG: Best extraction from {all_extracted_texts[0]['method']}: {len(best_text)} chars")
+            print("DEBUG: Sending request to OCR.space API (standard)...")
+            response = requests.post(api_url, files=files, data=data, timeout=60)
             
-            # Extract all unique words from all extractions
-            all_words = set()
-            for extraction in all_extracted_texts:
-                words = re.findall(r'\b[a-zA-Z]{2,}\b', extraction['text'].lower())
-                all_words.update(words)
+            if response.status_code == 200:
+                result = response.json()
+                return parse_ocr_space_response(result)
+            else:
+                print(f"DEBUG: OCR.space API returned status {response.status_code}")
+                return ""
+                
+    except Exception as e:
+        print(f"DEBUG: OCR.space standard method failed: {e}")
+        return ""
+
+def extract_text_ocr_space_enhanced(image_path):
+    """Extract text using OCR.space API - enhanced settings for difficult images"""
+    try:
+        api_url = 'https://api.ocr.space/parse/image'
+        api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
+        
+        with open(image_path, 'rb') as f:
+            files = {'file': f}
             
-            # Add missing words to best text
-            best_words = set(re.findall(r'\b[a-zA-Z]{2,}\b', best_text.lower()))
-            missing_words = all_words - best_words
+            # Enhanced settings for challenging images
+            data = {
+                'apikey': api_key,
+                'language': 'eng',
+                'isOverlayRequired': False,
+                'detectOrientation': True,
+                'scale': True,
+                'OCREngine': 1,  # Try engine 1 for difficult images
+                'isTable': True,  # Sometimes helps with structured text
+                'isSearchablePdfHideTextLayer': False
+            }
             
-            if missing_words:
-                best_text += " " + " ".join(missing_words)
-                print(f"DEBUG: Added {len(missing_words)} missing words")
+            print("DEBUG: Sending request to OCR.space API (enhanced)...")
+            response = requests.post(api_url, files=files, data=data, timeout=60)
             
-            print(f"DEBUG: FINAL COMBINED TEXT LENGTH: {len(best_text)} characters")
-            print(f"DEBUG: FINAL TEXT PREVIEW: {best_text[:500]}...")
-            return best_text
+            if response.status_code == 200:
+                result = response.json()
+                return parse_ocr_space_response(result)
+            else:
+                print(f"DEBUG: OCR.space enhanced API returned status {response.status_code}")
+                return ""
+                
+    except Exception as e:
+        print(f"DEBUG: OCR.space enhanced method failed: {e}")
+        return ""
+
+def parse_ocr_space_response(result):
+    """Parse OCR.space API response"""
+    try:
+        if result.get('IsErroredOnProcessing', True):
+            error_msg = result.get('ErrorMessage', 'Unknown error')
+            print(f"DEBUG: OCR.space processing error: {error_msg}")
+            return ""
+        
+        parsed_results = result.get('ParsedResults', [])
+        if not parsed_results:
+            print("DEBUG: OCR.space returned no parsed results")
+            return ""
+        
+        # Get text from first result
+        extracted_text = parsed_results[0].get('ParsedText', '')
+        
+        if extracted_text and len(extracted_text.strip()) > 0:
+            # Clean up the text
+            cleaned_text = extracted_text.replace('\r', ' ').replace('\n', ' ')
+            cleaned_text = ' '.join(cleaned_text.split())  # Remove extra whitespace
+            
+            print(f"DEBUG: OCR.space extracted {len(cleaned_text)} characters")
+            print(f"DEBUG: Raw text preview: {cleaned_text[:300]}...")
+            return cleaned_text
         else:
-            print("DEBUG: No text extracted by any method")
+            print("DEBUG: OCR.space returned empty text")
             return ""
             
     except Exception as e:
-        print(f"❌ Error in extract_text_with_multiple_methods: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"DEBUG: Error parsing OCR.space response: {e}")
         return ""
 
+def extract_text_pytesseract_fallback(image_path):
+    """Fallback to pytesseract if available"""
+    try:
+        print("DEBUG: Attempting pytesseract fallback...")
+        import pytesseract
+        from PIL import Image
+        
+        image = Image.open(image_path)
+        
+        # Simple preprocessing
+        if image.mode != 'L':
+            image = image.convert('L')
+            
+        # Try basic OCR
+        text = pytesseract.image_to_string(image, config='--psm 6')
+        
+        if text and len(text.strip()) > 0:
+            print(f"DEBUG: Pytesseract fallback worked: {len(text)} chars")
+            return text.strip()
+        else:
+            print("DEBUG: Pytesseract fallback returned empty")
+            return ""
+            
+    except ImportError:
+        print("DEBUG: Pytesseract not available")
+        return ""
+    except Exception as e:
+        print(f"DEBUG: Pytesseract fallback failed: {e}")
+        return ""
 def normalize_ingredient_text(text):
     """Enhanced text normalization with comprehensive OCR error correction"""
     if not text:
@@ -477,24 +547,15 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with enhanced processing and debug output"""
+    """Main scanning function with OCR.space integration"""
     try:
         print(f"\n{'='*80}")
-        print(f"🔬 STARTING ENHANCED INGREDIENT SCAN: {image_path}")
+        print(f"🔬 STARTING OCR.SPACE INGREDIENT SCAN: {image_path}")
         print(f"{'='*80}")
         print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
-        # Test tesseract availability
-        try:
-            test_img = Image.new('RGB', (100, 30), color='white')
-            pytesseract.image_to_string(test_img, config='--psm 6')
-            print("✅ Tesseract OCR is working")
-        except Exception as e:
-            print(f"❌ Tesseract error: {e}")
-            return create_error_result("OCR system not available")
-        
-        # Extract text using enhanced methods
-        print("🔍 Starting enhanced text extraction...")
+        # Extract text using OCR.space
+        print("🔍 Starting OCR.space text extraction...")
         text = extract_text_with_multiple_methods(image_path)
         print(f"📝 Extracted text length: {len(text)} characters")
         
@@ -508,7 +569,7 @@ def scan_image_for_ingredients(image_path):
         print(f"📊 Text quality assessment: {text_quality}")
         
         # Match ingredients using enhanced system
-        print("🧬 Starting enhanced ingredient matching...")
+        print("🧬 Starting ingredient matching...")
         matches = match_all_ingredients(text)
         
         # Rate ingredients according to hierarchy
