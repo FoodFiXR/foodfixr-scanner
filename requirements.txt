@@ -4,3 +4,5 @@ Pillow==10.1.0
 pytesseract==0.3.10
 stripe==7.8.1
 gunicorn==21.2.0
+opencv-python==4.8.1.78
+numpy==1.24.3
