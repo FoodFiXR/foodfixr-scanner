@@ -3,137 +3,145 @@ from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import re
 import os
 from scanner_config import *
-import cv2
-import numpy as np
 
-def enhance_image_for_ocr(image):
-    """Enhanced image preprocessing specifically for ingredient lists on mobile photos"""
+def preprocess_image_simple(image):
+    """Simplified image preprocessing using only PIL"""
     try:
-        # Convert PIL to OpenCV format
-        if hasattr(image, 'mode'):
-            image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        else:
-            image_cv = image
+        # Convert to RGB if needed
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
         
         # Convert to grayscale
-        gray = cv2.cvtColor(image_cv, cv2.COLOR_BGR2GRAY)
+        gray = image.convert('L')
         
-        # Multiple enhancement stages
-        
-        # 1. Resize if too small (critical for mobile photos)
-        height, width = gray.shape
-        if width < 1000:
-            scale_factor = 1000 / width
+        # Resize if too small (critical for mobile photos)
+        width, height = gray.size
+        if width < 800:
+            scale_factor = 800 / width
             new_width = int(width * scale_factor)
             new_height = int(height * scale_factor)
-            gray = cv2.resize(gray, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+            gray = gray.resize((new_width, new_height), Image.Resampling.LANCZOS)
             print(f"DEBUG: Resized image from {width}x{height} to {new_width}x{new_height}")
         
-        # 2. Noise reduction
-        gray = cv2.medianBlur(gray, 3)
+        # Enhance contrast aggressively
+        enhancer = ImageEnhance.Contrast(gray)
+        enhanced = enhancer.enhance(3.0)
         
-        # 3. Contrast enhancement
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-        gray = clahe.apply(gray)
+        # Enhance sharpness
+        enhancer = ImageEnhance.Sharpness(enhanced)
+        enhanced = enhancer.enhance(2.0)
         
-        # 4. Adaptive thresholding (better for varying lighting)
-        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                     cv2.THRESH_BINARY, 11, 2)
+        # Apply median filter to reduce noise
+        enhanced = enhanced.filter(ImageFilter.MedianFilter(size=3))
         
-        # 5. Morphological operations to clean up text
-        kernel = np.ones((1,1), np.uint8)
-        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        # Auto-level
+        enhanced = ImageOps.autocontrast(enhanced)
         
-        # Convert back to PIL
-        enhanced_image = Image.fromarray(binary)
-        return enhanced_image
+        # Equalize histogram
+        enhanced = ImageOps.equalize(enhanced)
+        
+        print(f"DEBUG: Image preprocessing completed")
+        return enhanced
         
     except Exception as e:
-        print(f"DEBUG: Image enhancement failed: {e}, using original")
+        print(f"DEBUG: Image preprocessing failed: {e}, using original")
         return image
 
 def extract_text_from_image(image_path):
-    """Enhanced text extraction with better preprocessing and multiple OCR attempts"""
+    """Simplified text extraction with aggressive preprocessing"""
     try:
         print(f"DEBUG: Starting text extraction from {image_path}")
         
-        # Load and preprocess image
+        # Load image
         image = Image.open(image_path)
         print(f"DEBUG: Original image size: {image.size}, mode: {image.mode}")
         
-        # Try multiple preprocessing approaches
         extracted_texts = []
         
-        # Method 1: Enhanced preprocessing
+        # Method 1: Heavily preprocessed image
         try:
-            enhanced_img = enhance_image_for_ocr(image)
+            processed_img = preprocess_image_simple(image)
             
-            # Multiple OCR configurations with enhanced image
+            # Try multiple OCR configurations
             configs = [
-                '--oem 3 --psm 6',   # Uniform block of text
-                '--oem 3 --psm 4',   # Single column
-                '--oem 3 --psm 3',   # Fully automatic
-                '--oem 3 --psm 8',   # Single word
-                '--oem 3 --psm 7',   # Single text line
-                '--oem 3 --psm 11',  # Sparse text
-                '--oem 3 --psm 12',  # Sparse text with OSD
+                '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),-.',
+                '--oem 3 --psm 4',
+                '--oem 3 --psm 3',
+                '--oem 3 --psm 6',
+                '--oem 3 --psm 8',
+                '--oem 3 --psm 7',
             ]
             
-            for config in configs:
+            for i, config in enumerate(configs):
                 try:
-                    text = pytesseract.image_to_string(enhanced_img, config=config)
-                    if text.strip() and len(text.strip()) > 3:
-                        extracted_texts.append(text.strip())
-                        print(f"DEBUG: Config {config} extracted {len(text)} chars")
+                    text = pytesseract.image_to_string(processed_img, config=config)
+                    text = text.strip()
+                    if text and len(text) > 2:
+                        extracted_texts.append(text)
+                        print(f"DEBUG: Config {i+1} extracted {len(text)} chars: {text[:50]}...")
                 except Exception as e:
-                    print(f"DEBUG: Config {config} failed: {e}")
-                    continue
+                    print(f"DEBUG: Config {i+1} failed: {e}")
         except Exception as e:
-            print(f"DEBUG: Enhanced preprocessing failed: {e}")
+            print(f"DEBUG: Processed image method failed: {e}")
         
-        # Method 2: Simple grayscale + contrast
+        # Method 2: Simple grayscale with high contrast
         try:
-            simple_img = image.convert('L')
-            enhancer = ImageEnhance.Contrast(simple_img)
-            simple_img = enhancer.enhance(2.0)
+            simple_gray = image.convert('L')
+            enhancer = ImageEnhance.Contrast(simple_gray)
+            high_contrast = enhancer.enhance(4.0)
             
-            text = pytesseract.image_to_string(simple_img, config='--oem 3 --psm 6')
-            if text.strip() and len(text.strip()) > 3:
-                extracted_texts.append(text.strip())
-                print(f"DEBUG: Simple method extracted {len(text)} chars")
+            text = pytesseract.image_to_string(high_contrast, config='--oem 3 --psm 6')
+            text = text.strip()
+            if text and len(text) > 2:
+                extracted_texts.append(text)
+                print(f"DEBUG: Simple method extracted {len(text)} chars: {text[:50]}...")
         except Exception as e:
             print(f"DEBUG: Simple method failed: {e}")
         
-        # Method 3: Original image with different configs
+        # Method 3: Original image
         try:
-            for config in ['--oem 3 --psm 6', '--oem 3 --psm 3']:
-                text = pytesseract.image_to_string(image, config=config)
-                if text.strip() and len(text.strip()) > 3:
-                    extracted_texts.append(text.strip())
-                    print(f"DEBUG: Original image config {config} extracted {len(text)} chars")
+            text = pytesseract.image_to_string(image, config='--oem 3 --psm 6')
+            text = text.strip()
+            if text and len(text) > 2:
+                extracted_texts.append(text)
+                print(f"DEBUG: Original image extracted {len(text)} chars: {text[:50]}...")
         except Exception as e:
-            print(f"DEBUG: Original image OCR failed: {e}")
+            print(f"DEBUG: Original image method failed: {e}")
         
-        # Combine all extracted texts
-        if extracted_texts:
-            # Take the longest text as it's likely the most complete
-            combined_text = max(extracted_texts, key=len)
+        # Method 4: Black and white with threshold
+        try:
+            bw_img = image.convert('L')
+            # Convert to pure black and white
+            threshold = 128
+            bw_img = bw_img.point(lambda x: 0 if x < threshold else 255, '1')
             
-            # Also combine unique words from all extractions
+            text = pytesseract.image_to_string(bw_img, config='--oem 3 --psm 6')
+            text = text.strip()
+            if text and len(text) > 2:
+                extracted_texts.append(text)
+                print(f"DEBUG: B&W method extracted {len(text)} chars: {text[:50]}...")
+        except Exception as e:
+            print(f"DEBUG: B&W method failed: {e}")
+        
+        # Combine results
+        if extracted_texts:
+            # Take the longest text as it's likely most complete
+            final_text = max(extracted_texts, key=len)
+            
+            # Add unique words from other extractions
             all_words = set()
             for text in extracted_texts:
                 words = re.findall(r'\b[a-zA-Z]{2,}\b', text.lower())
                 all_words.update(words)
             
-            # Add unique words to the main text
-            main_words = set(re.findall(r'\b[a-zA-Z]{2,}\b', combined_text.lower()))
+            main_words = set(re.findall(r'\b[a-zA-Z]{2,}\b', final_text.lower()))
             missing_words = all_words - main_words
             if missing_words:
-                combined_text += " " + " ".join(missing_words)
+                final_text += " " + " ".join(missing_words)
             
-            print(f"DEBUG: FINAL TEXT LENGTH: {len(combined_text)} characters")
-            print(f"DEBUG: FINAL TEXT PREVIEW: {combined_text[:200]}...")
-            return combined_text
+            print(f"DEBUG: FINAL TEXT LENGTH: {len(final_text)} characters")
+            print(f"DEBUG: FINAL TEXT PREVIEW: {final_text[:200]}...")
+            return final_text
         else:
             print("DEBUG: No text extracted by any method")
             return ""
@@ -154,132 +162,95 @@ def normalize_text(text):
     # Remove newlines and normalize whitespace
     text = re.sub(r'\s+', ' ', text)
     
-    # Fix common OCR errors specific to ingredient labels
+    # Fix common OCR errors
     ocr_fixes = {
-        # Common character misreads
+        # Numbers to letters
         '0': 'o', '1': 'l', '5': 's', '8': 'b', '6': 'g',
+        # Common character combinations
         'rn': 'm', 'vv': 'w', 'ii': 'll', 'cl': 'd',
-        
-        # Common ingredient OCR errors
+        # Ingredient-specific fixes
         'corn5yrup': 'corn syrup',
-        'cornsynup': 'corn syrup',
-        'com syrup': 'corn syrup',
         'hfc5': 'hfcs',
         'm5g': 'msg',
         'ms9': 'msg',
-        'aspertame': 'aspartame',
-        'hydrogenatedoil': 'hydrogenated oil',
         'naturalflavors': 'natural flavors',
-        'modifiedstarch': 'modified starch',
-        'highfructose': 'high fructose',
+        'cornsynup': 'corn syrup',
+        'com syrup': 'corn syrup',
         'partiallyhydrogenated': 'partially hydrogenated',
-        'monosodiumglutamate': 'monosodium glutamate',
-        'yeastextract': 'yeast extract',
+        'hydrogenatedoil': 'hydrogenated oil',
+        'modifiedstarch': 'modified starch',
         'soylecithin': 'soy lecithin',
         'canolaoil': 'canola oil',
-        'cottonseedoil': 'cottonseed oil',
-        'dextrose': 'dextrose',
         'maltodextrin': 'maltodextrin',
     }
     
-    # Apply OCR fixes
     for wrong, correct in ocr_fixes.items():
         text = text.replace(wrong, correct)
-    
-    # Apply config-based fixes if available
-    if 'common_ocr_errors' in globals():
-        for wrong, correct in common_ocr_errors.items():
-            text = text.replace(wrong, correct)
     
     return text
 
 def fuzzy_match_ingredient(text, ingredient_list):
-    """Improved ingredient matching with more lenient matching"""
+    """Improved ingredient matching"""
     matches = []
     normalized_text = normalize_text(text)
     
-    print(f"DEBUG: Searching in text: {normalized_text[:100]}...")
+    print(f"DEBUG: Searching for ingredients in: {normalized_text[:100]}...")
     
     for ingredient in ingredient_list:
         normalized_ingredient = normalize_text(ingredient)
         
-        # Skip very short ingredients that could cause false positives
         if len(normalized_ingredient) < 3:
             continue
         
-        # Create variations to check
-        variations = [normalized_ingredient]
+        # Exact match
+        pattern = r'\b' + re.escape(normalized_ingredient) + r'\b'
+        if re.search(pattern, normalized_text):
+            matches.append(ingredient)
+            print(f"DEBUG: Found exact match: '{normalized_ingredient}' -> '{ingredient}'")
+            continue
         
-        # Handle slash variations
-        if '/' in ingredient:
-            parts = ingredient.split('/')
-            variations.extend([normalize_text(part.strip()) for part in parts])
-        
-        # Handle parenthetical variations
-        if '(' in ingredient:
-            base = ingredient.split('(')[0].strip()
-            variations.append(normalize_text(base))
-        
-        # Handle hyphenated variations
-        if '-' in normalized_ingredient:
-            no_hyphen = normalized_ingredient.replace('-', ' ')
-            variations.append(no_hyphen)
-            variations.append(normalized_ingredient.replace('-', ''))
-        
-        # Check all variations
-        for variant in variations:
-            variant = variant.strip()
-            if not variant or len(variant) < 3:
-                continue
-                
-            # Exact word boundary match
-            pattern = r'\b' + re.escape(variant) + r'\b'
-            if re.search(pattern, normalized_text):
-                matches.append(ingredient)
-                print(f"DEBUG: Found exact match: '{variant}' -> '{ingredient}'")
-                break
-            
-            # Partial match for compound ingredients (more lenient)
-            variant_words = variant.split()
-            if len(variant_words) > 1:
-                # Check if all words are present within reasonable distance
-                word_positions = []
-                for word in variant_words:
+        # Handle compound ingredients
+        if ' ' in normalized_ingredient:
+            words = normalized_ingredient.split()
+            # Check if all words are present within reasonable distance
+            word_positions = []
+            for word in words:
+                if len(word) > 2:  # Skip very short words
                     word_pattern = r'\b' + re.escape(word) + r'\b'
                     match = re.search(word_pattern, normalized_text)
                     if match:
                         word_positions.append(match.start())
                     else:
                         break
-                
-                # If all words found and within reasonable distance
-                if len(word_positions) == len(variant_words):
-                    if len(word_positions) == 1 or (max(word_positions) - min(word_positions) < 100):
-                        matches.append(ingredient)
-                        print(f"DEBUG: Found compound match: '{variant}' -> '{ingredient}'")
-                        break
             
-            # Fuzzy match for very important ingredients (allow small errors)
-            if ingredient.lower() in ['msg', 'aspartame', 'corn syrup', 'high fructose corn syrup']:
-                # More lenient matching for critical ingredients
-                if variant in normalized_text or any(word in normalized_text for word in variant.split() if len(word) > 3):
+            if len(word_positions) == len(words):
+                if len(word_positions) == 1 or (max(word_positions) - min(word_positions) < 80):
                     matches.append(ingredient)
-                    print(f"DEBUG: Found fuzzy match: '{variant}' -> '{ingredient}'")
-                    break
+                    print(f"DEBUG: Found compound match: '{normalized_ingredient}' -> '{ingredient}'")
+        
+        # Special handling for critical ingredients with fuzzy matching
+        critical_ingredients = ['msg', 'aspartame', 'corn syrup', 'high fructose corn syrup', 'partially hydrogenated']
+        if any(crit in ingredient.lower() for crit in critical_ingredients):
+            # More lenient matching for critical ingredients
+            ingredient_words = normalized_ingredient.split()
+            main_word = max(ingredient_words, key=len) if ingredient_words else normalized_ingredient
+            if len(main_word) > 3 and main_word in normalized_text:
+                matches.append(ingredient)
+                print(f"DEBUG: Found critical ingredient match: '{main_word}' -> '{ingredient}'")
     
-    return list(set(matches))  # Remove duplicates
+    return list(set(matches))
 
 def assess_text_quality(text):
     """More lenient text quality assessment"""
-    if not text or len(text.strip()) < 2:
+    if not text or len(text.strip()) < 1:
         return "very_poor"
     
-    # Count words (sequences of letters)
+    # Count meaningful words
     words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
     
     if len(words) < 1:
         return "very_poor"
-    elif len(words) < 3 or len(text) < 10:
+    elif len(words) < 2 or len(text) < 8:
         return "poor"
     else:
         return "good"
@@ -300,7 +271,7 @@ def match_ingredients(text):
     
     print(f"DEBUG: Matching ingredients in text of {len(text)} characters")
     
-    # Use precise matching for each category
+    # Use fuzzy matching for each category
     trans_fat_matches = fuzzy_match_ingredient(text, trans_fat_high_risk + trans_fat_moderate_risk)
     excitotoxin_matches = fuzzy_match_ingredient(text, excitotoxin_high_risk + excitotoxin_moderate_risk)
     corn_matches = fuzzy_match_ingredient(text, corn_high_risk + corn_moderate_risk)
@@ -365,13 +336,13 @@ def rate_ingredients(matches, text_quality):
         "torula yeast"
     ]
     
-    # RULE 1: Check HIGH RISK Trans Fats (ranks 1-10) - ANY ONE = immediate danger
+    # RULE 1: Check HIGH RISK Trans Fats - ANY ONE = immediate danger
     for ingredient in matches["trans_fat"]:
         if any(high_risk.lower() in ingredient.lower() for high_risk in high_risk_trans_fats):
             print(f"🚨 HIGH RISK Trans Fat found: {ingredient}")
             return "🚨 Oh NOOOO! Danger!"
     
-    # RULE 2: Check HIGH RISK Excitotoxins (ranks 1-10) - ANY ONE = immediate danger  
+    # RULE 2: Check HIGH RISK Excitotoxins - ANY ONE = immediate danger  
     for ingredient in matches["excitotoxins"]:
         if any(high_risk.lower() in ingredient.lower() for high_risk in high_risk_excitotoxins):
             print(f"🚨 HIGH RISK Excitotoxin found: {ingredient}")
@@ -379,9 +350,8 @@ def rate_ingredients(matches, text_quality):
     
     # RULE 3: Count ALL other problematic ingredients
     total_problematic_count = 0
-    problematic_ingredients = []
     
-    # Count moderate trans fats (not caught above)
+    # Count moderate trans fats
     moderate_trans_fats = [
         "hydrogenated fat", "margarine", "vegetable oil", "frying oil",
         "modified fat", "synthetic fat", "lard substitute", 
@@ -391,9 +361,8 @@ def rate_ingredients(matches, text_quality):
     for ingredient in matches["trans_fat"]:
         if any(moderate.lower() in ingredient.lower() for moderate in moderate_trans_fats):
             total_problematic_count += 1
-            problematic_ingredients.append(f"Trans Fat (moderate): {ingredient}")
     
-    # Count moderate excitotoxins (not caught above)
+    # Count moderate excitotoxins
     moderate_excitotoxins = [
         "natural flavors", "natural flavoring", "spices", "seasonings",
         "soy sauce", "enzyme modified cheese", "whey protein isolate", 
@@ -403,27 +372,13 @@ def rate_ingredients(matches, text_quality):
     for ingredient in matches["excitotoxins"]:
         if any(moderate.lower() in ingredient.lower() for moderate in moderate_excitotoxins):
             total_problematic_count += 1
-            problematic_ingredients.append(f"Excitotoxin (moderate): {ingredient}")
     
-    # Count ALL corn ingredients
-    if matches["corn"]:
-        total_problematic_count += len(matches["corn"])
-        for ingredient in matches["corn"]:
-            problematic_ingredients.append(f"Corn: {ingredient}")
-    
-    # Count ALL sugar ingredients  
-    if matches["sugar"]:
-        total_problematic_count += len(matches["sugar"])
-        for ingredient in matches["sugar"]:
-            problematic_ingredients.append(f"Sugar: {ingredient}")
+    # Count ALL corn and sugar ingredients
+    total_problematic_count += len(matches["corn"]) + len(matches["sugar"])
     
     print(f"⚖️ Total problematic ingredients: {total_problematic_count}")
-    if problematic_ingredients:
-        print("Problematic ingredients found:")
-        for ing in problematic_ingredients:
-            print(f"  - {ing}")
     
-    # Apply the hierarchy rule: 1-2 = Proceed Carefully, 3+ = Danger
+    # Apply hierarchy rules
     if total_problematic_count >= 3:
         return "🚨 Oh NOOOO! Danger!"
     elif total_problematic_count >= 1:
@@ -433,15 +388,14 @@ def rate_ingredients(matches, text_quality):
     if len(matches["all_detected"]) > 0:
         return "✅ Yay! Safe!"
     
-    # If poor text quality and no ingredients detected, suggest trying again
+    # If poor text quality and no ingredients detected
     if text_quality == "poor":
         return "↪️ TRY AGAIN"
     
-    # Default safe
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with comprehensive error handling and debug output"""
+    """Main scanning function with comprehensive error handling"""
     try:
         print(f"DEBUG: Starting scan for {image_path}")
         print(f"DEBUG: File exists: {os.path.exists(image_path)}")
@@ -490,7 +444,7 @@ def scan_image_for_ingredients(image_path):
             confidence = "very_low"
         elif text_quality == "poor":
             confidence = "low"  
-        elif len(text) > 50 and len(matches["all_detected"]) > 0:
+        elif len(text) > 30 and len(matches["all_detected"]) > 0:
             confidence = "high"
         else:
             confidence = "medium"
