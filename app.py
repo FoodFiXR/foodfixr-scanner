@@ -26,9 +26,6 @@ MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-# Ensure upload directory exists
-# os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -196,8 +193,6 @@ def scan():
         </body>
         </html>
         """, 500
-
-# Add this route to your app.py for immediate testing
 
 @app.route('/test-manual', methods=['GET', 'POST'])
 def test_manual():
@@ -511,8 +506,8 @@ def debug_ocr():
                 <ul>
                     <li>Make sure you uploaded a valid image file</li>
                     <li>Try a smaller image file (under 16MB)</li>
-                    <li>Check that Tesseract OCR is properly installed</li>
-                    <li>Ensure OpenCV dependencies are available</li>
+                    <li>Check OCR.space API connectivity</li>
+                    <li>Verify image compression is working</li>
                 </ul>
                 
                 <br>
@@ -523,6 +518,7 @@ def debug_ocr():
         </body>
         </html>
         """
+
 @app.route('/test-scan')
 def test_scan():
     """Test scanning without actual image"""
@@ -766,33 +762,48 @@ def debug():
     debug_info.append(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
     
     try:
-        import pytesseract
-        from PIL import Image
-        test_img = Image.new('RGB', (100, 30), color='white')
-        result = pytesseract.image_to_string(test_img)
-        debug_info.append("✅ Tesseract: Working")
+        from ingredient_scanner import extract_text_with_multiple_methods
+        debug_info.append("✅ OCR.space functions: Available")
     except Exception as e:
-        debug_info.append(f"❌ Tesseract: Failed - {str(e)}")
+        debug_info.append(f"❌ OCR.space functions: Failed - {str(e)}")
     
     try:
-        import cv2
-        import numpy as np
-        test_array = np.zeros((100, 100, 3), dtype=np.uint8)
-        gray = cv2.cvtColor(test_array, cv2.COLOR_BGR2GRAY)
-        debug_info.append("✅ OpenCV: Working")
+        from PIL import Image
+        test_img = Image.new('RGB', (100, 30), color='white')
+        debug_info.append("✅ PIL/Pillow: Working")
     except Exception as e:
-        debug_info.append(f"❌ OpenCV: Failed - {str(e)}")
+        debug_info.append(f"❌ PIL/Pillow: Failed - {str(e)}")
+    
+    try:
+        import requests
+        response = requests.get('https://httpbin.org/get', timeout=5)
+        if response.status_code == 200:
+            debug_info.append("✅ Internet connectivity: Working")
+        else:
+            debug_info.append(f"⚠️ Internet connectivity: HTTP {response.status_code}")
+    except Exception as e:
+        debug_info.append(f"❌ Internet connectivity: Failed - {str(e)}")
     
     try:
         from ingredient_scanner import scan_image_for_ingredients
         from scanner_config import safe_ingredients
         debug_info.append("✅ Modules: All imported successfully")
+        debug_info.append(f"✅ Safe ingredients count: {len(safe_ingredients)}")
     except Exception as e:
         debug_info.append(f"❌ Modules: Import failed - {str(e)}")
     
     debug_info.append(f"Templates folder exists: {os.path.exists('templates')}")
     debug_info.append(f"Scanner.html exists: {os.path.exists('templates/scanner.html')}")
     debug_info.append(f"Static folder exists: {os.path.exists('static')}")
+    
+    # Test OCR.space API connection
+    try:
+        import requests
+        api_url = 'https://api.ocr.space/parse/image'
+        response = requests.get(api_url, timeout=10)
+        debug_info.append(f"✅ OCR.space API: Reachable (status: {response.status_code})")
+    except Exception as e:
+        debug_info.append(f"❌ OCR.space API: Unreachable - {str(e)}")
     
     html = f"""
     <html>
@@ -804,6 +815,7 @@ def debug():
     </div>
     <br>
     <a href="/debug-ocr" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔬 Test OCR</a>
+    <a href="/test-manual" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🧪 Manual Test</a>
     <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to Scanner</a>
     </div>
     </body>
