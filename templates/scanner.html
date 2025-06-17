@@ -441,12 +441,6 @@
             color: #f0f0f0;;
         }
 
-        .safe-ingredients {
-            background: rgba(76, 175, 80, 0.08);
-            border-left-color: #4CAF50;
-        }
-        .safe-ingredients .category-title { color: #66BB6A; }
-
         .risky-ingredients {
             background: rgba(244, 67, 54, 0.08);
             border-left-color: #f44336;
@@ -643,15 +637,6 @@
         {% if "TRY AGAIN" not in result.rating %}
         <div class="ingredients-section">
             <h3 class="section-title">Detected Ingredients:</h3>
-
-            {% if result.matched_ingredients.safe_ingredients %}
-            <div class="ingredient-category safe-ingredients">
-                <div class="category-title">✅ Safe Ingredients:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.safe_ingredients | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
 
             {% if result.matched_ingredients.trans_fat %}
             <div class="ingredient-category risky-ingredients">
