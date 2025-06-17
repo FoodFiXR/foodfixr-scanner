@@ -5,7 +5,7 @@ from scanner_config import *
 import requests
 from PIL import Image, ImageOps, ImageEnhance
 
-def compress_image_for_ocr(image_path, max_size_kb=900):
+def compress_image_for_ocr(image_path, max_size_kb=400):  # Reduced from 900KB
     """Memory-efficient image compression for OCR.space 1MB limit"""
     try:
         print(f"DEBUG: Checking image size for {image_path}")
@@ -27,9 +27,8 @@ def compress_image_for_ocr(image_path, max_size_kb=900):
         
         print(f"DEBUG: Original dimensions: {original_width}x{original_height}")
         
-        # Calculate safe target dimensions to prevent memory issues
-        # Limit max dimension to 2000px for memory safety
-        max_dimension = 2000
+        # More aggressive size limits for memory-constrained environments
+        max_dimension = 1200  # Reduced from 2000
         if max(original_width, original_height) > max_dimension:
             if original_width > original_height:
                 target_width = max_dimension
@@ -38,12 +37,12 @@ def compress_image_for_ocr(image_path, max_size_kb=900):
                 target_height = max_dimension
                 target_width = int(original_width * max_dimension / original_height)
         else:
-            # Calculate compression ratio for file size
+            # More aggressive compression ratio
             size_ratio = max_size_kb / current_size_kb
-            dimension_ratio = (size_ratio ** 0.5) * 0.8  # Conservative factor
+            dimension_ratio = (size_ratio ** 0.5) * 0.6  # More conservative
             
-            target_width = max(int(original_width * dimension_ratio), 800)  # Min 800px width
-            target_height = max(int(original_height * dimension_ratio), 600)  # Min 600px height
+            target_width = max(int(original_width * dimension_ratio), 600)  # Reduced min
+            target_height = max(int(original_height * dimension_ratio), 400)  # Reduced min
         
         print(f"DEBUG: Target dimensions: {target_width}x{target_height}")
         
@@ -63,8 +62,8 @@ def compress_image_for_ocr(image_path, max_size_kb=900):
                 print(f"DEBUG: Resizing image...")
                 img_resized = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 
-                # Try different quality levels
-                for quality in [85, 75, 65, 55]:
+                # Try lower quality settings first
+                for quality in [70, 60, 50, 40]:  # Start with lower quality
                     print(f"DEBUG: Trying quality {quality}...")
                     img_resized.save(compressed_path, 'JPEG', 
                                    quality=quality, optimize=True, progressive=True)
@@ -74,47 +73,64 @@ def compress_image_for_ocr(image_path, max_size_kb=900):
                     
                     if compressed_size_kb <= max_size_kb:
                         print(f"✅ Successfully compressed to {compressed_size_kb:.1f} KB")
+                        # Clean up memory immediately
+                        del img_resized
+                        gc.collect()
                         return compressed_path
                 
-                # If still too large, try smaller dimensions
-                print("DEBUG: Still too large, reducing dimensions further...")
-                smaller_width = int(target_width * 0.7)
-                smaller_height = int(target_height * 0.7)
+                # If still too large, emergency compression
+                print("DEBUG: Still too large, emergency compression...")
+                emergency_width = min(800, target_width // 2)
+                emergency_height = min(600, target_height // 2)
                 
-                img_smaller = img_resized.resize((smaller_width, smaller_height), Image.Resampling.LANCZOS)
-                img_smaller.save(compressed_path, 'JPEG', quality=60, optimize=True, progressive=True)
+                img_emergency = img_resized.resize((emergency_width, emergency_height), Image.Resampling.LANCZOS)
+                img_emergency.save(compressed_path, 'JPEG', quality=30, optimize=True)
                 
                 final_size_kb = os.path.getsize(compressed_path) / 1024
-                print(f"DEBUG: Final aggressive compression: {final_size_kb:.1f} KB")
+                print(f"DEBUG: Emergency compression: {final_size_kb:.1f} KB")
+                
+                # Clean up memory
+                del img_emergency
+                del img_resized
+                gc.collect()
                 
                 return compressed_path
                 
         except MemoryError:
-            print("DEBUG: Memory error during compression, trying more aggressive approach...")
-            # Fallback: Very conservative dimensions
-            safe_width = min(1200, original_width // 2)
-            safe_height = min(900, original_height // 2)
+            print("DEBUG: Memory error during compression, trying fallback...")
+            # Emergency fallback: Very conservative dimensions
+            safe_width = min(800, original_width // 3)
+            safe_height = min(600, original_height // 3)
             
             with Image.open(image_path) as img:
                 if img.mode in ('RGBA', 'LA', 'P'):
                     img = img.convert('RGB')
                 
                 img_safe = img.resize((safe_width, safe_height), Image.Resampling.LANCZOS)
-                img_safe.save(compressed_path, 'JPEG', quality=50, optimize=True)
+                img_safe.save(compressed_path, 'JPEG', quality=25, optimize=True)
                 
                 fallback_size_kb = os.path.getsize(compressed_path) / 1024
                 print(f"DEBUG: Memory-safe fallback: {fallback_size_kb:.1f} KB")
+                
+                # Clean up memory
+                del img_safe
+                gc.collect()
                 
                 return compressed_path
             
     except Exception as e:
         print(f"DEBUG: Image compression failed: {e}")
+        # Force cleanup on error
+        gc.collect()
         return image_path  # Return original path if compression fails
 
 def extract_text_with_multiple_methods(image_path):
     """Extract text using OCR.space API with fallback options"""
     try:
         print(f"DEBUG: Starting OCR.space API text extraction from {image_path}")
+        
+        # Force garbage collection before starting
+        gc.collect()
         
         # Try OCR.space API first
         text = extract_text_ocr_space(image_path)
@@ -136,13 +152,15 @@ def extract_text_with_multiple_methods(image_path):
         
     except Exception as e:
         print(f"DEBUG: All OCR methods failed: {e}")
+        # Force cleanup on error
+        gc.collect()
         return ""
 
 def extract_text_ocr_space(image_path):
-    """Extract text using OCR.space API - standard settings with compression"""
+    """Extract text using OCR.space API - with memory management"""
     try:
-        # Compress image if needed
-        processed_image_path = compress_image_for_ocr(image_path)
+        # Compress image with smaller limit
+        processed_image_path = compress_image_for_ocr(image_path, max_size_kb=300)
         
         # Force garbage collection after compression
         gc.collect()
@@ -153,6 +171,7 @@ def extract_text_ocr_space(image_path):
         print(f"DEBUG: Using image: {processed_image_path}")
         print(f"DEBUG: Final file size: {os.path.getsize(processed_image_path)/1024:.1f} KB")
         
+        # Use context manager for file handling
         with open(processed_image_path, 'rb') as f:
             files = {'file': f}
             
@@ -167,36 +186,43 @@ def extract_text_ocr_space(image_path):
             }
             
             print("DEBUG: Sending compressed image to OCR.space API (standard)...")
-            response = requests.post(api_url, files=files, data=data, timeout=60)
             
-            # Clean up compressed file if it's different from original
-            if processed_image_path != image_path:
-                try:
-                    os.remove(processed_image_path)
-                    print("DEBUG: Cleaned up compressed image file")
-                except:
-                    pass
+            # Shorter timeout to prevent memory buildup
+            response = requests.post(api_url, files=files, data=data, timeout=30)
+        
+        # Clean up compressed file immediately
+        if processed_image_path != image_path:
+            try:
+                os.remove(processed_image_path)
+                print("DEBUG: Cleaned up compressed image file")
+            except:
+                pass
+        
+        # Force garbage collection after API call
+        gc.collect()
+        
+        if response.status_code == 200:
+            result = response.json()
+            return parse_ocr_space_response(result)
+        else:
+            print(f"DEBUG: OCR.space API returned status {response.status_code}")
+            print(f"DEBUG: Response: {response.text[:500]}")
+            return ""
             
-            # Force garbage collection after API call
-            gc.collect()
-            
-            if response.status_code == 200:
-                result = response.json()
-                return parse_ocr_space_response(result)
-            else:
-                print(f"DEBUG: OCR.space API returned status {response.status_code}")
-                print(f"DEBUG: Response: {response.text[:500]}")
-                return ""
-                
     except Exception as e:
         print(f"DEBUG: OCR.space standard method failed: {e}")
+        # Force cleanup on error
+        gc.collect()
         return ""
 
 def extract_text_ocr_space_enhanced(image_path):
-    """Extract text using OCR.space API - enhanced settings with compression"""
+    """Extract text using OCR.space API - enhanced settings with memory management"""
     try:
-        # Compress image if needed
-        processed_image_path = compress_image_for_ocr(image_path)
+        # Compress image with smaller limit
+        processed_image_path = compress_image_for_ocr(image_path, max_size_kb=300)
+        
+        # Force garbage collection
+        gc.collect()
         
         api_url = 'https://api.ocr.space/parse/image'
         api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
@@ -217,26 +243,31 @@ def extract_text_ocr_space_enhanced(image_path):
             }
             
             print("DEBUG: Sending compressed image to OCR.space API (enhanced)...")
-            response = requests.post(api_url, files=files, data=data, timeout=60)
+            response = requests.post(api_url, files=files, data=data, timeout=30)
+        
+        # Clean up compressed file immediately
+        if processed_image_path != image_path:
+            try:
+                os.remove(processed_image_path)
+                print("DEBUG: Cleaned up compressed image file")
+            except:
+                pass
+        
+        # Force garbage collection
+        gc.collect()
+        
+        if response.status_code == 200:
+            result = response.json()
+            return parse_ocr_space_response(result)
+        else:
+            print(f"DEBUG: OCR.space enhanced API returned status {response.status_code}")
+            print(f"DEBUG: Response: {response.text[:500]}")
+            return ""
             
-            # Clean up compressed file if it's different from original
-            if processed_image_path != image_path:
-                try:
-                    os.remove(processed_image_path)
-                    print("DEBUG: Cleaned up compressed image file")
-                except:
-                    pass
-            
-            if response.status_code == 200:
-                result = response.json()
-                return parse_ocr_space_response(result)
-            else:
-                print(f"DEBUG: OCR.space enhanced API returned status {response.status_code}")
-                print(f"DEBUG: Response: {response.text[:500]}")
-                return ""
-                
     except Exception as e:
         print(f"DEBUG: OCR.space enhanced method failed: {e}")
+        # Force cleanup on error
+        gc.collect()
         return ""
 
 def parse_ocr_space_response(result):
@@ -291,6 +322,9 @@ def extract_text_pytesseract_fallback(image_path):
         import pytesseract
         from PIL import Image
         
+        # Force garbage collection before loading image
+        gc.collect()
+        
         image = Image.open(image_path)
         
         # Simple preprocessing
@@ -299,6 +333,10 @@ def extract_text_pytesseract_fallback(image_path):
             
         # Try basic OCR
         text = pytesseract.image_to_string(image, config='--psm 6')
+        
+        # Clean up image from memory
+        del image
+        gc.collect()
         
         if text and len(text.strip()) > 0:
             print(f"DEBUG: Pytesseract fallback worked: {len(text)} chars")
@@ -312,6 +350,8 @@ def extract_text_pytesseract_fallback(image_path):
         return ""
     except Exception as e:
         print(f"DEBUG: Pytesseract fallback failed: {e}")
+        # Force cleanup on error
+        gc.collect()
         return ""
 
 def normalize_ingredient_text(text):
@@ -599,10 +639,13 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with precise OCR.space integration"""
+    """Main scanning function with memory management"""
     try:
+        # Force garbage collection at start
+        gc.collect()
+        
         print(f"\n{'='*80}")
-        print(f"🔬 STARTING PRECISE INGREDIENT SCAN: {image_path}")
+        print(f"🔬 STARTING MEMORY-EFFICIENT SCAN: {image_path}")
         print(f"{'='*80}")
         print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
@@ -649,12 +692,19 @@ def scan_image_for_ingredients(image_path):
         # Print comprehensive summary
         print_scan_summary(result)
         
+        # Force final cleanup
+        gc.collect()
+        
         return result
         
     except Exception as e:
         print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Force cleanup on error
+        gc.collect()
+        
         return create_error_result(str(e))
 
 def determine_confidence(text_quality, text, matches):
