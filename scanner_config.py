@@ -19,7 +19,6 @@ trans_fat_high_risk = [
 trans_fat_moderate_risk = [
     "hydrogenated fat",
     "margarine",
-    "vegetable oil",
     "frying oil", 
     "modified fat",
     "synthetic fat",
@@ -52,7 +51,6 @@ excitotoxin_high_risk = [
     "hydrolyzed corn protein",
     "disodium inosinate",
     "disodium guanylate", 
-    "yeast extract",
     "autolyzed yeast",
     "calcium caseinate",
     "sodium caseinate",
@@ -63,20 +61,12 @@ excitotoxin_high_risk = [
 excitotoxin_moderate_risk = [
     "natural flavors",
     "natural flavoring", 
-    "spices",
-    "seasonings",
-    "seasoning blends",
-    "soy sauce",
     "non-brewed soy sauce", 
     "hydrolyzed soy sauce",
     "enzyme modified cheese",
     "whey protein isolate",
     "whey protein hydrolysate",
     "bouillon",
-    "broth", 
-    "stock",
-    "chicken broth",
-    "beef stock",
     "bouillon flavor"
 ]
 
@@ -109,24 +99,22 @@ corn_high_risk = [
     "xylitol",
     "caramel color",
     "vanillin",
-    "msg",
-    "monosodium glutamate"
+    "corn flour",
+    "cornmeal",
+    "corn oil",
+    "corn alcohol",
+    "corn ethanol",
+    "corn-based vinegars"
 ]
 
 # 🟡 Moderate Risk - Count toward total
 corn_moderate_risk = [
-    "natural flavors",
-    "natural flavoring",
-    "vegetable oil", 
-    "vegetable starch",
     "modified food starch",
     "lactic acid",
     "xanthan gum",
     "guar gum",
-    "enzymes",
     "lecithin",
     "tocopherols",
-    "baking powder",
     "polydextrose", 
     "inositol",
     "mono- and diglycerides",
@@ -141,13 +129,6 @@ corn_low_risk = [
     "sodium citrate",
     "potassium citrate",
     "masa harina",
-    "corn flour",
-    "cornmeal",
-    "corn oil",
-    "corn alcohol",
-    "corn ethanol",
-    "pla", 
-    "corn-based vinegars",
     "sorbitan monooleate",
     "sorbitan tristearate",
     "zein"
@@ -172,12 +153,12 @@ sugar_high_risk = [
     "fructose",
     "dextrose",
     "glucose",
-    "sucrose"
+    "sucrose",
+    "cane sugar"
 ]
 
 # 🟡 Moderate Risk - Count toward total
 sugar_moderate_risk = [
-    "cane sugar",
     "beet sugar",
     "brown sugar",
     "coconut sugar",
@@ -196,11 +177,7 @@ sugar_moderate_risk = [
     "treacle",
     "carob syrup", 
     "yacon syrup",
-    "honey"
-]
-
-# Low Risk - Count toward total
-sugar_low_risk = [
+    "honey",
     "maple syrup",
     "maple sugar",
     "coconut nectar",
@@ -219,7 +196,7 @@ sugar_low_risk = [
 ]
 
 # Combine all sugar categories for easier processing
-sugar_keywords = sugar_high_risk + sugar_moderate_risk + sugar_low_risk
+sugar_keywords = sugar_high_risk + sugar_moderate_risk 
 
 # GMO ALERT - From hierarchy document (NOT part of ranking)
 gmo_keywords = [
@@ -291,7 +268,7 @@ gmo_keywords = [
 ]
 
 # SAFE INGREDIENTS - Generally safe
-safe_ingredients = [
+ safe_ingredients = [
     "water",
     "salt", 
     "sea salt",
