@@ -230,9 +230,6 @@ def test_manual():
                 <div class="preset" onclick="fillText('partially hydrogenated soybean oil, sugar, salt')">
                     🚨 Trans Fat Test: partially hydrogenated soybean oil, sugar, salt
                 </div>
-                <div class="preset" onclick="fillText('water, salt, olive oil, garlic, black pepper')">
-                    ✅ Safe Test: water, salt, olive oil, garlic, black pepper
-                </div>
                 <div class="preset" onclick="fillText('chicken stock, modified cornstarch, vegetable oil, wheat flour, cream, chicken meat, chicken fat, salt, whey, dried chicken, monosodium glutamate, soy protein concentrate, water, natural flavoring, yeast extract, beta carotene for color, soy protein isolate, sodium phosphate, celery extract, onion extract, butter, garlic juice concentrate')">
                     📸 Campbell's Soup Test (from your image)
                 </div>
@@ -374,7 +371,7 @@ def debug_ocr():
         # Clean up
         os.remove(filepath)
         
-        # Format matches for display
+        # Format matches for display (removed safe_ingredients)
         matches_display = ""
         total_ingredients = 0
         for category, ingredients in matches.items():
@@ -525,9 +522,8 @@ def test_scan():
     try:
         # Test if all imports work
         from ingredient_scanner import scan_image_for_ingredients
-        from scanner_config import safe_ingredients
         
-        # Create a dummy result
+        # Create a dummy result (removed safe_ingredients)
         test_result = {
             "rating": "✅ Yay! Safe!",
             "matched_ingredients": {
@@ -536,8 +532,7 @@ def test_scan():
                 "corn": [],
                 "sugar": [],
                 "gmo": [],
-                "safe_ingredients": ["water", "salt"],
-                "all_detected": ["water", "salt"]
+                "all_detected": []
             },
             "confidence": "high",
             "text_quality": "good",
@@ -786,9 +781,7 @@ def debug():
     
     try:
         from ingredient_scanner import scan_image_for_ingredients
-        from scanner_config import safe_ingredients
         debug_info.append("✅ Modules: All imported successfully")
-        debug_info.append(f"✅ Safe ingredients count: {len(safe_ingredients)}")
     except Exception as e:
         debug_info.append(f"❌ Modules: Import failed - {str(e)}")
     
