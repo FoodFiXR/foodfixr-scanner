@@ -492,7 +492,7 @@ def assess_text_quality_enhanced(text):
         return "fair"
 
 def match_all_ingredients(text):
-    """Enhanced ingredient matching with precise categories"""
+    """Enhanced ingredient matching with tiered safety system"""
     if not text:
         print("DEBUG: No text provided for ingredient matching")
         return {
@@ -501,24 +501,39 @@ def match_all_ingredients(text):
             "corn": [],
             "sugar": [],
             "gmo": [],
-            "safe_ingredients": [],
+            "tier_1_safe": [],
+            "tier_2_safe": [],
+            "tier_3_caution": [],
+            "tier_4_danger": [],
             "all_detected": []
         }
     
     print(f"DEBUG: Matching ingredients in text of {len(text)} characters")
     print(f"DEBUG: Text sample: {text[:200]}...")
     
+    # Define tiered ingredient lists based on your data
+    tier_1_ingredients = ["broccoli", "spinach", "kale"]  # Most safe
+    tier_2_ingredients = ["citric acid", "xanthan gum", "msg", "monosodium glutamate", "stevia"]  # Generally safe
+    tier_3_ingredients = ["carrageenan"]  # Caution
+    tier_4_ingredients = ["brominated vegetable oil", "potassium bromate", "aspartame"]  # High concern
+    
     # Match each category using PRECISE matching
     trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
-    excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
+    excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk + excitotoxin_low_risk, "Excitotoxin")
     corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
     sugar_matches = precise_ingredient_matching(text, sugar_keywords, "Sugar")
     gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
-    safe_matches = precise_ingredient_matching(text, safe_ingredients, "Safe")
+    
+    # Match tiered ingredients
+    tier_1_matches = precise_ingredient_matching(text, tier_1_ingredients, "Tier 1 Safe")
+    tier_2_matches = precise_ingredient_matching(text, tier_2_ingredients, "Tier 2 Safe")
+    tier_3_matches = precise_ingredient_matching(text, tier_3_ingredients, "Tier 3 Caution")
+    tier_4_matches = precise_ingredient_matching(text, tier_4_ingredients, "Tier 4 Danger")
     
     # Combine all detected ingredients
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
-                           sugar_matches + gmo_matches + safe_matches))
+                           sugar_matches + gmo_matches + tier_1_matches + tier_2_matches + 
+                           tier_3_matches + tier_4_matches))
     
     result = {
         "trans_fat": list(set(trans_fat_matches)),
@@ -526,11 +541,14 @@ def match_all_ingredients(text):
         "corn": list(set(corn_matches)),
         "sugar": list(set(sugar_matches)),
         "gmo": list(set(gmo_matches)),
-        "safe_ingredients": list(set(safe_matches)),
+        "tier_1_safe": list(set(tier_1_matches)),
+        "tier_2_safe": list(set(tier_2_matches)),
+        "tier_3_caution": list(set(tier_3_matches)),
+        "tier_4_danger": list(set(tier_4_matches)),
         "all_detected": all_detected
     }
     
-    print(f"DEBUG: PRECISE INGREDIENT MATCHING RESULTS:")
+    print(f"DEBUG: TIERED INGREDIENT MATCHING RESULTS:")
     for category, ingredients in result.items():
         if ingredients:
             print(f"  ✅ {category}: {ingredients}")
@@ -541,12 +559,15 @@ def match_all_ingredients(text):
 
 def rate_ingredients_according_to_hierarchy(matches, text_quality):
     """
-    Rating system following EXACT hierarchy rules from document:
+    Updated rating system with tiered safety approach:
     
-    1. HIGH RISK TRANS FATS - ANY ONE = immediate danger
-    2. HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
-    3. Count ALL other problematic ingredients (moderate trans fats, moderate excitotoxins, corn, sugar)
-    4. If total count >= 3 = danger, if >= 1 = proceed carefully
+    1. Tier 4 ingredients = immediate danger
+    2. HIGH RISK TRANS FATS - ANY ONE = immediate danger
+    3. HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
+    4. Tier 3 ingredients = caution
+    5. Count ALL other problematic ingredients (moderate trans fats, moderate excitotoxins, corn, sugar)
+    6. If total count >= 3 = danger, if >= 1 = proceed carefully
+    7. Tier 1 & 2 ingredients = safe
     """
     
     print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
@@ -555,34 +576,41 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     if text_quality == "very_poor":
         return "↪️ TRY AGAIN"
     
-    # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
+    # RULE 1: Tier 4 ingredients = immediate danger
+    if matches["tier_4_danger"]:
+        print(f"🚨 TIER 4 DANGER ingredients detected: {matches['tier_4_danger']}")
+        return "🚨 Oh NOOOO! Danger!"
+    
+    # RULE 2: HIGH RISK TRANS FATS - ANY ONE = immediate danger
     high_risk_trans_fat_found = []
     for ingredient in matches["trans_fat"]:
-        # Check against high risk trans fat list from scanner_config
         for high_risk_item in trans_fat_high_risk:
             if high_risk_item.lower() in ingredient.lower():
                 high_risk_trans_fat_found.append(ingredient)
                 print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
                 return "🚨 Oh NOOOO! Danger!"
     
-    # RULE 2: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
+    # RULE 3: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
     high_risk_excitotoxin_found = []
     for ingredient in matches["excitotoxins"]:
-        # Check against high risk excitotoxin list from scanner_config
         for high_risk_item in excitotoxin_high_risk:
             if high_risk_item.lower() in ingredient.lower():
                 high_risk_excitotoxin_found.append(ingredient)
                 print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
                 return "🚨 Oh NOOOO! Danger!"
     
-    # RULE 3: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
+    # RULE 4: Tier 3 ingredients = caution (but check total count too)
+    tier_3_count = len(matches["tier_3_caution"])
+    if tier_3_count > 0:
+        print(f"⚠️ TIER 3 CAUTION ingredients detected: {matches['tier_3_caution']}")
+    
+    # RULE 5: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
     total_problematic_count = 0
     
     # Count moderate trans fats (not already counted as high risk)
     moderate_trans_fat_count = 0
     for ingredient in matches["trans_fat"]:
         if ingredient not in high_risk_trans_fat_found:
-            # Check if it's a moderate risk trans fat
             for moderate_item in trans_fat_moderate_risk:
                 if moderate_item.lower() in ingredient.lower():
                     moderate_trans_fat_count += 1
@@ -593,42 +621,44 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     moderate_excitotoxin_count = 0
     for ingredient in matches["excitotoxins"]:
         if ingredient not in high_risk_excitotoxin_found:
-            # Check if it's a moderate risk excitotoxin
             for moderate_item in excitotoxin_moderate_risk:
                 if moderate_item.lower() in ingredient.lower():
                     moderate_excitotoxin_count += 1
                     print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
                     break
-            # Also check low risk excitotoxins
             for low_item in excitotoxin_low_risk:
                 if low_item.lower() in ingredient.lower():
                     moderate_excitotoxin_count += 1
                     print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
                     break
     
-    # Count ALL corn ingredients (as per document: all corn counts)
+    # Count ALL corn and sugar ingredients
     corn_count = len(matches["corn"])
-    
-    # Count ALL sugar ingredients (as per document: all sugar counts)  
     sugar_count = len(matches["sugar"])
     
-    # Calculate total problematic count
-    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
+    # Calculate total problematic count (including Tier 3)
+    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count + tier_3_count
     
     print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
+    print(f"   - Tier 3 caution: {tier_3_count}")
     print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
     print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
     print(f"   - Corn ingredients: {corn_count}")
     print(f"   - Sugar ingredients: {sugar_count}")
     
-    # RULE 4: Apply hierarchy rules per document
-    # "Per category: if 1-2 stays Proceed Carefully, if 3-4 in food = Oh NOOO! Danger!"
+    # RULE 6: Apply hierarchy rules
     if total_problematic_count >= 3:
         return "🚨 Oh NOOOO! Danger!"
     elif total_problematic_count >= 1:
         return "⚠️ Proceed carefully"
     
-    # If some ingredients detected but no problematic ones
+    # RULE 7: Check for safe ingredients
+    safe_count = len(matches["tier_1_safe"]) + len(matches["tier_2_safe"])
+    if safe_count > 0:
+        print(f"✅ Safe ingredients detected: Tier 1: {matches['tier_1_safe']}, Tier 2: {matches['tier_2_safe']}")
+        return "✅ Yay! Safe!"
+    
+    # If some ingredients detected but none categorized
     if len(matches["all_detected"]) > 0:
         return "✅ Yay! Safe!"
     
@@ -723,12 +753,13 @@ def determine_confidence(text_quality, text, matches):
         return "low"
 
 def create_error_result(error_message):
-    """Create standardized error result"""
+    """Create standardized error result with tiered system"""
     return {
         "rating": "↪️ TRY AGAIN",
         "matched_ingredients": {
             "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "gmo": [], "safe_ingredients": [], "all_detected": []
+            "sugar": [], "gmo": [], "tier_1_safe": [], "tier_2_safe": [],
+            "tier_3_caution": [], "tier_4_danger": [], "all_detected": []
         },
         "confidence": "very_low",
         "text_quality": "very_poor",
@@ -761,14 +792,17 @@ def print_scan_summary(result):
     print(f"{'='*80}\n")
 
 def get_category_emoji(category):
-    """Get emoji for ingredient category"""
+    """Get emoji for ingredient category with tiered system"""
     emoji_map = {
         'trans_fat': '🚫',
         'excitotoxins': '⚠️',
         'corn': '🌽',
         'sugar': '🍯',
         'gmo': '🧬',
-        'safe_ingredients': '✅',
+        'tier_1_safe': '🟢',
+        'tier_2_safe': '🔵',
+        'tier_3_caution': '🟡',
+        'tier_4_danger': '🔴',
         'all_detected': '📋'
     }
     return emoji_map.get(category, '📝')
