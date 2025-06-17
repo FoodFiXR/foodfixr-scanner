@@ -266,7 +266,8 @@ gmo_keywords = [
     "lab-grown",
     "precision fermentation"
 ]
- safe_ingredients = [
+
+safe_ingredients = [
     "water",
     "salt", 
     "sea salt",
@@ -325,5 +326,3 @@ gmo_keywords = [
     "cumin",
     "coriander"
 ]
-
-
