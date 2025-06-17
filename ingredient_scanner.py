@@ -501,7 +501,6 @@ def match_all_ingredients(text):
             "corn": [],
             "sugar": [],
             "gmo": [],
-            "safe_ingredients": [],
             "all_detected": []
         }
     
@@ -514,11 +513,10 @@ def match_all_ingredients(text):
     corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
     sugar_matches = precise_ingredient_matching(text, sugar_keywords, "Sugar")
     gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
-    safe_matches = precise_ingredient_matching(text, safe_ingredients, "Safe")
     
-    # Combine all detected ingredients
+    # Combine all detected ingredients (removed safe_ingredients)
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
-                           sugar_matches + gmo_matches + safe_matches))
+                           sugar_matches + gmo_matches))
     
     result = {
         "trans_fat": list(set(trans_fat_matches)),
@@ -526,7 +524,6 @@ def match_all_ingredients(text):
         "corn": list(set(corn_matches)),
         "sugar": list(set(sugar_matches)),
         "gmo": list(set(gmo_matches)),
-        "safe_ingredients": list(set(safe_matches)),
         "all_detected": all_detected
     }
     
@@ -728,7 +725,7 @@ def create_error_result(error_message):
         "rating": "↪️ TRY AGAIN",
         "matched_ingredients": {
             "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "gmo": [], "safe_ingredients": [], "all_detected": []
+            "sugar": [], "gmo": [], "all_detected": []
         },
         "confidence": "very_low",
         "text_quality": "very_poor",
@@ -768,7 +765,6 @@ def get_category_emoji(category):
         'corn': '🌽',
         'sugar': '🍯',
         'gmo': '🧬',
-        'safe_ingredients': '✅',
         'all_detected': '📋'
     }
     return emoji_map.get(category, '📝')
