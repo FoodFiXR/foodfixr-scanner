@@ -146,8 +146,8 @@
         }
 
         .scan-icon {
-            width: 200px;        /* Increased from 140px for bigger image */
-            height: 200px;       /* Increased from 140px for bigger image */
+            width: 300px;        /* Increased from 200px for much bigger image */
+            height: 300px;       /* Increased from 200px for much bigger image */
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             border-radius: 20px;
@@ -169,8 +169,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 220px;        /* Adjusted to match new larger icon size */
-            height: 220px;       /* Adjusted to match new larger icon size */
+            width: 320px;        /* Adjusted to match new larger icon size */
+            height: 320px;       /* Adjusted to match new larger icon size */
             border: 3px solid rgba(233, 30, 99, 0.3);
             border-radius: 20px;
             transform: translate(-50%, -50%);
@@ -188,7 +188,7 @@
             }
         }
 
-        /* Trial Status */
+        /* Trial Status - Keep Original Colors */
         .trial-status {
             background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
             border-radius: 16px;
@@ -215,17 +215,17 @@
         }
 
         .trial-status.expired {
-            background: linear-gradient(135deg, rgba(64, 224, 208, 0.3), rgba(0, 206, 209, 0.3));
-            border-color: #00BFFF;
-            color: #2F4F4F;
+            background: linear-gradient(135deg, rgba(64, 224, 208, 0.3), rgba(0, 206, 209, 0.3)) !important;
+            border-color: #00BFFF !important;
+            color: #2F4F4F !important;
         }
 
         .trial-status.expired .trial-title {
-            color: #2F4F4F;
+            color: #2F4F4F !important;
         }
 
         .trial-status.expired .trial-info {
-            color: #556B7D;
+            color: #556B7D !important;
         }
 
         .trial-title {
@@ -514,13 +514,13 @@
             }
 
             .scan-icon {
-                width: 180px;        /* Larger on mobile too */
-                height: 200px;       /* Larger on mobile too */
+                width: 270px;        /* Larger on mobile too */
+                height: 270px;       /* Larger on mobile too */
             }
 
             .scan-pulse {
-                width: 180px;        /* Adjusted for mobile */
-                height: 200px;       /* Adjusted for mobile */
+                width: 290px;        /* Adjusted for mobile */
+                height: 290px;       /* Adjusted for mobile */
             }
 
             .emoji {
