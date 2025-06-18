@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+.safe-ingredients {
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4CAF50;
+        }
+        .safe-ingredients .category-title { color: #66BB6A; }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -381,7 +385,7 @@
         .section-title {
             font-size: 18px;
             font-weight: 700;
-            color: #fff;
+            color: #000;
             margin-bottom: 16px;
             text-align: left;
         }
@@ -440,7 +444,7 @@
             font-size: 14px;
             line-height: 1.6;
             margin: 0;
-            color: #f0f0f0;;
+            color: #000;
         }
 
         .risky-ingredients {
@@ -453,7 +457,7 @@
             background: rgba(255, 152, 0, 0.08);
             border-left-color: #ff9800;
         }
-        .moderate-ingredients .category-title { color: #FFA726;  }
+        .moderate-ingredients .category-title { color: #E65100;  }
 
         .try-again-message {
             background: linear-gradient(135deg, #fff3e0, #ffe0b2);
@@ -669,16 +673,25 @@
 
             {% if result.matched_ingredients.sugar %}
             <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">🍯 Sugars:</div>
+                <div class="category-title">🍯 High Risk Sugars:</div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.sugar | join(", ") }}
                 </div>
             </div>
             {% endif %}
 
+            {% if result.matched_ingredients.sugar_safe %}
+            <div class="ingredient-category safe-ingredients">
+                <div class="category-title">✅ Safe Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar_safe | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
             {% if result.matched_ingredients.gmo %}
 <div class="ingredient-category moderate-ingredients">
-    <div class="category-title">👽GMO Ingredients:</div>
+    <div class="category-title">📣 GMO Ingredients:</div>
     <div class="ingredient-list">
         {{ result.matched_ingredients.gmo | join(", ") }}
     </div>
@@ -686,8 +699,8 @@
 
 <!-- Add GMO Alert banner -->
 <div class="gmo-alert">
-    <span class="gmo-alert-icon">👽</span>
-    <span>☠️ Toxin Alert! This product contains GMO's or Dangerously Toxic Ingredients</span>
+    <span class="gmo-alert-icon">📣</span>
+    <span>GMO Alert! This product contains genetically modified ingredients</span>
 </div>
 {% endif %}
         </div>
