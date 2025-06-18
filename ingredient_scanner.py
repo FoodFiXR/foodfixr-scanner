@@ -339,10 +339,9 @@ def cleanup_before_request():
     except Exception as e:
         print(f"DEBUG: Pre-request cleanup error: {e}")
 
-# Add this to your main Flask route BEFORE processing the image
-@app.before_request
-def before_request():
-    """Run cleanup before each request"""
+# This function should be called from your main app.py file
+def before_request_cleanup():
+    """Run cleanup before each request - call this from your main Flask app"""
     cleanup_before_request()
 
 def process_image_with_memory_management(image_path):
