@@ -85,7 +85,7 @@
 
         /* Main App Container */
         .app-container {
-            background: rgba(240, 245, 250, 0.85);
+            background: rgba(230, 237, 242, 0.85);
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px 24px;
@@ -319,7 +319,7 @@
 
         /* Enhanced Results - Mobile First Design */
         .result {
-            background: rgba(240, 245, 250, 0.85);
+            background: rgba(230, 237, 242, 0.85);
             backdrop-filter: blur(20px);
             border-radius: 20px;
             padding: 20px;
@@ -687,7 +687,7 @@
 
             {% if result.matched_ingredients.gmo %}
 <div class="ingredient-category moderate-ingredients">
-    <div class="category-title">📣 GMO Ingredients:</div>
+    <div class="category-title">👽 GMO Ingredients:</div>
     <div class="ingredient-list">
         {{ result.matched_ingredients.gmo | join(", ") }}
     </div>
@@ -695,8 +695,8 @@
 
 <!-- Add GMO Alert banner -->
 <div class="gmo-alert">
-    <span class="gmo-alert-icon">📣</span>
-    <span>GMO Alert! This product contains genetically modified ingredients</span>
+    <span class="gmo-alert-icon">👽</span>
+    <span>☠️Toxin Alert! This product contains Dangerously Toxic ingredients</span>
 </div>
 {% endif %}
         </div>
