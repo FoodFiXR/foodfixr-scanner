@@ -500,6 +500,7 @@ def match_all_ingredients(text):
             "excitotoxins": [],
             "corn": [],
             "sugar": [],
+            "sugar_safe": [],
             "gmo": [],
             "all_detected": []
         }
@@ -511,18 +512,20 @@ def match_all_ingredients(text):
     trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
     excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
     corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
-    sugar_matches = precise_ingredient_matching(text, sugar_keywords, "Sugar")
+    sugar_high_matches = precise_ingredient_matching(text, sugar_high_risk, "High Risk Sugar")
+    sugar_safe_matches = precise_ingredient_matching(text, sugar_safe, "Safe Sugar")
     gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
     
-    # Combine all detected ingredients (removed safe_ingredients)
+    # Combine all detected ingredients
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
-                           sugar_matches + gmo_matches))
+                           sugar_high_matches + sugar_safe_matches + gmo_matches))
     
     result = {
         "trans_fat": list(set(trans_fat_matches)),
         "excitotoxins": list(set(excitotoxin_matches)),
         "corn": list(set(corn_matches)),
-        "sugar": list(set(sugar_matches)),
+        "sugar": list(set(sugar_high_matches)),
+        "sugar_safe": list(set(sugar_safe_matches)),
         "gmo": list(set(gmo_matches)),
         "all_detected": all_detected
     }
@@ -606,8 +609,8 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     # Count ALL corn ingredients (as per document: all corn counts)
     corn_count = len(matches["corn"])
     
-    # Count ALL sugar ingredients (as per document: all sugar counts)  
-    sugar_count = len(matches["sugar"])
+    # Count ALL sugar ingredients (only high risk sugars count as problematic)  
+    sugar_count = len(matches["sugar"])  # Only high risk sugars
     
     # Calculate total problematic count
     total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
@@ -725,7 +728,7 @@ def create_error_result(error_message):
         "rating": "↪️ TRY AGAIN",
         "matched_ingredients": {
             "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "gmo": [], "all_detected": []
+            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": []
         },
         "confidence": "very_low",
         "text_quality": "very_poor",
@@ -764,7 +767,8 @@ def get_category_emoji(category):
         'excitotoxins': '⚠️',
         'corn': '🌽',
         'sugar': '🍯',
-        'gmo': '🧬',
+        'sugar_safe': '✅',
+        'gmo': '👽',
         'all_detected': '📋'
     }
     return emoji_map.get(category, '📝')
