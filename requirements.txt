@@ -5,3 +5,4 @@ pytesseract==0.3.10
 stripe==7.8.1
 gunicorn==21.2.0
 requests==2.31.0
+psutil==5.9.8
