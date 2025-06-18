@@ -157,8 +157,8 @@ sugar_high_risk = [
     "cane sugar"
 ]
 
-# 🟡 Moderate Risk - Count toward total
-sugar_moderate_risk = [
+# ✅ Safe Sugars - Don't count as problematic (previously moderate risk)
+sugar_safe = [
     "beet sugar",
     "brown sugar",
     "coconut sugar",
@@ -195,8 +195,8 @@ sugar_moderate_risk = [
     "ethyl maltol"
 ]
 
-# Combine all sugar categories for easier processing
-sugar_keywords = sugar_high_risk + sugar_moderate_risk 
+# Combine high risk and safe for easier processing
+sugar_keywords = sugar_high_risk + sugar_safe 
 
 # GMO ALERT - From hierarchy document (NOT part of ranking)
 gmo_keywords = [
@@ -210,6 +210,7 @@ gmo_keywords = [
     "soy protein isolate",
     "canola oil",
     "cottonseed oil",
+    "cottonseed",
     "textured vegetable protein",
     "tvp",
     "hydrolyzed soy protein",
