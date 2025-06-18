@@ -153,8 +153,7 @@ sugar_high_risk = [
     "fructose",
     "dextrose",
     "glucose",
-    "sucrose",
-    "cane sugar"
+    "sucrose"
 ]
 
 # ✅ Safe Sugars - Don't count as problematic (previously moderate risk)
@@ -192,7 +191,8 @@ sugar_safe = [
     "diastatic malt",
     "malt syrup",
     "malt extract",
-    "ethyl maltol"
+    "ethyl maltol",
+    "cane sugar"
 ]
 
 # Combine high risk and safe for easier processing
