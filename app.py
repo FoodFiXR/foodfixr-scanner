@@ -531,6 +531,7 @@ def test_scan():
                 "excitotoxins": [],
                 "corn": [],
                 "sugar": [],
+                "sugar_safe": [],
                 "gmo": [],
                 "all_detected": []
             },
