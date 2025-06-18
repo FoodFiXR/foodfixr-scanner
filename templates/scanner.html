@@ -13,7 +13,7 @@
 
         body {
             background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
-            font-family: comfortaa;
+            font-family: 'Comfortaa', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -394,40 +394,40 @@
             border-left: 4px solid;
         }
 
-.gmo-alert {
-    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-    border: 2px solid #ff9800;
-    border-radius: 12px;
-    padding: 16px;
-    margin: 16px 0;
-    text-align: center;
-    font-weight: 700;
-    font-size: 18px;
-    color: #f57c00;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    animation: pulse-alert 2s infinite;
-}
+        .gmo-alert {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 2px solid #ff9800;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: #f57c00;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            animation: pulse-alert 2s infinite;
+        }
 
-@keyframes pulse-alert {
-    0% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.02);
-    }
-    100% {
-        transform: scale(1);
-    }
-}
+        @keyframes pulse-alert {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
 
-.gmo-alert-icon {
-    font-size: 24px;
-}
+        .gmo-alert-icon {
+            font-size: 24px;
+        }
 
-          .category-title {
+        .category-title {
             font-weight: 700;
             margin-bottom: 8px;
             font-size: 16px;
@@ -454,6 +454,12 @@
             border-left-color: #ff9800;
         }
         .moderate-ingredients .category-title { color: #E65100;  }
+
+        .safe-ingredients {
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4CAF50;
+        }
+        .safe-ingredients .category-title { color: #66BB6A; }
 
         .try-again-message {
             background: linear-gradient(135deg, #fff3e0, #ffe0b2);
@@ -637,6 +643,7 @@
         {% endif %}
 
         {% if "TRY AGAIN" not in result.rating %}
+        {% if "Safe" not in result.rating %}
         <div class="ingredients-section">
             <h3 class="section-title">Detected Ingredients:</h3>
 
@@ -686,20 +693,21 @@
             {% endif %}
 
             {% if result.matched_ingredients.gmo %}
-<div class="ingredient-category moderate-ingredients">
-    <div class="category-title">👽 GMO Ingredients:</div>
-    <div class="ingredient-list">
-        {{ result.matched_ingredients.gmo | join(", ") }}
-    </div>
-</div>
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">👽 GMO Ingredients:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
 
-<!-- Add GMO Alert banner -->
-<div class="gmo-alert">
-    <span class="gmo-alert-icon">☠️</span>
-    <span>Toxin Alert! This product contains Dangerously Toxic ingredients</span>
-</div>
-{% endif %}
+            <!-- Add GMO Alert banner -->
+            <div class="gmo-alert">
+                <span class="gmo-alert-icon">👽</span>
+                <span>Toxin alert! Looks like there are some if-y players to be aware of.</span>
+            </div>
+            {% endif %}
         </div>
+        {% endif %}
         {% else %}
         <div class="try-again-message">
             Couldn't read ingredients clearly. Try better lighting and hold steady.
