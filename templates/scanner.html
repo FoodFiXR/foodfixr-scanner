@@ -164,18 +164,20 @@
             transform: scale(0.98);
         }
 
-        /* Scan Pulse Effect */
+        /* Remove Scan Pulse Effect - commented out */
+        /*
         .scan-pulse {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 320px;        /* Adjusted to match new larger icon size */
-            height: 320px;       /* Adjusted to match new larger icon size */
+            width: 320px;
+            height: 320px;
             border: 3px solid rgba(233, 30, 99, 0.3);
             border-radius: 20px;
             transform: translate(-50%, -50%);
             animation: pulse 2s infinite;
         }
+        */
 
         @keyframes pulse {
             0% {
@@ -188,13 +190,13 @@
             }
         }
 
-        /* Trial Status - Keep Original Colors */
+        /* Trial Status - Updated Colors */
         .trial-status {
-            background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+            background: linear-gradient(135deg, #77ecfe, rgba(119, 236, 254, 0.8));
             border-radius: 16px;
             padding: 18px;
             margin: 24px 0;
-            border: 2px solid #4CAF50;
+            border: 2px solid #0e4b9e;
             position: relative;
             overflow: hidden;
         }
@@ -231,7 +233,7 @@
         .trial-title {
             font-size: 18px;
             font-weight: 700;
-            color: #000 !important;  
+            color: #0e4b9e !important;  
             margin-bottom: 8px;
             display: flex;
             align-items: center;
@@ -239,7 +241,7 @@
             gap: 8px;
         }
 
-        /* Modern Scan Button */
+        /* Modern Scan Button with Pulse Animation */
         .scan-button {
             background: linear-gradient(135deg, #e91e63, #ad1457);
             color: white;
@@ -257,6 +259,28 @@
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             position: relative;
             overflow: hidden;
+            animation: button-pulse 2s infinite;
+        }
+
+        @keyframes button-pulse {
+            0% {
+                box-shadow: 
+                    0 8px 24px rgba(233, 30, 99, 0.4),
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 0 rgba(233, 30, 99, 0.5);
+            }
+            50% {
+                box-shadow: 
+                    0 8px 24px rgba(233, 30, 99, 0.6),
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 8px rgba(233, 30, 99, 0.2);
+            }
+            100% {
+                box-shadow: 
+                    0 8px 24px rgba(233, 30, 99, 0.4),
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 0 rgba(233, 30, 99, 0);
+            }
         }
 
         .scan-button::before {
@@ -352,7 +376,7 @@
         }
 
         .result-header.caution {
-            background: linear-gradient(135deg, #fff8e1, #ffecb3);
+            background: linear-gradient(135deg, #efef0b, rgba(239, 239, 11, 0.8));
         }
 
         .result-header.danger {
@@ -362,7 +386,7 @@
         .result-emoji {
             width: 48px;
             height: 48px;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 12px rgba(64, 64, 64, 0.6));
             flex-shrink: 0;
         }
 
@@ -374,7 +398,7 @@
         }
 
         .result-title.safe { color: #4CAF50; }
-        .result-title.caution { color: #FF9800; }
+        .result-title.caution { color: #6c02d7; }
         .result-title.danger { color: #F44336; }
 
         .ingredients-section {
@@ -398,15 +422,15 @@
         }
 
         .gmo-alert {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border: 2px solid #ff9800;
+            background: #d7d6d7;
+            border: 2px solid #3801af;
             border-radius: 12px;
             padding: 16px;
             margin: 16px 0;
             text-align: center;
             font-weight: 700;
             font-size: 18px;
-            color: #f57c00;
+            color: #3801af;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -453,10 +477,10 @@
         .risky-ingredients .category-title { color: #EF5350; }
 
         .moderate-ingredients {
-            background: rgba(255, 152, 0, 0.08);
-            border-left-color: #ff9800;
+            background: #d7d6d7;
+            border-left-color: #8400c2;
         }
-        .moderate-ingredients .category-title { color: #E65100;  }
+        .moderate-ingredients .category-title { color: #8400c2; }
 
         .safe-ingredients {
             background: rgba(76, 175, 80, 0.08);
@@ -465,13 +489,13 @@
         .safe-ingredients .category-title { color: #66BB6A; }
 
         .try-again-message {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border: 2px solid #ff9800;
+            background: linear-gradient(135deg, #efef0b, rgba(239, 239, 11, 0.8));
+            border: 2px solid #e7e300;
             border-radius: 12px;
             padding: 20px;
             margin: 16px 0;
             font-size: 16px;
-            color: #ef6c00;
+            color: #6c02d7;
             font-weight: 600;
         }
 
@@ -560,7 +584,7 @@
         <!-- Scanner Section -->
         <div class="scanner-section">
             <div class="scan-icon-container">
-                <div class="scan-pulse"></div>
+                <!-- Removed the scan-pulse div -->
                 <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
