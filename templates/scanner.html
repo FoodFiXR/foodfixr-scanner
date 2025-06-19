@@ -92,7 +92,7 @@
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px 24px;
-            max-width: 380px;
+            max-width: 420px;  /* Increased from 380px to accommodate bigger logo */
             width: 100%;
             box-shadow: 
                 0 20px 60px rgba(233, 30, 99, 0.15),
@@ -134,7 +134,7 @@
             font-weight: 500;
         }
 
-        /* Scanner Icon */
+        /* Scanner Icon - MADE BIGGER */
         .scanner-section {
             margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
         }
@@ -146,8 +146,8 @@
         }
 
         .scan-icon {
-            width: 300px;        /* Increased from 200px for much bigger image */
-            height: 300px;       /* Increased from 200px for much bigger image */
+            width: 380px;        /* INCREASED from 300px to 380px - Much bigger! */
+            height: 380px;       /* INCREASED from 300px to 380px - Much bigger! */
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             border-radius: 20px;
@@ -170,8 +170,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 320px;
-            height: 320px;
+            width: 400px;        /* Adjusted for bigger logo */
+            height: 400px;       /* Adjusted for bigger logo */
             border: 3px solid rgba(233, 30, 99, 0.3);
             border-radius: 20px;
             transform: translate(-50%, -50%);
@@ -523,6 +523,7 @@
             .app-container {
                 padding: 20px 18px;     /* Reduced from 24px 20px */
                 margin: 0 3px 12px 3px; /* Reduced margins */
+                max-width: 390px;       /* Slightly wider for mobile to fit bigger logo */
             }
 
             .app-header {
@@ -538,13 +539,13 @@
             }
 
             .scan-icon {
-                width: 270px;        /* Larger on mobile too */
-                height: 270px;       /* Larger on mobile too */
+                width: 340px;        /* BIGGER on mobile too - increased from 270px */
+                height: 340px;       /* BIGGER on mobile too - increased from 270px */
             }
 
             .scan-pulse {
-                width: 290px;        /* Adjusted for mobile */
-                height: 290px;       /* Adjusted for mobile */
+                width: 360px;        /* Adjusted for mobile bigger logo */
+                height: 360px;       /* Adjusted for mobile bigger logo */
             }
 
             .emoji {
@@ -564,6 +565,19 @@
 
             .result-title {
                 font-size: 20px;
+            }
+        }
+
+        /* Extra small mobile devices */
+        @media (max-width: 360px) {
+            .app-container {
+                max-width: 350px;
+                padding: 18px 15px;
+            }
+            
+            .scan-icon {
+                width: 310px;        /* Slightly smaller for very small screens */
+                height: 310px;       /* Slightly smaller for very small screens */
             }
         }
     </style>
@@ -869,15 +883,17 @@
             }, 400);
             {% endif %}
         });
-           function handleScanClick() {
-    if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-        // Redirect to upgrade page instead of showing alert
-        window.location.href = '/upgrade';
-        return;
-    }
+           
+        function handleScanClick() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
 
-    triggerScanner();
-}
+            triggerScanner();
+        }
+
         function triggerScanner() {
             const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
             
@@ -889,18 +905,18 @@
         }
 
         // Update the handleFileSelected function
-function handleFileSelected() {
-    if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-        // Redirect to upgrade page instead of showing alert
-        window.location.href = '/upgrade';
-        return;
-    }
+        function handleFileSelected() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
 
-    showLoading();
-    scansUsed++;
-    updateScanCount();
-    document.getElementById('uploadForm').submit();
-}
+            showLoading();
+            scansUsed++;
+            updateScanCount();
+            document.getElementById('uploadForm').submit();
+        }
 
         function startWebcam() {
             const video = document.getElementById("webcam");
@@ -919,39 +935,39 @@ function handleFileSelected() {
                 });
         }
 
-       // Update the capturePhoto function
-function capturePhoto() {
-    const video = document.getElementById("webcam");
-    const canvas = document.getElementById("snapshot");
-    const form = document.getElementById("scanForm");
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    
-    const stream = video.srcObject;
-    const tracks = stream.getTracks();
-    tracks.forEach(track => track.stop());
-    video.style.display = "none";
-    
-    canvas.toBlob(function (blob) {
-        const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
-        const container = new DataTransfer();
-        container.items.add(file);
-        document.getElementById("hiddenImage").files = container.files;
-        
-        if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-            // Redirect to upgrade page instead of showing alert
-            window.location.href = '/upgrade';
-            return;
-        }
+        // Update the capturePhoto function
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    // Redirect to upgrade page instead of showing alert
+                    window.location.href = '/upgrade';
+                    return;
+                }
 
-        showLoading();
-        scansUsed++;
-        updateScanCount();
-        form.submit();
-    }, "image/jpeg", 0.8);
-}
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
+        }
 
         function showLoading() {
             document.getElementById('loadingState').style.display = 'block';
@@ -982,6 +998,7 @@ function capturePhoto() {
                 }, 600);
             }
         });
+        
         // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
         document.addEventListener('DOMContentLoaded', function() {
             const scanButton = document.getElementById('scanButton');
