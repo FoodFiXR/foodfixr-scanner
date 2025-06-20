@@ -1,977 +1,1073 @@
-import re
-import os
-import gc
-from scanner_config import *
-import requests
-from PIL import Image, ImageOps, ImageEnhance
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8" />
+    <title>FoodFixr Scanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-import gc
-import psutil  # Add this for memory monitoring
-import os
-import tempfile
-import time
-from PIL import Image
-import requests
+        body {
+            background: #e50ce8;  /* Changed to solid pink background */
+            font-family: 'Comfortaa', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: hidden;
+            text-align: center;
+            min-height: 100vh;
+            position: relative;
+            padding: 20px 15px;
+        }
 
-# Add memory monitoring function
-def log_memory_usage(stage=""):
-    """Log current memory usage"""
-    try:
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
-        
-        # Force garbage collection if memory is high
-        if memory_mb > 200:  # If using more than 200MB
-            print(f"DEBUG: High memory usage detected, forcing cleanup...")
-            gc.collect()
-            time.sleep(0.1)  # Brief pause after cleanup
-    except:
-        pass
+        /* Enhanced Emoji Shower Styles */
+        .emoji-shower {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
 
-def aggressive_cleanup():
-    """Ultra-aggressive memory cleanup"""
-    try:
-        # Force multiple garbage collection cycles
-        for _ in range(3):
-            gc.collect()
-        
-        # Clear PIL cache
-        Image.MAX_IMAGE_PIXELS = None
-        
-        # Force Python to release memory back to OS (if possible)
-        if hasattr(gc, 'set_threshold'):
-            gc.set_threshold(0, 0, 0)  # Disable automatic GC temporarily
-            gc.collect()
-            gc.set_threshold(700, 10, 10)  # Re-enable with aggressive settings
-        
-        print("DEBUG: Aggressive cleanup completed")
-    except Exception as e:
-        print(f"DEBUG: Cleanup error: {e}")
+        .emoji {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            opacity: 0.95;
+            animation: enhancedFall linear infinite;
+            user-select: none;
+            border-radius: 50%;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+        }
 
-def compress_image_for_ocr(image_path, max_size_kb=150):  # Increased from 100KB
-    """Ultra-aggressive memory-efficient image compression for OCR.space"""
-    log_memory_usage("before compression")
-    
-    try:
-        print(f"DEBUG: Checking image size for {image_path}")
-        
-        # Check current file size
-        current_size_kb = os.path.getsize(image_path) / 1024
-        print(f"DEBUG: Current image size: {current_size_kb:.1f} KB")
-        
-        if current_size_kb <= max_size_kb:
-            print(f"DEBUG: Image size OK ({current_size_kb:.1f} KB), no compression needed")
-            return image_path
-        
-        print(f"DEBUG: Image too large ({current_size_kb:.1f} KB), compressing...")
-        
-        # Create compressed filename in temp directory
-        temp_dir = tempfile.gettempdir()
-        base_name = os.path.splitext(os.path.basename(image_path))[0]
-        compressed_path = os.path.join(temp_dir, f"{base_name}_compressed_{int(time.time())}.jpg")
-        
-        # Ultra-conservative approach for memory-constrained environments
-        try:
-            # Get basic image info without loading into memory
-            with Image.open(image_path) as img:
-                original_width, original_height = img.size
-                img_mode = img.mode
-                
-            print(f"DEBUG: Original dimensions: {original_width}x{original_height}")
+        @keyframes enhancedFall {
+            0% {
+                transform: translateY(-120px) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(-80px) rotate(36deg) scale(1);
+            }
+            90% {
+                opacity: 0.8;
+                transform: translateY(calc(100vh - 50px)) rotate(324deg) scale(0.9);
+            }
+            100% {
+                transform: translateY(calc(100vh + 120px)) rotate(360deg) scale(0.6);
+                opacity: 0;
+            }
+        }
+
+        /* Floating animation for result display */
+        .result-float {
+            animation: floatIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes floatIn {
+            0% {
+                transform: translateY(60px) scale(0.9);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Main App Container */
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 32px 24px;
+            max-width: 420px;  /* Increased from 380px to accommodate bigger logo */
+            width: 100%;
+            box-shadow: 
+                0 20px 60px rgba(229, 12, 232, 0.15),
+                0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            margin-bottom: 20px;
+        }
+
+        /* Header Styling */
+        .app-header {
+            margin-bottom: 16px;        /* Reduced from 28px */
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 6px;         /* Reduced from 8px */
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .app-subtitle {
+            font-size: 15px;
+            color: #000;
+            font-weight: 500;
+        }
+
+        /* Scanner Icon - MADE BIGGER */
+        .scanner-section {
+            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
+        }
+
+        .scan-icon-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 12px;        /* Reduced from 20px */
+        }
+
+        .scan-icon {
+            width: 380px;        /* INCREASED from 300px to 380px - Much bigger! */
+            height: 380px;       /* INCREASED from 300px to 380px - Much bigger! */
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 20px;
+            filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
+            object-fit: contain;  /* Ensures proper aspect ratio */
+        }
+
+        .scan-icon:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 12px 32px rgba(233, 30, 99, 0.3));
+        }
+
+        .scan-icon:active {
+            transform: scale(0.98);
+        }
+
+        /* Remove Scan Pulse Effect - commented out */
+        /*
+        .scan-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 400px;        /* Adjusted for bigger logo */
+            height: 400px;       /* Adjusted for bigger logo */
+            border: 3px solid rgba(233, 30, 99, 0.3);
+            border-radius: 20px;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+        */
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        /* Trial Status - Updated Colors */
+        .trial-status {
+            background: linear-gradient(135deg, #77ecfe, rgba(119, 236, 254, 0.8));
+            border-radius: 16px;
+            padding: 18px;
+            margin: 24px 0;
+            border: 2px solid #0e4b9e;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trial-status::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .trial-status:hover::before {
+            left: 100%;
+        }
+
+        .trial-status.expired {
+            background: linear-gradient(135deg, rgba(64, 224, 208, 0.3), rgba(0, 206, 209, 0.3)) !important;
+            border-color: #00BFFF !important;
+            color: #2F4F4F !important;
+        }
+
+        .trial-status.expired .trial-title {
+            color: #2F4F4F !important;
+        }
+
+        .trial-status.expired .trial-info {
+            color: #556B7D !important;
+        }
+
+        .trial-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0e4b9e !important;  
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* Modern Scan Button with NEW PINK COLOR */
+        .scan-button {
+            background: linear-gradient(135deg, #e50ce8, #c209c5);  /* CHANGED TO PINK #e50ce8 */
+            color: white;
+            padding: 18px 32px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            margin: 20px 0;
+            box-shadow: 
+                0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED shadow color for pink */
+                0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+            animation: button-pulse 2s infinite;
+        }
+
+        @keyframes button-pulse {
+            0% {
+                box-shadow: 
+                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 0 rgba(229, 12, 232, 0.5);  /* UPDATED for pink */
+            }
+            50% {
+                box-shadow: 
+                    0 8px 24px rgba(229, 12, 232, 0.6),  /* UPDATED for pink */
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 8px rgba(229, 12, 232, 0.2);  /* UPDATED for pink */
+            }
+            100% {
+                box-shadow: 
+                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
+                    0 4px 12px rgba(0, 0, 0, 0.1),
+                    0 0 0 0 rgba(229, 12, 232, 0);  /* UPDATED for pink */
+            }
+        }
+
+        .scan-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .scan-button:hover::before {
+            left: 100%;
+        }
+
+        .scan-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 32px rgba(229, 12, 232, 0.5),  /* UPDATED hover shadow for pink */
+                0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .scan-button:active {
+            transform: translateY(-1px);
+        }
+
+        .scan-button:disabled {
+            background: linear-gradient(135deg, #bdbdbd, #9e9e9e);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Enhanced Loading State */
+        .loading {
+            display: none;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid rgba(233, 30, 99, 0.1);
+            border-top: 4px solid #e91e63;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 16px;
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* Enhanced Results - Mobile First Design */
+        .result {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 420px;
+            margin-top: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.08),
+                0 8px 32px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 16px 20px;
+            border-radius: 12px;
+        }
+
+        .result-header.safe {
+            background: linear-gradient(135deg, #fff8e1, #f0f4c3);
+        }
+
+        .result-header.caution {
+            background: linear-gradient(135deg, #efef0b, rgba(239, 239, 11, 0.8));
+        }
+
+        .result-header.danger {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+        }
+
+        .result-emoji {
+            width: 48px;
+            height: 48px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 12px rgba(64, 64, 64, 0.6));
+            flex-shrink: 0;
+        }
+
+        .result-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0;
+            text-align: left;
+        }
+
+        .result-title.safe { color: #4CAF50; }
+        .result-title.caution { color: #6c02d7; }
+        .result-title.danger { color: #F44336; }
+
+        .ingredients-section {
+            margin-top: 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #000;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .ingredient-category {
+            margin-bottom: 12px;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: left;
+            border-left: 4px solid;
+        }
+
+        .gmo-alert {
+            background: #d7d6d7;
+            border: 2px solid #3801af;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: #3801af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            animation: pulse-alert 2s infinite;
+        }
+
+        @keyframes pulse-alert {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .gmo-alert-icon {
+            font-size: 24px;
+        }
+
+        .category-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .villain-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            object-fit: cover;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .ingredient-list {
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+            color: #000;
+        }
+
+        /* Add "Detected:" before ingredient lists */
+        .ingredient-list::before {
+            content: "Detected: ";
+            font-weight: 700;
+            color: #000;
+        }
+
+        .risky-ingredients {
+            background: rgba(244, 67, 54, 0.08);
+            border-left-color: #f44336;
+        }
+        .risky-ingredients .category-title { color: #EF5350; }
+
+        .moderate-ingredients {
+            background: #d7d6d7;
+            border-left-color: #8400c2;
+        }
+        .moderate-ingredients .category-title { color: #8400c2; }
+
+        .safe-ingredients {
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4CAF50;
+        }
+        .safe-ingredients .category-title { color: #66BB6A; }
+
+        .try-again-message {
+            background: linear-gradient(135deg, #efef0b, rgba(239, 239, 11, 0.8));
+            border: 2px solid #e7e300;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            font-size: 16px;
+            color: #6c02d7;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: #c62828;
+            padding: 18px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 4px solid #f44336;
+            font-weight: 600;
+        }
+
+        /* Hidden Elements */
+        video, canvas, form {
+            display: none;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 480px) {
+            body {
+                padding: 12px 8px;      /* Reduced from 15px 10px */
+            }
             
-            # More aggressive initial sizing for very large images
-            max_dimension = 800  # Increased from 600 for better OCR quality
-            if max(original_width, original_height) > max_dimension:
-                if original_width > original_height:
-                    target_width = max_dimension
-                    target_height = int(original_height * max_dimension / original_width)
-                else:
-                    target_height = max_dimension
-                    target_width = int(original_width * max_dimension / original_height)
-            else:
-                # More aggressive compression for smaller images
-                size_ratio = max_size_kb / current_size_kb
-                dimension_ratio = (size_ratio ** 0.5) * 0.5  # Less aggressive than before
-                
-                target_width = max(int(original_width * dimension_ratio), 400)
-                target_height = max(int(original_height * dimension_ratio), 300)
-            
-            print(f"DEBUG: Target dimensions: {target_width}x{target_height}")
-            
-            # Process with immediate cleanup and moderate quality settings
-            with Image.open(image_path) as img:
-                # Convert mode if needed
-                if img_mode in ('RGBA', 'LA', 'P'):
-                    print(f"DEBUG: Converting from {img_mode} to RGB")
-                    img = img.convert('RGB')
-                
-                # Resize with memory management
-                print(f"DEBUG: Resizing image...")
-                img_resized = img.resize((target_width, target_height), Image.Resampling.LANCZOS)  # Better quality
-                
-                # Force garbage collection after resize
-                log_memory_usage("after resize")
-                
-                # Try moderate quality settings (improved for OCR)
-                for quality in [60, 50, 40, 30, 25, 20]:  # Start higher for better OCR
-                    print(f"DEBUG: Trying quality {quality}...")
-                    try:
-                        img_resized.save(compressed_path, 'JPEG', 
-                                       quality=quality, optimize=True, progressive=False)
-                        
-                        compressed_size_kb = os.path.getsize(compressed_path) / 1024
-                        print(f"DEBUG: Quality {quality}: Size {compressed_size_kb:.1f} KB")
-                        
-                        if compressed_size_kb <= max_size_kb:
-                            print(f"✅ Successfully compressed to {compressed_size_kb:.1f} KB")
-                            # Clean up memory immediately
-                            del img_resized
-                            aggressive_cleanup()
-                            log_memory_usage("after compression success")
-                            return compressed_path
-                    except Exception as e:
-                        print(f"DEBUG: Quality {quality} failed: {e}")
-                        continue
-                
-                # Emergency ultra-compression if still too large
-                print("DEBUG: Still too large, emergency ultra-compression...")
-                emergency_width = min(500, target_width // 2)  # Slightly larger
-                emergency_height = min(400, target_height // 2)  # Slightly larger
-                
-                # Create new smaller image
-                del img_resized  # Free memory first
-                aggressive_cleanup()
-                
-                # Reopen and process with minimal memory
-                with Image.open(image_path) as img_new:
-                    if img_new.mode in ('RGBA', 'LA', 'P'):
-                        img_new = img_new.convert('RGB')
-                    
-                    img_emergency = img_new.resize((emergency_width, emergency_height), Image.Resampling.LANCZOS)
-                    img_emergency.save(compressed_path, 'JPEG', quality=25, optimize=False)  # Slightly better quality
-                    
-                    final_size_kb = os.path.getsize(compressed_path) / 1024
-                    print(f"DEBUG: Emergency compression: {final_size_kb:.1f} KB")
-                    
-                    # Clean up memory
-                    del img_emergency
-                    aggressive_cleanup()
-                    log_memory_usage("after emergency compression")
-                    
-                    return compressed_path
-                
-        except MemoryError as me:
-            print(f"DEBUG: Memory error during compression: {me}")
-            # Ultra-minimal fallback
-            try:
-                aggressive_cleanup()
-                
-                with Image.open(image_path) as img:
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        img = img.convert('RGB')
-                    
-                    # Very small emergency size
-                    img_tiny = img.resize((400, 300), Image.Resampling.NEAREST)  # Slightly larger
-                    img_tiny.save(compressed_path, 'JPEG', quality=15, optimize=False)
-                    
-                    tiny_size_kb = os.path.getsize(compressed_path) / 1024
-                    print(f"DEBUG: Tiny fallback: {tiny_size_kb:.1f} KB")
-                    
-                    del img_tiny
-                    aggressive_cleanup()
-                    return compressed_path
-            except:
-                print("DEBUG: All compression methods failed")
-                aggressive_cleanup()
-                return image_path
-            
-    except Exception as e:
-        print(f"DEBUG: Image compression failed: {e}")
-        aggressive_cleanup()
-        return image_path
-    finally:
-        # Always clean up
-        aggressive_cleanup()
-        log_memory_usage("end of compression")
+            .app-container {
+                padding: 20px 18px;     /* Reduced from 24px 20px */
+                margin: 0 3px 12px 3px; /* Reduced margins */
+                max-width: 390px;       /* Slightly wider for mobile to fit bigger logo */
+            }
 
-def extract_text_with_multiple_methods(image_path):
-    """Extract text using OCR.space API with fallback options"""
-    try:
-        print(f"DEBUG: Starting OCR.space API text extraction from {image_path}")
-        
-        # Force garbage collection before starting
-        gc.collect()
-        
-        # Try OCR.space API first
-        text = extract_text_ocr_space(image_path)
-        
-        if text and len(text.strip()) > 5:
-            print(f"DEBUG: OCR.space successful - extracted {len(text)} characters")
-            return text
-        
-        # If OCR.space fails, try with different settings
-        print("DEBUG: First attempt failed, trying with enhanced settings...")
-        text = extract_text_ocr_space_enhanced(image_path)
-        
-        if text and len(text.strip()) > 5:
-            print(f"DEBUG: OCR.space enhanced successful - extracted {len(text)} characters")
-            return text
-        
-        print("DEBUG: OCR.space failed, trying basic pytesseract fallback...")
-        return extract_text_pytesseract_fallback(image_path)
-        
-    except Exception as e:
-        print(f"DEBUG: All OCR methods failed: {e}")
-        # Force cleanup on error
-        gc.collect()
-        return ""
+            .app-header {
+                margin-bottom: 12px;    /* Reduced from default */
+            }
 
-def extract_text_ocr_space(image_path):
-    """Extract text using OCR.space API - with aggressive memory management"""
-    log_memory_usage("start OCR")
-    
-    try:
-        # Force garbage collection before starting
-        aggressive_cleanup()
+            .scanner-section {
+                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
+            }
+
+            .logo-text {
+                font-size: 42px;
+            }
+
+            .scan-icon {
+                width: 340px;        /* BIGGER on mobile too - increased from 270px */
+                height: 340px;       /* BIGGER on mobile too - increased from 270px */
+            }
+
+            .scan-pulse {
+                width: 360px;        /* Adjusted for mobile bigger logo */
+                height: 360px;       /* Adjusted for mobile bigger logo */
+            }
+
+            .emoji {
+                width: 35px;
+                height: 35px;
+            }
+
+            .result {
+                margin-top: 20px;
+                padding: 24px 20px;
+            }
+
+            .result-emoji {
+                width: 48px;
+                height: 48px;
+            }
+
+            .result-title {
+                font-size: 20px;
+            }
+        }
+
+        /* Extra small mobile devices */
+        @media (max-width: 360px) {
+            .app-container {
+                max-width: 350px;
+                padding: 18px 15px;
+            }
+            
+            .scan-icon {
+                width: 310px;        /* Slightly smaller for very small screens */
+                height: 310px;       /* Slightly smaller for very small screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Enhanced Emoji Shower Container -->
+    <div class="emoji-shower" id="emojiShower"></div>
+
+    <div class="app-container">
+        <!-- Modern Header -->
+        <div class="app-header">
+            <div class="app-logo">
+                <div class="logo-text">FOOD FIXR</div>
+            </div>
+            <div class="app-subtitle">Smart Ingredient Scanner</div>
+        </div>
+
+        <!-- Scanner Section -->
+        <div class="scanner-section">
+            <div class="scan-icon-container">
+                <!-- Removed the scan-pulse div -->
+                <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
+            </div>
+        </div>
+
+        <!-- Enhanced Trial Status -->
+        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
+            <div class="trial-title" id="trialTitle">
+                {% if session.get('is_premium') %}
+                    💎 Premium Active
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                    🔒 Trial Expired
+                {% else %}
+                    🎉 Free Trial Active
+                {% endif %}
+            </div>
+            {% if not session.get('is_premium') %}
+            <div class="trial-info">
+                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
+                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Error Message -->
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Enhanced Scan Button with NEW PINK COLOR -->
+        <button class="scan-button" id="scanButton" onclick="handleScanClick()">
+            {% if session.get('is_premium') %}
+                📸 START HERE
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO CONTINUE
+            {% else %}
+                📸 START HERE ({{ 10 - session.get('scans_used', 0) }} left)
+            {% endif %}
+        </button>
+
+        <!-- Enhanced Loading State -->
+        <div class="loading" id="loadingState">
+            <div class="spinner"></div>
+            <div class="loading-text">🔬 Analyzing ingredients...</div>
+        </div>
+    </div>
+
+    <!-- Hidden Forms -->
+    <form id="uploadForm" method="post" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="image" accept="image/*" capture="environment" onchange="handleFileSelected()" />
+    </form>
+
+    <form id="scanForm" method="post" enctype="multipart/form-data">
+        <input id="hiddenImage" type="file" name="image" />
+    </form>
+
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="snapshot"></canvas>
+
+    <!-- Enhanced Results -->
+    {% if result %}
+    <div class="result result-float">
+        {% if "Danger" in result.rating %}
+        <div class="result-header danger">
+            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+            <h2 class="result-title danger">Oh NOOOO! Danger!</h2>
+        </div>
+        {% elif "Proceed" in result.rating %}
+        <div class="result-header caution">
+            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+            <h2 class="result-title caution">Proceed carefully</h2>
+        </div>
+        {% elif "TRY AGAIN" in result.rating %}
+        <div class="result-header caution">
+            <h2 class="result-title caution">↪️ TRY AGAIN</h2>
+        </div>
+        {% else %}
+        <div class="result-header safe">
+            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+            <h2 class="result-title safe">Yay! Safe!</h2>
+        </div>
+        {% endif %}
+
+        {% if "TRY AGAIN" not in result.rating %}
         
-        # Compress image with moderate limit
-        processed_image_path = compress_image_for_ocr(image_path, max_size_kb=150)
+        <!-- Show GMO Alert even for Safe products if GMO ingredients are detected -->
+        {% if result.matched_ingredients.gmo %}
+        <div class="gmo-alert">
+            <span>☠️Toxin alert! Looks like there are some if-y players to be aware of.</span>
+        </div>
+        {% endif %}
+
+        {% if "Safe" not in result.rating %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+
+            {% if result.matched_ingredients.trans_fat %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">
+                    <img src="/static/Trans Fats.png" class="villain-icon" alt="Trans Fat Villain" />
+                    Trans Fats : Contribute to heart disease, diabetes, stroke, brain decline, infertility and even some types of cancer.
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.trans_fat | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.excitotoxins %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">
+                    <img src="/static/Excitotoxins.jpg" class="villain-icon" alt="Excitotoxins Villain" />
+                    Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer's, Parkinsosn's) and ADHD.
+
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.excitotoxins | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.corn %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/Corn.jpg" class="villain-icon" alt="Corn Villain" />
+                   Corn :  Exponentially increases inflammation, pain, and gut damage.
+                   
+
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.corn | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.sugar %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/Sugar.jpg" class="villain-icon" alt="Sugar Villain" />
+                    Sugar : In excess can increase pain, cause diabetes, and make the body acidic.
         
-        # Force garbage collection after compression
-        aggressive_cleanup()
-        
-        api_url = 'https://api.ocr.space/parse/image'
-        api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
-        
-        print(f"DEBUG: Using image: {processed_image_path}")
-        print(f"DEBUG: Final file size: {os.path.getsize(processed_image_path)/1024:.1f} KB")
-        
-        # Use context manager for file handling with longer timeout
-        response = None
-        try:
-            with open(processed_image_path, 'rb') as f:
-                files = {'file': f}
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.sugar_safe %}
+            <div class="ingredient-category safe-ingredients">
+                <div class="category-title">✅ Safe Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar_safe | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.gmo %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
+                    GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
+                    
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <!-- For Safe products, only show detected GMO ingredients if any -->
+        {% if result.matched_ingredients.gmo %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
+                    GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        {% else %}
+        <div class="try-again-message">
+            Couldn't read ingredients clearly. Try better lighting and hold steady.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <script>
+        // Global variables
+        let scansUsed = {{ session.get('scans_used', 0) }};
+        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
+        let trialExpired = {{ 'true' if trial_expired else 'false' }};
+
+        // Enhanced Emoji Shower System
+        const emojiShower = {
+            container: null,
+            isActive: false,
+            emojiImages: {
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png'
+            },
+
+            init() {
+                this.container = document.getElementById('emojiShower');
+            },
+
+            start(type, duration = 4000) {
+                if (!type || this.isActive) return;
                 
-                data = {
-                    'apikey': api_key,
-                    'language': 'eng',
-                    'isOverlayRequired': False,
-                    'detectOrientation': True,
-                    'scale': True,
-                    'OCREngine': 2,
-                    'isTable': False
+                this.isActive = true;
+                const emojiImage = this.emojiImages[type];
+                
+                if (!emojiImage) {
+                    this.isActive = false;
+                    return;
                 }
                 
-                print("DEBUG: Sending compressed image to OCR.space API...")
+                console.log(`🎊 Starting enhanced ${type} emoji shower`);
                 
-                # Longer timeout to prevent timeout errors
-                response = requests.post(api_url, files=files, data=data, timeout=30)
-                
-                log_memory_usage("after API call")
-        
-        except Exception as e:
-            print(f"DEBUG: OCR API call failed: {e}")
-            return ""
-        finally:
-            # Clean up compressed file immediately - even if API fails
-            if processed_image_path != image_path:
-                try:
-                    os.remove(processed_image_path)
-                    print("DEBUG: Cleaned up compressed image file")
-                except:
-                    pass
-            
-            # Force garbage collection after API call
-            aggressive_cleanup()
-            log_memory_usage("after cleanup")
-        
-        if response and response.status_code == 200:
-            result = response.json()
-            extracted_text = parse_ocr_space_response(result)
-            
-            # Clear response object
-            del response
-            aggressive_cleanup()
-            
-            return extracted_text
-        else:
-            if response:
-                print(f"DEBUG: OCR.space API returned status {response.status_code}")
-                # Try to get error details
-                try:
-                    error_data = response.json()
-                    print(f"DEBUG: API Error details: {error_data}")
-                except:
-                    print(f"DEBUG: Response text: {response.text[:200]}")
-            return ""
-            
-    except Exception as e:
-        print(f"DEBUG: OCR.space method failed: {e}")
-        # Force cleanup on error
-        aggressive_cleanup()
-        return ""
-    finally:
-        # Always clean up
-        aggressive_cleanup()
-        log_memory_usage("end OCR")
+                // More frequent emoji creation for denser shower
+                const interval = setInterval(() => {
+                    this.createEmoji(emojiImage);
+                }, 200); // Faster creation rate
 
-def extract_text_ocr_space_enhanced(image_path):
-    """Extract text using OCR.space API - enhanced settings with aggressive memory management"""
-    try:
-        # Force garbage collection
-        gc.collect()
-        
-        # Compress image with moderate limit
-        processed_image_path = compress_image_for_ocr(image_path, max_size_kb=150)
-        
-        # Force garbage collection
-        gc.collect()
-        
-        api_url = 'https://api.ocr.space/parse/image'
-        api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
-        
-        try:
-            with open(processed_image_path, 'rb') as f:
-                files = {'file': f}
+                // Also create bursts of emojis
+                let burstCount = 0;
+                const burstInterval = setInterval(() => {
+                    if (burstCount >= 3) {
+                        clearInterval(burstInterval);
+                        return;
+                    }
+                    
+                    // Create burst of 3-5 emojis
+                    for (let i = 0; i < 3 + Math.random() * 3; i++) {
+                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
+                    }
+                    burstCount++;
+                }, 1000);
+
+                // Stop after duration
+                setTimeout(() => {
+                    clearInterval(interval);
+                    clearInterval(burstInterval);
+                    this.isActive = false;
+                    
+                    // Clean up after additional 6 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 6000);
+                }, duration);
+            },
+
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
+                emoji.className = 'emoji';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
                 
-                # Enhanced settings for challenging images
-                data = {
-                    'apikey': api_key,
-                    'language': 'eng',
-                    'isOverlayRequired': False,
-                    'detectOrientation': True,
-                    'scale': True,
-                    'OCREngine': 1,  # Try engine 1 for difficult images
-                    'isTable': True,  # Sometimes helps with structured text
-                    'isSearchablePdfHideTextLayer': False
+                // More varied horizontal positions
+                emoji.style.left = (Math.random() * 120 - 10) + '%';
+                
+                // Varied animation duration (3-7 seconds)
+                const duration = 3 + Math.random() * 4;
+                emoji.style.animationDuration = duration + 's';
+                
+                // Enhanced horizontal drift
+                const drift = (Math.random() - 0.5) * 300;
+                emoji.style.setProperty('--drift', drift + 'px');
+                
+                // More size variety (35-55px)
+                const size = 35 + Math.random() * 20;
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
+                // Random delay for staggered effect
+                const delay = Math.random() * 1000;
+                emoji.style.animationDelay = delay + 'ms';
+                
+                this.container.appendChild(emoji);
+                
+                // Remove emoji after animation completes
+                setTimeout(() => {
+                    if (emoji.parentNode) {
+                        emoji.parentNode.removeChild(emoji);
+                    }
+                }, (duration * 1000) + delay + 1000);
+            },
+
+            cleanup() {
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
                 }
-                
-                print("DEBUG: Sending compressed image to OCR.space API (enhanced)...")
-                response = requests.post(api_url, files=files, data=data, timeout=30)  # Longer timeout
-        
-        except Exception as e:
-            print(f"DEBUG: Enhanced OCR API call failed: {e}")
-            return ""
-        finally:
-            # Clean up compressed file immediately
-            if processed_image_path != image_path:
-                try:
-                    os.remove(processed_image_path)
-                    print("DEBUG: Cleaned up compressed image file")
-                except:
-                    pass
+                console.log('🧹 Enhanced emoji shower cleaned up');
+            }
+        };
+
+        // Initialize emoji shower on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            emojiShower.init();
             
-            # Force garbage collection
-            gc.collect()
-        
-        if response.status_code == 200:
-            result = response.json()
-            return parse_ocr_space_response(result)
-        else:
-            print(f"DEBUG: OCR.space enhanced API returned status {response.status_code}")
-            try:
-                error_data = response.json()
-                print(f"DEBUG: Enhanced API Error details: {error_data}")
-            except:
-                print(f"DEBUG: Enhanced Response text: {response.text[:200]}")
-            return ""
-            
-    except Exception as e:
-        print(f"DEBUG: OCR.space enhanced method failed: {e}")
-        # Force cleanup on error
-        gc.collect()
-        return ""
+            // Trigger enhanced emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 5000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 4000);
+                {% elif "Safe" in result.rating %}
+                emojiShower.start('safe', 4500);
+                {% endif %}
+            }, 400);
+            {% endif %}
+        });
+           
+        function handleScanClick() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
 
-# Add at the very beginning of your main request handler
-def cleanup_before_request():
-    """Clean up memory before processing each request"""
-    try:
-        log_memory_usage("before request")
-        aggressive_cleanup()
-        
-        # Clear any temporary files older than 5 minutes
-        temp_dir = tempfile.gettempdir()
-        current_time = time.time()
-        
-        for filename in os.listdir(temp_dir):
-            if filename.endswith('_compressed.jpg') or 'compressed' in filename:
-                filepath = os.path.join(temp_dir, filename)
-                try:
-                    if os.path.isfile(filepath):
-                        file_age = current_time - os.path.getmtime(filepath)
-                        if file_age > 300:  # 5 minutes
-                            os.remove(filepath)
-                            print(f"DEBUG: Cleaned up old temp file: {filename}")
-                except:
-                    pass
-        
-        log_memory_usage("after request cleanup")
-        print("DEBUG: Pre-request cleanup completed")
-        
-    except Exception as e:
-        print(f"DEBUG: Pre-request cleanup error: {e}")
-
-# This function should be called from your main app.py file
-def before_request_cleanup():
-    """Run cleanup before each request - call this from your main Flask app"""
-    cleanup_before_request()
-
-def process_image_with_memory_management(image_path):
-    """Main image processing function with comprehensive memory management"""
-    log_memory_usage("start processing")
-    
-    try:
-        # Clean up before starting
-        aggressive_cleanup()
-        
-        # Extract text with multiple fallback methods
-        extracted_text = ""
-        
-        # Try OCR.space first (most memory efficient)
-        print("DEBUG: Attempting OCR.space extraction...")
-        extracted_text = extract_text_ocr_space(image_path)
-        
-        if not extracted_text or len(extracted_text.strip()) < 10:
-            print("DEBUG: OCR.space failed, trying enhanced method...")
-            aggressive_cleanup()  # Clean up before trying again
-            extracted_text = extract_text_ocr_space_enhanced(image_path)
-        
-        if not extracted_text or len(extracted_text.strip()) < 5:
-            print("DEBUG: All OCR methods failed")
-            return None
-        
-        log_memory_usage("after OCR")
-        
-        # Process the extracted text
-        result = analyze_ingredients(extracted_text)
-        
-        # Clean up after processing
-        aggressive_cleanup()
-        log_memory_usage("end processing")
-        
-        return result
-        
-    except Exception as e:
-        print(f"DEBUG: Error in image processing: {e}")
-        aggressive_cleanup()
-        return None
-    finally:
-        # Always clean up
-        aggressive_cleanup()
-        
-        # Final temp file cleanup
-        try:
-            if image_path and os.path.exists(image_path):
-                os.remove(image_path)
-                print("DEBUG: Cleaned up original uploaded file")
-        except:
-            pass
-
-def parse_ocr_space_response(result):
-    """Parse OCR.space API response with better error handling"""
-    try:
-        print(f"DEBUG: OCR.space response keys: {list(result.keys())}")
-        
-        if result.get('IsErroredOnProcessing', True):
-            error_messages = result.get('ErrorMessage', ['Unknown error'])
-            if isinstance(error_messages, list):
-                error_msg = ', '.join(error_messages)
-            else:
-                error_msg = str(error_messages)
-            print(f"DEBUG: OCR.space processing error: {error_msg}")
-            return ""
-        
-        parsed_results = result.get('ParsedResults', [])
-        if not parsed_results:
-            print("DEBUG: OCR.space returned no parsed results")
-            return ""
-        
-        # Get text from first result
-        first_result = parsed_results[0]
-        print(f"DEBUG: First result keys: {list(first_result.keys())}")
-        
-        extracted_text = first_result.get('ParsedText', '')
-        
-        if extracted_text and len(extracted_text.strip()) > 0:
-            # Clean up the text
-            cleaned_text = extracted_text.replace('\r', ' ').replace('\n', ' ')
-            cleaned_text = ' '.join(cleaned_text.split())  # Remove extra whitespace
-            
-            print(f"DEBUG: OCR.space extracted {len(cleaned_text)} characters")
-            print(f"DEBUG: Raw text preview: {cleaned_text[:300]}...")
-            return cleaned_text
-        else:
-            print("DEBUG: OCR.space returned empty text")
-            # Check if there's an error in the parsed result
-            if 'ErrorMessage' in first_result:
-                print(f"DEBUG: ParsedResult error: {first_result['ErrorMessage']}")
-            return ""
-            
-    except Exception as e:
-        print(f"DEBUG: Error parsing OCR.space response: {e}")
-        print(f"DEBUG: Raw response: {result}")
-        return ""
-
-def extract_text_pytesseract_fallback(image_path):
-    """Fallback to pytesseract if available"""
-    try:
-        print("DEBUG: Attempting pytesseract fallback...")
-        import pytesseract
-        from PIL import Image
-        
-        # Force garbage collection before loading image
-        gc.collect()
-        
-        image = Image.open(image_path)
-        
-        # Simple preprocessing
-        if image.mode != 'L':
-            image = image.convert('L')
-            
-        # Try basic OCR
-        text = pytesseract.image_to_string(image, config='--psm 6')
-        
-        # Clean up image from memory
-        del image
-        gc.collect()
-        
-        if text and len(text.strip()) > 0:
-            print(f"DEBUG: Pytesseract fallback worked: {len(text)} chars")
-            return text.strip()
-        else:
-            print("DEBUG: Pytesseract fallback returned empty")
-            return ""
-            
-    except ImportError:
-        print("DEBUG: Pytesseract not available")
-        return ""
-    except Exception as e:
-        print(f"DEBUG: Pytesseract fallback failed: {e}")
-        # Force cleanup on error
-        gc.collect()
-        return ""
-
-def normalize_ingredient_text(text):
-    """CONSERVATIVE text normalization - only fix obvious OCR errors"""
-    if not text:
-        return ""
-    
-    # Convert to lowercase and basic cleanup
-    text = text.lower().strip()
-    
-    # Remove excessive whitespace and newlines
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Remove common OCR artifacts but be conservative
-    text = re.sub(r'[^\w\s\-\(\),.]', ' ', text)
-    
-    # ONLY fix the most obvious OCR errors - be very conservative
-    obvious_corrections = {
-        # Only fix clear number-to-letter mistakes that are obvious
-        'rn': 'm',  # common OCR error
-        'cornsynup': 'corn syrup',  # specific known error
-        'com syrup': 'corn syrup',  # specific known error
-        'hfc5': 'hfcs',  # specific known error
-        'naturalflavors': 'natural flavors',  # compound word fix
-        'naturalflavor': 'natural flavor',  # compound word fix
-        'soylecithin': 'soy lecithin',  # compound word fix
-        'monosodiumglutamate': 'monosodium glutamate',  # compound word fix
-        'highfructose': 'high fructose',  # compound word fix
-        'vegetableoil': 'vegetable oil',  # compound word fix
-    }
-    
-    # Apply only obvious corrections
-    for wrong, correct in obvious_corrections.items():
-        text = text.replace(wrong, correct)
-    
-    return text
-
-def precise_ingredient_matching(text, ingredient_list, category_name=""):
-    """MUCH MORE PRECISE matching - avoid false positives"""
-    matches = []
-    normalized_text = normalize_ingredient_text(text)
-    
-    print(f"DEBUG: Searching for {category_name} ingredients in normalized text")
-    print(f"DEBUG: Text preview: {normalized_text[:200]}...")
-    
-    for ingredient in ingredient_list:
-        normalized_ingredient = normalize_ingredient_text(ingredient)
-        
-        if len(normalized_ingredient) < 2:
-            continue
-        
-        # Strategy 1: EXACT word boundary match (most reliable)
-        pattern = r'\b' + re.escape(normalized_ingredient) + r'\b'
-        if re.search(pattern, normalized_text):
-            matches.append(ingredient)
-            print(f"DEBUG: ✅ EXACT WORD MATCH: '{normalized_ingredient}' -> '{ingredient}'")
-            continue
-        
-        # Strategy 2: For multi-word ingredients, check if ALL words are present nearby
-        if ' ' in normalized_ingredient:
-            words = normalized_ingredient.split()
-            if len(words) >= 2:
-                # ALL words must be found within 50 characters of each other
-                all_word_positions = []
-                all_words_found = True
-                
-                for word in words:
-                    if len(word) <= 2:  # Skip very short words
-                        continue
-                    word_pattern = r'\b' + re.escape(word) + r'\b'
-                    matches_found = list(re.finditer(word_pattern, normalized_text))
-                    if matches_found:
-                        all_word_positions.extend([m.start() for m in matches_found])
-                    else:
-                        all_words_found = False
-                        break
-                
-                if all_words_found and all_word_positions:
-                    # Check if words are reasonably close together (within 50 chars)
-                    min_pos = min(all_word_positions)
-                    max_pos = max(all_word_positions)
-                    if max_pos - min_pos <= 50:
-                        matches.append(ingredient)
-                        print(f"DEBUG: ✅ MULTI-WORD MATCH: '{normalized_ingredient}' -> '{ingredient}'")
-                        continue
-        
-        # Strategy 3: For single critical ingredients only, allow partial matching
-        # But ONLY for ingredients longer than 5 characters to avoid false positives
-        if (' ' not in normalized_ingredient and 
-            len(normalized_ingredient) > 5 and
-            normalized_ingredient in normalized_text):
-            
-            # Double-check this isn't a substring of a larger word
-            # Find all occurrences and check word boundaries
-            for match in re.finditer(re.escape(normalized_ingredient), normalized_text):
-                start, end = match.span()
-                
-                # Check characters before and after
-                char_before = normalized_text[start-1] if start > 0 else ' '
-                char_after = normalized_text[end] if end < len(normalized_text) else ' '
-                
-                # Only match if surrounded by non-letter characters
-                if not char_before.isalpha() and not char_after.isalpha():
-                    matches.append(ingredient)
-                    print(f"DEBUG: ✅ PARTIAL MATCH: '{normalized_ingredient}' -> '{ingredient}'")
-                    break
-    
-    unique_matches = list(set(matches))
-    print(f"DEBUG: {category_name} category found {len(unique_matches)} matches: {unique_matches}")
-    return unique_matches
-
-def assess_text_quality_enhanced(text):
-    """Enhanced text quality assessment"""
-    if not text or len(text.strip()) < 1:
-        return "very_poor"
-    
-    # Count meaningful words (2+ chars, mostly letters)
-    words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
-    
-    # Count ingredient-like words
-    ingredient_words = []
-    common_food_words = ['oil', 'sugar', 'salt', 'water', 'acid', 'flavor', 'protein', 
-                        'extract', 'syrup', 'starch', 'lecithin', 'natural', 'modified']
-    
-    for word in words:
-        if any(food_word in word.lower() for food_word in common_food_words):
-            ingredient_words.append(word)
-    
-    print(f"DEBUG: Text quality assessment - Total words: {len(words)}, Ingredient words: {len(ingredient_words)}")
-    
-    if len(words) < 2:
-        return "very_poor"
-    elif len(words) < 5 and len(ingredient_words) < 1:
-        return "poor"
-    elif len(ingredient_words) >= 1 or len(words) >= 10:
-        return "good"
-    else:
-        return "fair"
-
-def match_all_ingredients(text):
-    """Enhanced ingredient matching with precise categories"""
-    if not text:
-        print("DEBUG: No text provided for ingredient matching")
-        return {
-            "trans_fat": [],
-            "excitotoxins": [],
-            "corn": [],
-            "sugar": [],
-            "sugar_safe": [],
-            "gmo": [],
-            "all_detected": []
+            triggerScanner();
         }
-    
-    print(f"DEBUG: Matching ingredients in text of {len(text)} characters")
-    print(f"DEBUG: Text sample: {text[:200]}...")
-    
-    # Match each category using PRECISE matching
-    trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
-    excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
-    corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
-    sugar_high_matches = precise_ingredient_matching(text, sugar_high_risk, "High Risk Sugar")
-    sugar_safe_matches = precise_ingredient_matching(text, sugar_safe, "Safe Sugar")
-    gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
-    
-    # Combine all detected ingredients
-    all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
-                           sugar_high_matches + sugar_safe_matches + gmo_matches))
-    
-    result = {
-        "trans_fat": list(set(trans_fat_matches)),
-        "excitotoxins": list(set(excitotoxin_matches)),
-        "corn": list(set(corn_matches)),
-        "sugar": list(set(sugar_high_matches)),
-        "sugar_safe": list(set(sugar_safe_matches)),
-        "gmo": list(set(gmo_matches)),
-        "all_detected": all_detected
-    }
-    
-    print(f"DEBUG: PRECISE INGREDIENT MATCHING RESULTS:")
-    for category, ingredients in result.items():
-        if ingredients:
-            print(f"  ✅ {category}: {ingredients}")
-        else:
-            print(f"  ❌ {category}: No matches")
-    
-    return result
 
-def rate_ingredients_according_to_hierarchy(matches, text_quality):
-    """
-    Rating system following EXACT hierarchy rules from document:
-    
-    1. HIGH RISK TRANS FATS - ANY ONE = immediate danger
-    2. HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
-    3. Count ALL other problematic ingredients (moderate trans fats, moderate excitotoxins, corn, sugar)
-    4. If total count >= 3 = danger, if >= 1 = proceed carefully
-    """
-    
-    print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
-    
-    # If text quality is very poor, suggest trying again
-    if text_quality == "very_poor":
-        return "↪️ TRY AGAIN"
-    
-    # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
-    high_risk_trans_fat_found = []
-    for ingredient in matches["trans_fat"]:
-        # Check against high risk trans fat list from scanner_config
-        for high_risk_item in trans_fat_high_risk:
-            if high_risk_item.lower() in ingredient.lower():
-                high_risk_trans_fat_found.append(ingredient)
-                print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
-                return "🚨 Oh NOOOO! Danger!"
-    
-    # RULE 2: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
-    high_risk_excitotoxin_found = []
-    for ingredient in matches["excitotoxins"]:
-        # Check against high risk excitotoxin list from scanner_config
-        for high_risk_item in excitotoxin_high_risk:
-            if high_risk_item.lower() in ingredient.lower():
-                high_risk_excitotoxin_found.append(ingredient)
-                print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
-                return "🚨 Oh NOOOO! Danger!"
-    
-    # RULE 3: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
-    total_problematic_count = 0
-    
-    # Count moderate trans fats (not already counted as high risk)
-    moderate_trans_fat_count = 0
-    for ingredient in matches["trans_fat"]:
-        if ingredient not in high_risk_trans_fat_found:
-            # Check if it's a moderate risk trans fat
-            for moderate_item in trans_fat_moderate_risk:
-                if moderate_item.lower() in ingredient.lower():
-                    moderate_trans_fat_count += 1
-                    print(f"⚠️ Moderate trans fat counted: {ingredient}")
-                    break
-    
-    # Count moderate excitotoxins (not already counted as high risk)  
-    moderate_excitotoxin_count = 0
-    for ingredient in matches["excitotoxins"]:
-        if ingredient not in high_risk_excitotoxin_found:
-            # Check if it's a moderate risk excitotoxin
-            for moderate_item in excitotoxin_moderate_risk:
-                if moderate_item.lower() in ingredient.lower():
-                    moderate_excitotoxin_count += 1
-                    print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
-                    break
-            # Also check low risk excitotoxins
-            for low_item in excitotoxin_low_risk:
-                if low_item.lower() in ingredient.lower():
-                    moderate_excitotoxin_count += 1
-                    print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
-                    break
-    
-    # Count ALL corn ingredients (as per document: all corn counts)
-    corn_count = len(matches["corn"])
-    
-    # Count ALL sugar ingredients (only high risk sugars count as problematic)  
-    sugar_count = len(matches["sugar"])  # Only high risk sugars
-    
-    # Calculate total problematic count
-    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
-    
-    print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
-    print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
-    print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
-    print(f"   - Corn ingredients: {corn_count}")
-    print(f"   - Sugar ingredients: {sugar_count}")
-    
-    # RULE 4: Apply hierarchy rules per document
-    # "Per category: if 1-2 stays Proceed Carefully, if 3-4 in food = Oh NOOO! Danger!"
-    if total_problematic_count >= 3:
-        return "🚨 Oh NOOOO! Danger!"
-    elif total_problematic_count >= 1:
-        return "⚠️ Proceed carefully"
-    
-    # If some ingredients detected but no problematic ones
-    if len(matches["all_detected"]) > 0:
-        return "✅ Yay! Safe!"
-    
-    # If poor text quality and no ingredients detected
-    if text_quality in ["poor", "fair"]:
-        return "↪️ TRY AGAIN"
-    
-    return "✅ Yay! Safe!"
-
-def scan_image_for_ingredients(image_path):
-    """Main scanning function with memory management"""
-    try:
-        # Force garbage collection at start
-        gc.collect()
-        
-        print(f"\n{'='*80}")
-        print(f"🔬 STARTING MEMORY-EFFICIENT SCAN: {image_path}")
-        print(f"{'='*80}")
-        print(f"DEBUG: File exists: {os.path.exists(image_path)}")
-        
-        # Extract text using OCR.space
-        print("🔍 Starting OCR.space text extraction...")
-        text = extract_text_with_multiple_methods(image_path)
-        print(f"📝 Extracted text length: {len(text)} characters")
-        
-        if text:
-            print(f"📋 EXTRACTED TEXT:\n{text}")
-        else:
-            print("❌ No text extracted!")
-        
-        # Assess text quality
-        text_quality = assess_text_quality_enhanced(text)
-        print(f"📊 Text quality assessment: {text_quality}")
-        
-        # Match ingredients using PRECISE system
-        print("🧬 Starting PRECISE ingredient matching...")
-        matches = match_all_ingredients(text)
-        
-        # Rate ingredients according to hierarchy
-        print("⚖️ Applying hierarchy-based rating...")
-        rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
-        print(f"🏆 Final rating: {rating}")
-        
-        # Determine confidence
-        confidence = determine_confidence(text_quality, text, matches)
-        
-        # Check for GMO Alert
-        gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
-        
-        # Create comprehensive result
-        result = {
-            "rating": rating,
-            "matched_ingredients": matches,
-            "confidence": confidence,
-            "extracted_text_length": len(text),
-            "text_quality": text_quality,
-            "extracted_text": text,
-            "gmo_alert": gmo_alert
+        function triggerScanner() {
+            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+            
+            if (isPhone) {
+                document.getElementById("fileInput").click();
+            } else {
+                startWebcam();
+            }
         }
-        
-        # Print comprehensive summary
-        print_scan_summary(result)
-        
-        # Force final cleanup
-        gc.collect()
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Force cleanup on error
-        gc.collect()
-        
-        return create_error_result(str(e))
 
-def determine_confidence(text_quality, text, matches):
-    """Determine confidence level based on multiple factors"""
-    if text_quality == "very_poor":
-        return "very_low"
-    elif text_quality == "poor":
-        return "low"
-    elif text_quality == "fair":
-        return "medium"
-    elif len(text) > 50 and len(matches["all_detected"]) > 0:
-        return "high"
-    elif len(text) > 20:
-        return "medium"
-    else:
-        return "low"
+        // Update the handleFileSelected function
+        function handleFileSelected() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
 
-def create_error_result(error_message):
-    """Create standardized error result"""
-    return {
-        "rating": "↪️ TRY AGAIN",
-        "matched_ingredients": {
-            "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": []
-        },
-        "confidence": "very_low",
-        "text_quality": "very_poor",
-        "extracted_text_length": 0,
-        "gmo_alert": None,
-        "error": error_message
-    }
+            showLoading();
+            scansUsed++;
+            updateScanCount();
+            document.getElementById('uploadForm').submit();
+        }
 
-def print_scan_summary(result):
-    """Print comprehensive scan summary"""
-    print(f"\n{'🎯 SCAN SUMMARY':=^80}")
-    print(f"🏆 FINAL RATING: {result['rating']}")
-    print(f"🎯 Confidence: {result['confidence']}")
-    print(f"📊 Text Quality: {result['text_quality']}")
-    print(f"📝 Text Length: {result['extracted_text_length']} characters")
-    
-    if result['gmo_alert']:
-        print(f"📣 {result['gmo_alert']}")
-    
-    print(f"\n🧬 DETECTED INGREDIENTS BY CATEGORY:")
-    for category, ingredients in result['matched_ingredients'].items():
-        if ingredients:
-            emoji = get_category_emoji(category)
-            print(f"  {emoji} {category.replace('_', ' ').title()}: {ingredients}")
-        else:
-            print(f"  ❌ {category.replace('_', ' ').title()}: None detected")
-    
-    total_detected = len(result['matched_ingredients']['all_detected'])
-    print(f"\n📊 TOTAL UNIQUE INGREDIENTS DETECTED: {total_detected}")
-    print(f"{'='*80}\n")
+        function startWebcam() {
+            const video = document.getElementById("webcam");
+            video.style.display = "block";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    setTimeout(() => capturePhoto(), 2000);
+                })
+                .catch(function(err) {
+                    console.error("Camera error:", err);
+                    alert("📷 Camera access denied. Please use file upload.");
+                    video.style.display = "none";
+                });
+        }
 
-def get_category_emoji(category):
-    """Get emoji for ingredient category"""
-    emoji_map = {
-        'trans_fat': '🚫',
-        'excitotoxins': '⚠️',
-        'corn': '🌽',
-        'sugar': '🍯',
-        'sugar_safe': '✅',
-        'gmo': '👽',
-        'all_detected': '📋'
-    }
-    return emoji_map.get(category, '📝')
+        // Update the capturePhoto function
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    // Redirect to upgrade page instead of showing alert
+                    window.location.href = '/upgrade';
+                    return;
+                }
 
-# Additional utility function for backwards compatibility
-def analyze_ingredients(text):
-    """Wrapper function for backwards compatibility"""
-    return match_all_ingredients(text)
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('scanButton').style.display = 'none';
+        }
+
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = false; // Make sure button is clickable for upgrade
+            }
+        }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 600);
+            }
+        });
+        
+        // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanButton = document.getElementById('scanButton');
+            
+            // Update the button to be clickable even when trial expires
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.style.cursor = 'pointer';
+            }
+        });
+    </script>
+</body>
+</html>
