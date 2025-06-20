@@ -241,9 +241,9 @@
             gap: 8px;
         }
 
-        /* Modern Scan Button with Pulse Animation */
+        /* Modern Scan Button with NEW PINK COLOR */
         .scan-button {
-            background: linear-gradient(135deg, #e50ce8, #ad1457);
+            background: linear-gradient(135deg, #e50ce8, #c209c5);  /* CHANGED TO PINK #e50ce8 */
             color: white;
             padding: 18px 32px;
             border: none;
@@ -254,7 +254,7 @@
             width: 100%;
             margin: 20px 0;
             box-shadow: 
-                0 8px 24px rgba(229, 12, 232, 0.4),
+                0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED shadow color for pink */
                 0 4px 12px rgba(0, 0, 0, 0.1);
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             position: relative;
@@ -265,21 +265,21 @@
         @keyframes button-pulse {
             0% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.4),
+                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 0 rgba(229, 12, 232, 0.5);
+                    0 0 0 0 rgba(229, 12, 232, 0.5);  /* UPDATED for pink */
             }
             50% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.6),
+                    0 8px 24px rgba(229, 12, 232, 0.6),  /* UPDATED for pink */
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 8px rgba(229, 12, 232, 0.2);
+                    0 0 0 8px rgba(229, 12, 232, 0.2);  /* UPDATED for pink */
             }
             100% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.4),
+                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 0 rgba(229, 12, 232, 0);
+                    0 0 0 0 rgba(229, 12, 232, 0);  /* UPDATED for pink */
             }
         }
 
@@ -301,7 +301,7 @@
         .scan-button:hover {
             transform: translateY(-3px);
             box-shadow: 
-                0 12px 32px rgba(229, 12, 232, 0.5),
+                0 12px 32px rgba(229, 12, 232, 0.5),  /* UPDATED hover shadow for pink */
                 0 6px 16px rgba(0, 0, 0, 0.15);
         }
 
@@ -598,25 +598,46 @@
         <!-- Scanner Section -->
         <div class="scanner-section">
             <div class="scan-icon-container">
-                <!-- Demo button since we can't access the actual image -->
-                <div style="width: 380px; height: 380px; background: linear-gradient(135deg, #e91e63, #9c27b0); border-radius: 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;" onclick="handleScanClick()">📸<br>SCANNER</div>
+                <!-- Removed the scan-pulse div -->
+                <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
 
         <!-- Enhanced Trial Status -->
-        <div class="trial-status" id="trialStatus">
+        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
             <div class="trial-title" id="trialTitle">
-                🎉 Free Trial Active
+                {% if session.get('is_premium') %}
+                    💎 Premium Active
+                {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                    🔒 Trial Expired
+                {% else %}
+                    🎉 Free Trial Active
+                {% endif %}
             </div>
+            {% if not session.get('is_premium') %}
             <div class="trial-info">
-                Scans: <span id="scansUsed">0</span>/10 • 
-                Time: <span id="timeLeft">48h 0m</span>
+                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
+                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
             </div>
+            {% endif %}
         </div>
 
-        <!-- Enhanced Scan Button with NEW COLOR -->
+        <!-- Error Message -->
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Enhanced Scan Button with NEW PINK COLOR -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
-            📸 START HERE
+            {% if session.get('is_premium') %}
+                📸 START HERE
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                💳 UPGRADE TO CONTINUE
+            {% else %}
+                📸 START HERE ({{ 10 - session.get('scans_used', 0) }} left)
+            {% endif %}
         </button>
 
         <!-- Enhanced Loading State -->
@@ -638,20 +659,117 @@
     <video id="webcam" autoplay playsinline></video>
     <canvas id="snapshot"></canvas>
 
+    <!-- Enhanced Results -->
+    {% if result %}
+    <div class="result result-float">
+        {% if "Danger" in result.rating %}
+        <div class="result-header danger">
+            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+            <h2 class="result-title danger">Oh NOOOO! Danger!</h2>
+        </div>
+        {% elif "Proceed" in result.rating %}
+        <div class="result-header caution">
+            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+            <h2 class="result-title caution">Proceed carefully</h2>
+        </div>
+        {% elif "TRY AGAIN" in result.rating %}
+        <div class="result-header caution">
+            <h2 class="result-title caution">↪️ TRY AGAIN</h2>
+        </div>
+        {% else %}
+        <div class="result-header safe">
+            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+            <h2 class="result-title safe">Yay! Safe!</h2>
+        </div>
+        {% endif %}
+
+        {% if "TRY AGAIN" not in result.rating %}
+        {% if "Safe" not in result.rating %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+
+            {% if result.matched_ingredients.trans_fat %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">⚠️ Trans Fat:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.trans_fat | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.excitotoxins %}
+            <div class="ingredient-category risky-ingredients">
+                <div class="category-title">⚠️ Excitotoxins:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.excitotoxins | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.corn %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">🌽 Corn-based:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.corn | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.sugar %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">🍯 High Risk Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.sugar_safe %}
+            <div class="ingredient-category safe-ingredients">
+                <div class="category-title">✅ Safe Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar_safe | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.gmo %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">👽 GMO Ingredients:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+
+            <!-- Add GMO Alert banner -->
+            <div class="gmo-alert">
+                <span>☠️Toxin alert! Looks like there are some if-y players to be aware of.</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="try-again-message">
+            Couldn't read ingredients clearly. Try better lighting and hold steady.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <script>
         // Global variables
-        let scansUsed = 0;
-        let isPremium = false;
-        let trialExpired = false;
+        let scansUsed = {{ session.get('scans_used', 0) }};
+        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
+        let trialExpired = {{ 'true' if trial_expired else 'false' }};
 
         // Enhanced Emoji Shower System
         const emojiShower = {
             container: null,
             isActive: false,
             emojiImages: {
-                safe: '✅',
-                danger: '⚠️',
-                caution: '⚡'
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png'
             },
 
             init() {
@@ -662,9 +780,9 @@
                 if (!type || this.isActive) return;
                 
                 this.isActive = true;
-                const emojiText = this.emojiImages[type];
+                const emojiImage = this.emojiImages[type];
                 
-                if (!emojiText) {
+                if (!emojiImage) {
                     this.isActive = false;
                     return;
                 }
@@ -673,7 +791,7 @@
                 
                 // More frequent emoji creation for denser shower
                 const interval = setInterval(() => {
-                    this.createEmoji(emojiText);
+                    this.createEmoji(emojiImage);
                 }, 200); // Faster creation rate
 
                 // Also create bursts of emojis
@@ -686,7 +804,7 @@
                     
                     // Create burst of 3-5 emojis
                     for (let i = 0; i < 3 + Math.random() * 3; i++) {
-                        setTimeout(() => this.createEmoji(emojiText), i * 100);
+                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
                     }
                     burstCount++;
                 }, 1000);
@@ -704,11 +822,11 @@
                 }, duration);
             },
 
-            createEmoji(emojiText) {
-                const emoji = document.createElement('div');
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
                 emoji.className = 'emoji';
-                emoji.textContent = emojiText;
-                emoji.style.fontSize = '40px';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
                 
                 // More varied horizontal positions
                 emoji.style.left = (Math.random() * 120 - 10) + '%';
@@ -751,17 +869,29 @@
         // Initialize emoji shower on page load
         document.addEventListener('DOMContentLoaded', function() {
             emojiShower.init();
+            
+            // Trigger enhanced emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 5000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 4000);
+                {% elif "Safe" in result.rating %}
+                emojiShower.start('safe', 4500);
+                {% endif %}
+            }, 400);
+            {% endif %}
         });
            
         function handleScanClick() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
                 // Redirect to upgrade page instead of showing alert
-                alert('Trial expired - would redirect to upgrade page');
+                window.location.href = '/upgrade';
                 return;
             }
 
-            alert('Scanner would activate here!');
-            emojiShower.start('safe', 3000);
+            triggerScanner();
         }
 
         function triggerScanner() {
@@ -777,14 +907,15 @@
         // Update the handleFileSelected function
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                alert('Trial expired - would redirect to upgrade page');
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
                 return;
             }
 
             showLoading();
             scansUsed++;
             updateScanCount();
-            // document.getElementById('uploadForm').submit();
+            document.getElementById('uploadForm').submit();
         }
 
         function startWebcam() {
@@ -804,6 +935,40 @@
                 });
         }
 
+        // Update the capturePhoto function
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    // Redirect to upgrade page instead of showing alert
+                    window.location.href = '/upgrade';
+                    return;
+                }
+
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
+        }
+
         function showLoading() {
             document.getElementById('loadingState').style.display = 'block';
             document.getElementById('scanButton').style.display = 'none';
@@ -817,12 +982,33 @@
             
             const scanButton = document.getElementById('scanButton');
             if (!isPremium && scansUsed < 10) {
-                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)`;
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
             } else if (!isPremium && scansUsed >= 10) {
                 scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
                 scanButton.disabled = true;
             }
         }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 600);
+            }
+        });
+        
+        // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanButton = document.getElementById('scanButton');
+            
+            // Update the button to be clickable even when trial expires
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.style.cursor = 'pointer';
+            }
+        });
     </script>
 </body>
 </html>
