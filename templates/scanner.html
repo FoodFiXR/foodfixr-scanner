@@ -699,6 +699,14 @@
         {% endif %}
 
         {% if "TRY AGAIN" not in result.rating %}
+        
+        <!-- Show GMO Alert even for Safe products if GMO ingredients are detected -->
+        {% if result.matched_ingredients.gmo %}
+        <div class="gmo-alert">
+            <span>☠️Toxin alert! Looks like there are some if-y players to be aware of.</span>
+        </div>
+        {% endif %}
+
         {% if "Safe" not in result.rating %}
         <div class="ingredients-section">
             <h3 class="section-title">Detected Ingredients:</h3>
@@ -780,13 +788,24 @@
                     {{ result.matched_ingredients.gmo | join(", ") }}
                 </div>
             </div>
-
-            <!-- Add GMO Alert banner -->
-            <div class="gmo-alert">
-                <span>☠️Toxin alert! Looks like there are some if-y players to be aware of.</span>
-            </div>
             {% endif %}
         </div>
+        {% else %}
+        <!-- For Safe products, only show detected GMO ingredients if any -->
+        {% if result.matched_ingredients.gmo %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
+                    GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% endif %}
         {% else %}
         <div class="try-again-message">
@@ -1022,10 +1041,10 @@
             
             const scanButton = document.getElementById('scanButton');
             if (!isPremium && scansUsed < 10) {
-                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)`;
             } else if (!isPremium && scansUsed >= 10) {
                 scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
-                scanButton.disabled = true;
+                scanButton.disabled = false; // Make sure button is clickable for upgrade
             }
         }
 
