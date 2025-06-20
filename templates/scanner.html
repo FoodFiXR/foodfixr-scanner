@@ -454,6 +454,104 @@
             font-size: 24px;
         }
 
+        /* Toxin Alert Popup */
+        .toxin-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .toxin-popup.show {
+            display: flex;
+        }
+
+        .toxin-popup-content {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 350px;
+            margin: 20px;
+            box-shadow: 0 20px 60px rgba(255, 68, 68, 0.4);
+            border: 3px solid #ff6666;
+            animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .toxin-popup-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+            animation: pulse-warning 1.5s infinite;
+        }
+
+        .toxin-popup-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .toxin-popup-message {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .toxin-popup-button {
+            background: white;
+            color: #cc0000;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .toxin-popup-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.5) rotate(-5deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05) rotate(2deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
         .category-title {
             font-weight: 700;
             margin-bottom: 8px;
@@ -599,6 +697,18 @@
 <body>
     <!-- Enhanced Emoji Shower Container -->
     <div class="emoji-shower" id="emojiShower"></div>
+
+    <!-- Toxin Alert Popup -->
+    <div class="toxin-popup" id="toxinPopup">
+        <div class="toxin-popup-content">
+            <div class="toxin-popup-icon">☠️</div>
+            <div class="toxin-popup-title">TOXIN ALERT!</div>
+            <div class="toxin-popup-message">
+                GMO ingredients detected! These toxins can affect your health, causing allergies, gut problems, and hormone disruption.
+            </div>
+            <button class="toxin-popup-button" onclick="closeToxinPopup()">I UNDERSTAND</button>
+        </div>
+    </div>
 
     <div class="app-container">
         <!-- Modern Header -->
