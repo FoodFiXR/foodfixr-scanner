@@ -15,7 +15,7 @@
         }
 
         body {
-            background: linear-gradient(180deg, #e50ce8 0%, #e1bee7 50%, #e91e63 100%);
+            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
             font-family: 'Comfortaa', sans-serif;
             display: flex;
             flex-direction: column;
@@ -454,104 +454,6 @@
             font-size: 24px;
         }
 
-        /* Toxin Alert Popup */
-        .toxin-popup {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .toxin-popup.show {
-            display: flex;
-        }
-
-        .toxin-popup-content {
-            background: linear-gradient(135deg, #ff4444, #cc0000);
-            color: white;
-            padding: 30px;
-            border-radius: 20px;
-            text-align: center;
-            max-width: 350px;
-            margin: 20px;
-            box-shadow: 0 20px 60px rgba(255, 68, 68, 0.4);
-            border: 3px solid #ff6666;
-            animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-
-        .toxin-popup-icon {
-            font-size: 60px;
-            margin-bottom: 15px;
-            animation: pulse-warning 1.5s infinite;
-        }
-
-        .toxin-popup-title {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 15px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .toxin-popup-message {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 25px;
-            line-height: 1.4;
-        }
-
-        .toxin-popup-button {
-            background: white;
-            color: #cc0000;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .toxin-popup-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes popIn {
-            0% {
-                transform: scale(0.5) rotate(-5deg);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.05) rotate(2deg);
-            }
-            100% {
-                transform: scale(1) rotate(0deg);
-                opacity: 1;
-            }
-        }
-
-        @keyframes pulse-warning {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.1);
-            }
-        }
-
         .category-title {
             font-weight: 700;
             margin-bottom: 8px;
@@ -573,12 +475,6 @@
             font-size: 14px;
             line-height: 1.6;
             margin: 0;
-            color: #000;
-        }
-
-        .ingredient-list::before {
-            content: "Detected: ";
-            font-weight: 700;
             color: #000;
         }
 
@@ -697,18 +593,6 @@
 <body>
     <!-- Enhanced Emoji Shower Container -->
     <div class="emoji-shower" id="emojiShower"></div>
-
-    <!-- Toxin Alert Popup -->
-    <div class="toxin-popup" id="toxinPopup">
-        <div class="toxin-popup-content">
-            <div class="toxin-popup-icon">☠️</div>
-            <div class="toxin-popup-title">TOXIN ALERT!</div>
-            <div class="toxin-popup-message">
-                GMO ingredients detected! These toxins can affect your health, causing allergies, gut problems, and hormone disruption.
-            </div>
-            <button class="toxin-popup-button" onclick="closeToxinPopup()">I UNDERSTAND</button>
-        </div>
-    </div>
 
     <div class="app-container">
         <!-- Modern Header -->
@@ -829,7 +713,7 @@
             <div class="ingredient-category risky-ingredients">
                 <div class="category-title">
                     <img src="/static/Excitotoxins.jpg" class="villain-icon" alt="Excitotoxins Villain" />
-                    Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer's, Parkinsosn's) and ADHD.
+                    Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer’s, Parkinsosn’s) and ADHD.
 
 
                 </div>
@@ -965,3 +849,199 @@
                     this.isActive = false;
                     
                     // Clean up after additional 6 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 6000);
+                }, duration);
+            },
+
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
+                emoji.className = 'emoji';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
+                
+                // More varied horizontal positions
+                emoji.style.left = (Math.random() * 120 - 10) + '%';
+                
+                // Varied animation duration (3-7 seconds)
+                const duration = 3 + Math.random() * 4;
+                emoji.style.animationDuration = duration + 's';
+                
+                // Enhanced horizontal drift
+                const drift = (Math.random() - 0.5) * 300;
+                emoji.style.setProperty('--drift', drift + 'px');
+                
+                // More size variety (35-55px)
+                const size = 35 + Math.random() * 20;
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
+                // Random delay for staggered effect
+                const delay = Math.random() * 1000;
+                emoji.style.animationDelay = delay + 'ms';
+                
+                this.container.appendChild(emoji);
+                
+                // Remove emoji after animation completes
+                setTimeout(() => {
+                    if (emoji.parentNode) {
+                        emoji.parentNode.removeChild(emoji);
+                    }
+                }, (duration * 1000) + delay + 1000);
+            },
+
+            cleanup() {
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
+                }
+                console.log('🧹 Enhanced emoji shower cleaned up');
+            }
+        };
+
+        // Initialize emoji shower on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            emojiShower.init();
+            
+            // Trigger enhanced emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 5000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 4000);
+                {% elif "Safe" in result.rating %}
+                emojiShower.start('safe', 4500);
+                {% endif %}
+            }, 400);
+            {% endif %}
+        });
+           
+        function handleScanClick() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
+
+            triggerScanner();
+        }
+
+        function triggerScanner() {
+            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+            
+            if (isPhone) {
+                document.getElementById("fileInput").click();
+            } else {
+                startWebcam();
+            }
+        }
+
+        // Update the handleFileSelected function
+        function handleFileSelected() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
+
+            showLoading();
+            scansUsed++;
+            updateScanCount();
+            document.getElementById('uploadForm').submit();
+        }
+
+        function startWebcam() {
+            const video = document.getElementById("webcam");
+            video.style.display = "block";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    setTimeout(() => capturePhoto(), 2000);
+                })
+                .catch(function(err) {
+                    console.error("Camera error:", err);
+                    alert("📷 Camera access denied. Please use file upload.");
+                    video.style.display = "none";
+                });
+        }
+
+        // Update the capturePhoto function
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    // Redirect to upgrade page instead of showing alert
+                    window.location.href = '/upgrade';
+                    return;
+                }
+
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('scanButton').style.display = 'none';
+        }
+
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 SCAN INGREDIENTS (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = true;
+            }
+        }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 600);
+            }
+        });
+        
+        // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanButton = document.getElementById('scanButton');
+            
+            // Update the button to be clickable even when trial expires
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.style.cursor = 'pointer';
+            }
+        });
+    </script>
+</body>
+</html>
