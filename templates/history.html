@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8" />
+    <title>FoodFixr - Scan History</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #e50ce8;
+            font-family: 'Comfortaa', sans-serif;
+            min-height: 100vh;
+            padding: 20px 15px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(229, 12, 232, 0.15);
+        }
+
+        .logo-text {
+            font-size: 36px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(229, 12, 232, 0.4);
+        }
+
+        .nav-btn.secondary {
+            background: linear-gradient(135deg, #666, #555);
+        }
+
+        .stats-bar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat {
+            flex: 1;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e50ce8;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .scan-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .scan-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .scan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .scan-result {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .result-emoji {
+            width: 32px;
+            height: 32px;
+        }
+
+        .result-text {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .result-text.safe { color: #4CAF50; }
+        .result-text.caution { color: #6c02d7; }
+        .result-text.danger { color: #F44336; }
+        .result-text.retry { color: #2196F3; }
+
+        .scan-date {
+            font-size: 14px;
+            color: #666;
+            text-align: right;
+        }
+
+        .ingredients-summary {
+            margin-top: 16px;
+        }
+
+        .ingredient-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .ingredient-tag {
+            background: rgba(233, 30, 99, 0.1);
+            color: #e91e63;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(233, 30, 99, 0.2);
+        }
+
+        .ingredient-tag.trans-fat {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            border-color: rgba(244, 67, 54, 0.2);
+        }
+
+        .ingredient-tag.excitotoxin {
+            background: rgba(255, 152, 0, 0.1);
+            color: #ff9800;
+            border-color: rgba(255, 152, 0, 0.2);
+        }
+
+        .ingredient-tag.corn {
+            background: rgba(156, 39, 176, 0.1);
+            color: #9c27b0;
+            border-color: rgba(156, 39, 176, 0.2);
+        }
+
+        .ingredient-tag.sugar {
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+            border-color: rgba(255, 193, 7, 0.2);
+        }
+
+        .ingredient-tag.gmo {
+            background: rgba(121, 85, 72, 0.1);
+            color: #795548;
+            border-color: rgba(121, 85, 72, 0.2);
+        }
+
+        .expand-btn {
+            background: none;
+            border: 2px solid #e50ce8;
+            color: #e50ce8;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .expand-btn:hover {
+            background: #e50ce8;
+            color: white;
+        }
+
+        .scan-details {
+            display: none;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .scan-details.expanded {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 16px;
+        }
+
+        .detail-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .detail-content {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .empty-state {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 60px 24px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .empty-emoji {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .empty-subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 32px;
+        }
+
+        .filter-bar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid #ddd;
+            background: white;
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn.active {
+            border-color: #e50ce8;
+            background: #e50ce8;
+            color: white;
+        }
+
+        .clear-history {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        .clear-history:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 0 8px;
+            }
+            
+            .scan-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .scan-date {
+                text-align: left;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                gap: 16px;
+            }
+            
+            .nav-buttons {
+                flex-direction: column;
+            }
+            
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .clear-history {
+                margin-left: 0;
+                margin-top: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-text">FOOD FIXR</div>
+            <div class="page-title">📊 Scan History</div>
+            <div class="nav-buttons">
+                <a href="/" class="nav-btn">📸 New Scan</a>
+                <a href="/account" class="nav-btn secondary">👤 Account</a>
+                {% if session.get('is_premium') %}
+                    <button onclick="exportHistory()" class="nav-btn secondary">📤 Export</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Stats Bar -->
+        {% if stats %}
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-number">{{ stats.total_scans }}</div>
+                <div class="stat-label">Total Scans</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ stats.safe_scans }}</div>
+                <div class="stat-label">Safe Products</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ stats.danger_scans }}</div>
+                <div class="stat-label">Dangerous Products</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ stats.ingredients_found }}</div>
+                <div class="stat-label">Ingredients Found</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Filter Bar -->
+        {% if scans %}
+        <div class="filter-bar">
+            <button class="filter-btn active" onclick="filterScans('all')">All</button>
+            <button class="filter-btn" onclick="filterScans('safe')">✅ Safe</button>
+            <button class="filter-btn" onclick="filterScans('danger')">🚨 Danger</button>
+            <button class="filter-btn" onclick="filterScans('caution')">⚠️ Caution</button>
+            <button class="filter-btn" onclick="filterScans('gmo')">👽 GMO</button>
+            
+            {% if session.get('is_premium') %}
+            <button class="clear-history" onclick="clearHistory()">🗑️ Clear History</button>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Scan History -->
+        {% if scans %}
+            {% for scan in scans %}
+            <div class="scan-card" data-rating="{{ scan.rating_type }}" data-has-gmo="{{ 'true' if scan.has_gmo else 'false' }}">
+                <div class="scan-header">
+                    <div class="scan-result">
+                        {% if scan.rating_type == 'safe' %}
+                            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+                            <span class="result-text safe">Yay! Safe!</span>
+                        {% elif scan.rating_type == 'danger' %}
+                            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+                            <span class="result-text danger">Oh NOOOO! Danger!</span>
+                        {% elif scan.rating_type == 'caution' %}
+                            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+                            <span class="result-text caution">Proceed carefully</span>
+                        {% else %}
+                            <span class="result-text retry">↪️ Try Again</span>
+                        {% endif %}
+                    </div>
+                    <div class="scan-date">
+                        <div>{{ scan.date }}</div>
+                        <div style="font-size: 12px; color: #999;">{{ scan.time }}</div>
+                    </div>
+                </div>
+
+                {% if scan.ingredient_summary %}
+                <div class="ingredients-summary">
+                    <div class="ingredient-tags">
+                        {% for category, count in scan.ingredient_summary.items() %}
+                            {% if count > 0 %}
+                                <span class="ingredient-tag {{ category }}">
+                                    {% if category == 'trans_fat' %}🚫 Trans Fat ({{ count }})
+                                    {% elif category == 'excitotoxins' %}⚠️ Excitotoxins ({{ count }})
+                                    {% elif category == 'corn' %}🌽 Corn ({{ count }})
+                                    {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
+                                    {% elif category == 'gmo' %}👽 GMO ({{ count }})
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <button class="expand-btn" onclick="toggleDetails(this)">
+                    <span class="expand-text">View Details</span>
+                </button>
+
+                <div class="scan-details">
+                    {% if scan.confidence %}
+                    <div class="detail-section">
+                        <div class="detail-title">🎯 Confidence Level</div>
+                        <div class="detail-content">{{ scan.confidence.title() }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if scan.extracted_text %}
+                    <div class="detail-section">
+                        <div class="detail-title">📝 Extracted Text ({{ scan.text_length }} characters)</div>
+                        <div class="detail-content">{{ scan.extracted_text[:500] }}{% if scan.text_length > 500 %}...{% endif %}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if scan.detected_ingredients %}
+                    <div class="detail-section">
+                        <div class="detail-title">🧬 All Detected Ingredients</div>
+                        <div class="detail-content">{{ scan.detected_ingredients | join(', ') }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-emoji">📱</div>
+                <div class="empty-title">No Scan History Yet</div>
+                <div class="empty-subtitle">Start scanning food products to build your history!</div>
+                <a href="/" class="nav-btn">📸 Start Scanning</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function toggleDetails(button) {
+            const details = button.nextElementSibling;
+            const expandText = button.querySelector('.expand-text');
+            
+            if (details.classList.contains('expanded')) {
+                details.classList.remove('expanded');
+                expandText.textContent = 'View Details';
+            } else {
+                details.classList.add('expanded');
+                expandText.textContent = 'Hide Details';
+            }
+        }
+
+        function filterScans(type) {
+            // Update active filter button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide scan cards
+            document.querySelectorAll('.scan-card').forEach(card => {
+                const rating = card.dataset.rating;
+                const hasGmo = card.dataset.hasGmo === 'true';
+                
+                let show = false;
+                
+                if (type === 'all') {
+                    show = true;
+                } else if (type === 'gmo') {
+                    show = hasGmo;
+                } else {
+                    show = rating === type;
+                }
+                
+                card.style.display = show ? 'block' : 'none';
+            });
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all scan history? This cannot be undone.')) {
+                fetch('/clear-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Failed to clear history. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to clear history. Please try again.');
+                });
+            }
+        }
+
+        function exportHistory() {
+            window.location.href = '/export-history';
+        }
+    </script>
+</body>
+</html>
