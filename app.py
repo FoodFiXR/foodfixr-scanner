@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 import os
 import tempfile
 from werkzeug.utils import secure_filename
@@ -7,12 +7,14 @@ import json
 from datetime import datetime, timedelta
 import uuid
 import stripe
+import csv
+import io
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Stripe Configuration
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')  # Add this to your environment variables
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 
 # Your domain for Stripe redirects
@@ -37,6 +39,7 @@ def init_session():
         session['trial_start'] = datetime.now().isoformat()
         session['scans_used'] = 0
         session['is_premium'] = False
+        session['scan_history'] = []  # Initialize scan history
         session.permanent = True
 
 def is_trial_expired():
@@ -76,6 +79,90 @@ def can_scan():
         return False
         
     return True
+
+def save_scan_to_history(result):
+    """Save scan result to user's history"""
+    try:
+        # Initialize scan_history if it doesn't exist
+        if 'scan_history' not in session:
+            session['scan_history'] = []
+        
+        # Determine rating type for filtering
+        rating_type = 'retry'
+        if 'Safe' in result.get('rating', ''):
+            rating_type = 'safe'
+        elif 'Danger' in result.get('rating', ''):
+            rating_type = 'danger'
+        elif 'Proceed' in result.get('rating', ''):
+            rating_type = 'caution'
+        
+        # Create ingredient summary
+        matched = result.get('matched_ingredients', {})
+        ingredient_summary = {
+            'trans_fat': len(matched.get('trans_fat', [])),
+            'excitotoxins': len(matched.get('excitotoxins', [])),
+            'corn': len(matched.get('corn', [])),
+            'sugar': len(matched.get('sugar', [])),
+            'gmo': len(matched.get('gmo', []))
+        }
+        
+        # Create history entry
+        now = datetime.now()
+        history_entry = {
+            'id': str(uuid.uuid4()),
+            'timestamp': now.isoformat(),
+            'date': now.strftime('%B %d, %Y'),
+            'time': now.strftime('%I:%M %p'),
+            'rating': result.get('rating', ''),
+            'rating_type': rating_type,
+            'confidence': result.get('confidence', ''),
+            'text_length': result.get('extracted_text_length', 0),
+            'extracted_text': result.get('extracted_text', '')[:1000],  # Limit to prevent session bloat
+            'ingredient_summary': ingredient_summary,
+            'detected_ingredients': matched.get('all_detected', []),
+            'has_gmo': len(matched.get('gmo', [])) > 0,
+            'gmo_alert': result.get('gmo_alert')
+        }
+        
+        # Add to beginning of history (newest first)
+        scan_history = session.get('scan_history', [])
+        scan_history.insert(0, history_entry)
+        
+        # For non-premium users, limit history to last 20 scans
+        if not session.get('is_premium') and len(scan_history) > 20:
+            scan_history = scan_history[:20]
+        
+        session['scan_history'] = scan_history
+        session.modified = True
+        
+        print(f"DEBUG: Saved scan to history. Total history items: {len(scan_history)}")
+        
+    except Exception as e:
+        print(f"ERROR: Failed to save scan to history: {e}")
+
+def get_history_stats():
+    """Calculate statistics from scan history"""
+    history = session.get('scan_history', [])
+    
+    if not history:
+        return None
+    
+    total_scans = len(history)
+    safe_scans = sum(1 for scan in history if scan['rating_type'] == 'safe')
+    danger_scans = sum(1 for scan in history if scan['rating_type'] == 'danger')
+    
+    # Count total unique ingredients found
+    all_ingredients = set()
+    for scan in history:
+        all_ingredients.update(scan.get('detected_ingredients', []))
+    
+    return {
+        'total_scans': total_scans,
+        'safe_scans': safe_scans,
+        'danger_scans': danger_scans,
+        'caution_scans': total_scans - safe_scans - danger_scans,
+        'ingredients_found': len(all_ingredients)
+    }
 
 @app.route('/')
 def index():
@@ -150,6 +237,9 @@ def scan():
             result = scan_image_for_ingredients(filepath)
             print(f"DEBUG: Scan result: {result}")
             
+            # Save to scan history
+            save_scan_to_history(result)
+            
             # Clean up uploaded file
             try:
                 os.remove(filepath)
@@ -194,6 +284,102 @@ def scan():
         </html>
         """, 500
 
+@app.route('/history')
+def history():
+    """Display scan history"""
+    init_session()
+    
+    scan_history = session.get('scan_history', [])
+    stats = get_history_stats()
+    
+    return render_template('history.html',
+                         scans=scan_history,
+                         stats=stats,
+                         trial_expired=is_trial_expired(),
+                         trial_time_left=get_trial_time_left())
+
+@app.route('/clear-history', methods=['POST'])
+def clear_history():
+    """Clear scan history (premium users only)"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'Premium required'}), 403
+        
+        session['scan_history'] = []
+        session.modified = True
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error clearing history: {e}")
+        return jsonify({'error': 'Failed to clear history'}), 500
+
+@app.route('/export-history')
+def export_history():
+    """Export scan history as CSV (premium users only)"""
+    try:
+        if not session.get('is_premium'):
+            return redirect('/upgrade')
+        
+        scan_history = session.get('scan_history', [])
+        
+        if not scan_history:
+            return redirect('/history')
+        
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Date', 'Time', 'Rating', 'Confidence', 'Text Length',
+            'Trans Fat Count', 'Excitotoxins Count', 'Corn Count', 
+            'Sugar Count', 'GMO Count', 'Has GMO', 'Detected Ingredients',
+            'Extracted Text Preview'
+        ])
+        
+        # Write data
+        for scan in scan_history:
+            ingredients_summary = scan.get('ingredient_summary', {})
+            detected_ingredients = ', '.join(scan.get('detected_ingredients', []))
+            text_preview = scan.get('extracted_text', '')[:200] + '...' if len(scan.get('extracted_text', '')) > 200 else scan.get('extracted_text', '')
+            
+            writer.writerow([
+                scan.get('date', ''),
+                scan.get('time', ''),
+                scan.get('rating', ''),
+                scan.get('confidence', ''),
+                scan.get('text_length', 0),
+                ingredients_summary.get('trans_fat', 0),
+                ingredients_summary.get('excitotoxins', 0),
+                ingredients_summary.get('corn', 0),
+                ingredients_summary.get('sugar', 0),
+                ingredients_summary.get('gmo', 0),
+                'Yes' if scan.get('has_gmo') else 'No',
+                detected_ingredients,
+                text_preview
+            ])
+        
+        # Create response
+        output.seek(0)
+        
+        # Create file-like object for send_file
+        export_file = io.BytesIO()
+        export_file.write(output.getvalue().encode('utf-8'))
+        export_file.seek(0)
+        
+        filename = f"foodfixr_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        return send_file(
+            export_file,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        print(f"Export error: {e}")
+        return redirect('/history')
+
 @app.route('/test-manual', methods=['GET', 'POST'])
 def test_manual():
     """Manual text input for testing ingredient detection"""
@@ -229,9 +415,6 @@ def test_manual():
                 </div>
                 <div class="preset" onclick="fillText('partially hydrogenated soybean oil, sugar, salt')">
                     🚨 Trans Fat Test: partially hydrogenated soybean oil, sugar, salt
-                </div>
-                <div class="preset" onclick="fillText('chicken stock, modified cornstarch, vegetable oil, wheat flour, cream, chicken meat, chicken fat, salt, whey, dried chicken, monosodium glutamate, soy protein concentrate, water, natural flavoring, yeast extract, beta carotene for color, soy protein isolate, sodium phosphate, celery extract, onion extract, butter, garlic juice concentrate')">
-                    📸 Campbell's Soup Test (from your image)
                 </div>
                 
                 <script>
@@ -359,7 +542,7 @@ def debug_ocr():
         
         print(f"DEBUG OCR: Processing {filepath}")
         
-        # Use the NEW function names from updated ingredient_scanner
+        # Use the functions from updated ingredient_scanner
         from ingredient_scanner import extract_text_with_multiple_methods, assess_text_quality_enhanced, match_all_ingredients, rate_ingredients_according_to_hierarchy
         
         # Extract text with full debug output
@@ -371,7 +554,7 @@ def debug_ocr():
         # Clean up
         os.remove(filepath)
         
-        # Format matches for display (removed safe_ingredients)
+        # Format matches for display
         matches_display = ""
         total_ingredients = 0
         for category, ingredients in matches.items():
@@ -456,8 +639,6 @@ def debug_ocr():
                     {'<div style="margin: 15px 0; padding: 15px; background: #fff3e0; border-radius: 5px;"><strong style="color: #f57c00;">📣 GMO Alert!</strong><br>This product contains genetically modified ingredients: ' + ', '.join(matches.get('gmo', [])) + '</div>' if matches.get('gmo') else ''}
                 </div>
                 
-                {'<div class="section"><h3>🔧 Troubleshooting Tips</h3><ul><li>Ensure good lighting when taking the photo</li><li>Hold the camera steady and close enough to read the text clearly</li><li>Make sure the ingredient list is flat and not wrinkled</li><li>Try scanning just the ingredient section, not the entire package</li><li>Clean the camera lens before taking the photo</li></ul></div>' if quality == 'very_poor' or len(text) < 10 else ''}
-                
                 <div class="nav-buttons">
                     <a href="/debug-ocr">🔬 Test Another Image</a>
                     <a href="/" class="secondary">← Back to Main Scanner</a>
@@ -523,7 +704,7 @@ def test_scan():
         # Test if all imports work
         from ingredient_scanner import scan_image_for_ingredients
         
-        # Create a dummy result (removed safe_ingredients)
+        # Create a dummy result
         test_result = {
             "rating": "✅ Yay! Safe!",
             "matched_ingredients": {
@@ -810,6 +991,7 @@ def debug():
     <br>
     <a href="/debug-ocr" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔬 Test OCR</a>
     <a href="/test-manual" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🧪 Manual Test</a>
+    <a href="/history" style="background: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">📊 View History</a>
     <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to Scanner</a>
     </div>
     </body>
