@@ -1,15 +1,15 @@
 # Flask Configuration
-SECRET_KEY=your-super-secret-flask-key-here
+SECRET_KEY=3dd9ca8557fc91b47981c284758fe8ce9ffab57206a680b4881661c41fceaf7b
 
 # Stripe Configuration (START WITH TEST KEYS)
-STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
-STRIPE_SECRET_KEY=sk_test_your_secret_key_here
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+STRIPE_PUBLISHABLE_KEY=pk_live_51Rc8P5QB07L7UduOzqXcTC4Z6LVVgwxveIE9rQNRTUYyJq9EVAferVT5PuBlMzqaiojlNTZ8vTTIqPHImACuyuLz005KMkBule
+STRIPE_SECRET_KEY=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
+STRIPE_WEBHOOK_SECRET=we_1Rc9j8QB07L7UduO6XVFvvRX
 
 # Price IDs from Step 2
-STRIPE_WEEKLY_PRICE_ID=price_your_weekly_price_id_here
-STRIPE_MONTHLY_PRICE_ID=price_your_monthly_price_id_here
-STRIPE_YEARLY_PRICE_ID=price_your_yearly_price_id_here
+STRIPE_WEEKLY_PRICE_ID=prod_SXD9k3bXPI5ATu
+STRIPE_MONTHLY_PRICE_ID=prod_SXDAp7OBx8T6Zl
+STRIPE_YEARLY_PRICE_ID=prod_SXDClXt0RdWux7
 
 # Your app domain
-DOMAIN=https://your-app-name.onrender.com
+DOMAIN=https://foodfixr-scanner-o3dy.onrender.com
