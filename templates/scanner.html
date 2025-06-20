@@ -15,7 +15,7 @@
         }
 
         body {
-            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
+            background: #e50ce8;  /* Changed to solid pink background */
             font-family: 'Comfortaa', sans-serif;
             display: flex;
             flex-direction: column;
@@ -95,7 +95,7 @@
             max-width: 420px;  /* Increased from 380px to accommodate bigger logo */
             width: 100%;
             box-shadow: 
-                0 20px 60px rgba(233, 30, 99, 0.15),
+                0 20px 60px rgba(229, 12, 232, 0.15),
                 0 8px 32px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
@@ -478,6 +478,13 @@
             color: #000;
         }
 
+        /* Add "Detected:" before ingredient lists */
+        .ingredient-list::before {
+            content: "Detected: ";
+            font-weight: 700;
+            color: #000;
+        }
+
         .risky-ingredients {
             background: rgba(244, 67, 54, 0.08);
             border-left-color: #f44336;
@@ -713,7 +720,7 @@
             <div class="ingredient-category risky-ingredients">
                 <div class="category-title">
                     <img src="/static/Excitotoxins.jpg" class="villain-icon" alt="Excitotoxins Villain" />
-                    Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer’s, Parkinsosn’s) and ADHD.
+                    Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer's, Parkinsosn's) and ADHD.
 
 
                 </div>
