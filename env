@@ -1,13 +1,15 @@
 # Flask Configuration
-SECRET_KEY=your-secret-key-here
-FLASK_ENV=production
+SECRET_KEY=your-super-secret-flask-key-here
 
-# Stripe Configuration
-STRIPE_PUBLISHABLE_KEY=pk_live_your_publishable_key_here
-STRIPE_SECRET_KEY=sk_live_your_secret_key_here
+# Stripe Configuration (START WITH TEST KEYS)
+STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
+STRIPE_SECRET_KEY=sk_test_your_secret_key_here
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-STRIPE_PRICE_ID=price_your_monthly_price_id_here
 
-# For testing, use test keys:
-# STRIPE_PUBLISHABLE_KEY=pk_test_your_test_publishable_key_here
-# STRIPE_SECRET_KEY=sk_test_your_test_secret_key_here
+# Price IDs from Step 2
+STRIPE_WEEKLY_PRICE_ID=price_your_weekly_price_id_here
+STRIPE_MONTHLY_PRICE_ID=price_your_monthly_price_id_here
+STRIPE_YEARLY_PRICE_ID=price_your_yearly_price_id_here
+
+# Your app domain
+DOMAIN=https://your-app-name.onrender.com
