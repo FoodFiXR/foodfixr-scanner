@@ -808,4 +808,317 @@
             <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">
                     <img src="/static/Sugar.jpg" class="villain-icon" alt="Sugar Villain" />
-                    Sugar : In excess
+                    Sugar : In excess can increase pain, cause diabetes, and make the body acidic.
+        
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.sugar_safe %}
+            <div class="ingredient-category safe-ingredients">
+                <div class="category-title">✅ Safe Sugars:</div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.sugar_safe | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.matched_ingredients.gmo %}
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
+                    GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
+                    
+
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <!-- For Safe products, only show detected GMO ingredients if any -->
+        {% if result.matched_ingredients.gmo %}
+        <div class="ingredients-section">
+            <h3 class="section-title">Detected Ingredients:</h3>
+            <div class="ingredient-category moderate-ingredients">
+                <div class="category-title">
+                    <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
+                    GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
+                </div>
+                <div class="ingredient-list">
+                    {{ result.matched_ingredients.gmo | join(", ") }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        {% else %}
+        <div class="try-again-message">
+            Couldn't read ingredients clearly. Try better lighting and hold steady.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <script>
+        // Global variables
+        let scansUsed = {{ session.get('scans_used', 0) }};
+        let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
+        let trialExpired = {{ 'true' if trial_expired else 'false' }};
+
+        // Enhanced Emoji Shower System
+        const emojiShower = {
+            container: null,
+            isActive: false,
+            emojiImages: {
+                safe: '/static/safe.png',
+                danger: '/static/danger.png',
+                caution: '/static/carefully.png'
+            },
+
+            init() {
+                this.container = document.getElementById('emojiShower');
+            },
+
+            start(type, duration = 4000) {
+                if (!type || this.isActive) return;
+                
+                this.isActive = true;
+                const emojiImage = this.emojiImages[type];
+                
+                if (!emojiImage) {
+                    this.isActive = false;
+                    return;
+                }
+                
+                console.log(`🎊 Starting enhanced ${type} emoji shower`);
+                
+                // More frequent emoji creation for denser shower
+                const interval = setInterval(() => {
+                    this.createEmoji(emojiImage);
+                }, 200); // Faster creation rate
+
+                // Also create bursts of emojis
+                let burstCount = 0;
+                const burstInterval = setInterval(() => {
+                    if (burstCount >= 3) {
+                        clearInterval(burstInterval);
+                        return;
+                    }
+                    
+                    // Create burst of 3-5 emojis
+                    for (let i = 0; i < 3 + Math.random() * 3; i++) {
+                        setTimeout(() => this.createEmoji(emojiImage), i * 100);
+                    }
+                    burstCount++;
+                }, 1000);
+
+                // Stop after duration
+                setTimeout(() => {
+                    clearInterval(interval);
+                    clearInterval(burstInterval);
+                    this.isActive = false;
+                    
+                    // Clean up after additional 6 seconds
+                    setTimeout(() => {
+                        this.cleanup();
+                    }, 6000);
+                }, duration);
+            },
+
+            createEmoji(imageSrc) {
+                const emoji = document.createElement('img');
+                emoji.className = 'emoji';
+                emoji.src = imageSrc;
+                emoji.alt = 'emoji';
+                
+                // More varied horizontal positions
+                emoji.style.left = (Math.random() * 120 - 10) + '%';
+                
+                // Varied animation duration (3-7 seconds)
+                const duration = 3 + Math.random() * 4;
+                emoji.style.animationDuration = duration + 's';
+                
+                // Enhanced horizontal drift
+                const drift = (Math.random() - 0.5) * 300;
+                emoji.style.setProperty('--drift', drift + 'px');
+                
+                // More size variety (35-55px)
+                const size = 35 + Math.random() * 20;
+                emoji.style.width = size + 'px';
+                emoji.style.height = size + 'px';
+                
+                // Random delay for staggered effect
+                const delay = Math.random() * 1000;
+                emoji.style.animationDelay = delay + 'ms';
+                
+                this.container.appendChild(emoji);
+                
+                // Remove emoji after animation completes
+                setTimeout(() => {
+                    if (emoji.parentNode) {
+                        emoji.parentNode.removeChild(emoji);
+                    }
+                }, (duration * 1000) + delay + 1000);
+            },
+
+            cleanup() {
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
+                }
+                console.log('🧹 Enhanced emoji shower cleaned up');
+            }
+        };
+
+        // Initialize emoji shower on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            emojiShower.init();
+            
+            // Trigger enhanced emoji shower if there's a result
+            {% if result %}
+            setTimeout(() => {
+                {% if "Danger" in result.rating %}
+                emojiShower.start('danger', 5000);
+                {% elif "Proceed" in result.rating %}
+                emojiShower.start('caution', 4000);
+                {% elif "Safe" in result.rating %}
+                emojiShower.start('safe', 4500);
+                {% endif %}
+            }, 400);
+            {% endif %}
+        });
+           
+        function handleScanClick() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
+
+            triggerScanner();
+        }
+
+        function triggerScanner() {
+            const isPhone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+            
+            if (isPhone) {
+                document.getElementById("fileInput").click();
+            } else {
+                startWebcam();
+            }
+        }
+
+        // Update the handleFileSelected function
+        function handleFileSelected() {
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                // Redirect to upgrade page instead of showing alert
+                window.location.href = '/upgrade';
+                return;
+            }
+
+            showLoading();
+            scansUsed++;
+            updateScanCount();
+            document.getElementById('uploadForm').submit();
+        }
+
+        function startWebcam() {
+            const video = document.getElementById("webcam");
+            video.style.display = "block";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    setTimeout(() => capturePhoto(), 2000);
+                })
+                .catch(function(err) {
+                    console.error("Camera error:", err);
+                    alert("📷 Camera access denied. Please use file upload.");
+                    video.style.display = "none";
+                });
+        }
+
+        // Update the capturePhoto function
+        function capturePhoto() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshot");
+            const form = document.getElementById("scanForm");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.style.display = "none";
+            
+            canvas.toBlob(function (blob) {
+                const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById("hiddenImage").files = container.files;
+                
+                if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                    // Redirect to upgrade page instead of showing alert
+                    window.location.href = '/upgrade';
+                    return;
+                }
+
+                showLoading();
+                scansUsed++;
+                updateScanCount();
+                form.submit();
+            }, "image/jpeg", 0.8);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('scanButton').style.display = 'none';
+        }
+
+        function updateScanCount() {
+            const scansUsedElement = document.getElementById('scansUsed');
+            if (scansUsedElement) {
+                scansUsedElement.textContent = scansUsed;
+            }
+            
+            const scanButton = document.getElementById('scanButton');
+            if (!isPremium && scansUsed < 10) {
+                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)`;
+            } else if (!isPremium && scansUsed >= 10) {
+                scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
+                scanButton.disabled = false; // Make sure button is clickable for upgrade
+            }
+        }
+
+        // Auto-scroll to results when they appear
+        window.addEventListener('load', function() {
+            const result = document.querySelector('.result');
+            if (result) {
+                setTimeout(() => {
+                    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 600);
+            }
+        });
+        
+        // Add click handler for the scan button to redirect when it shows "UPGRADE TO CONTINUE"
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanButton = document.getElementById('scanButton');
+            
+            // Update the button to be clickable even when trial expires
+            if (!isPremium && (scansUsed >= 10 || trialExpired)) {
+                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.style.cursor = 'pointer';
+            }
+        });
+    </script>
+</body>
+</html>
