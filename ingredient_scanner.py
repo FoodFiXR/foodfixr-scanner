@@ -594,25 +594,60 @@ def check_for_safety_labels(text):
     
     normalized_text = normalize_ingredient_text(text)
     print(f"DEBUG: Checking for safety labels in text: {normalized_text[:200]}...")
+    print(f"DEBUG: Full normalized text: {normalized_text}")
     
-    # Define safety label patterns
+    # Define safety label patterns (made more flexible and comprehensive)
     safety_patterns = [
-        r'\bno\s+msg\b',           # "no msg"
-        r'\bnon\s*gmo\b',          # "non gmo" or "non-gmo"
-        r'\bnon\s*-\s*gmo\b',      # "non-gmo" with hyphen
-        r'\bmsg\s+free\b',         # "msg free"
-        r'\bgmo\s+free\b',         # "gmo free"
-        r'\bwithout\s+msg\b',      # "without msg"
-        r'\bwithout\s+gmo\b',      # "without gmo"
-        r'\bno\s+artificial\s+msg\b',  # "no artificial msg"
-        r'\bno\s+added\s+msg\b',   # "no added msg"
+        r'\bno\s+msg\b',              # "no msg"
+        r'\bno\s+msg\s+added\b',      # "no msg added"
+        r'\bmsg\s+free\b',            # "msg free"
+        r'\bwithout\s+msg\b',         # "without msg"
+        r'\bno\s+artificial\s+msg\b', # "no artificial msg"
+        r'\bno\s+added\s+msg\b',      # "no added msg"
+        
+        r'\bnon\s*gmo\b',             # "non gmo" or "nongmo"
+        r'\bnon\s*-\s*gmo\b',         # "non-gmo" with hyphen
+        r'\bgmo\s+free\b',            # "gmo free"
+        r'\bwithout\s+gmo\b',         # "without gmo"
+        r'\bno\s+gmo\b',              # "no gmo"
+        r'\bnon\s+genetically\s+modified\b',  # "non genetically modified"
+        
+        # Additional patterns for common variations
+        r'\bmsg\s*free\b',            # "msgfree"
+        r'\bgmo\s*free\b',            # "gmofree" 
+        r'\bnon\s*gmo\s+natural\b',   # "non-gmo natural" or "nongmo natural"
+        r'\bnatural\s+non\s*gmo\b',   # "natural non-gmo"
+        r'\bno\s+monosodium\s+glutamate\b',  # "no monosodium glutamate"
     ]
     
     # Check each pattern
     for pattern in safety_patterns:
-        matches = re.findall(pattern, normalized_text)
+        matches = re.findall(pattern, normalized_text, re.IGNORECASE)
         if matches:
             print(f"DEBUG: ✅ SAFETY LABEL FOUND: Pattern '{pattern}' matched: {matches}")
+            return True
+    
+    # Also check for common phrases that might be split across words
+    safety_phrases = [
+        "no msg added",
+        "msg free", 
+        "non gmo",
+        "non-gmo",
+        "gmo free",
+        "no gmo",
+        "without msg",
+        "without gmo",
+        "non genetically modified",
+        "no monosodium glutamate"
+    ]
+    
+    for phrase in safety_phrases:
+        # Remove spaces and hyphens for flexible matching
+        flexible_text = re.sub(r'[\s\-_]+', '', normalized_text)
+        flexible_phrase = re.sub(r'[\s\-_]+', '', phrase)
+        
+        if flexible_phrase in flexible_text:
+            print(f"DEBUG: ✅ SAFETY PHRASE FOUND (flexible): '{phrase}' found in text")
             return True
     
     print("DEBUG: ❌ No safety labels found")
