@@ -235,7 +235,6 @@ gmo_keywords = [
     "lactic acid",
     "sodium lactate",
     "tocopherols",
-    "vitamin e",
     "modified food starch",
     "bioengineered food",
     "contains bioengineered ingredients",
