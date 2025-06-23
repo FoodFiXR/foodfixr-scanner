@@ -739,8 +739,8 @@
             
             <!-- Video Element -->
             <video id="introVideo" class="intro-video" preload="auto" style="display: none;" muted>
-                <source src="intro-video.mp4" type="video/mp4">
-                <source src="intro-video.webm" type="video/webm">
+                <source src="/static/intro-video.mp4" type="video/mp4">
+                <source src="/static/intro-video.webm" type="video/webm">
                 Your browser does not support the video tag.
             </video>
             
@@ -1029,13 +1029,22 @@
             const progressBar = document.getElementById('videoProgressBar');
             const overlay = document.getElementById('videoIntroOverlay');
             
+            // Add timeout to prevent infinite loading
+            const loadingTimeout = setTimeout(() => {
+                console.log('Video loading timeout - skipping to scanner');
+                loading.innerHTML = '<div class="video-loading-text">Video unavailable. <span style="color: #e50ce8; cursor: pointer;" onclick="skipVideoIntro()">Continue to scanner →</span></div>';
+                // Auto-skip after 5 seconds if still loading
+                setTimeout(skipVideoIntro, 5000);
+            }, 10000); // 10 second timeout
+            
             // Always show intro for testing (remove this condition later)
             console.log('Page loaded, showing video intro');
             showVideoIntro();
             
-            // Video loading
+            // Video loading success
             video.addEventListener('loadeddata', function() {
                 console.log('Video loaded successfully');
+                clearTimeout(loadingTimeout);
                 loading.style.display = 'none';
                 video.style.display = 'block';
                 attemptVideoPlay();
@@ -1043,6 +1052,7 @@
             
             video.addEventListener('canplay', function() {
                 console.log('Video can play');
+                clearTimeout(loadingTimeout);
                 loading.style.display = 'none';
                 video.style.display = 'block';
                 attemptVideoPlay();
@@ -1059,12 +1069,15 @@
             // Video ended
             video.addEventListener('ended', function() {
                 console.log('Video ended');
+                clearTimeout(loadingTimeout);
                 skipVideoIntro();
             });
             
             // Video error
             video.addEventListener('error', function(e) {
                 console.error('Video error:', e);
+                console.error('Video error details:', video.error);
+                clearTimeout(loadingTimeout);
                 loading.innerHTML = '<div class="video-loading-text">Video unavailable. <span style="color: #e50ce8; cursor: pointer;" onclick="skipVideoIntro()">Continue to scanner →</span></div>';
             });
             
