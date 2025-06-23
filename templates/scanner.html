@@ -983,7 +983,7 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
-        let hasSeenIntro = false; // Always show intro for now - you can enable localStorage later
+        let hasSeenIntro = localStorage.getItem('foodfixr_seen_intro') === 'true';
 
         // Video Intro Functions
         function showVideoIntro() {
@@ -1015,11 +1015,11 @@
             overlay.style.display = 'none';
             overlay.classList.add('hidden');
             
-            // Mark as seen (uncomment when you want to remember preference)
-            // localStorage.setItem('foodfixr_seen_intro', 'true');
+            // IMPORTANT: Remember that user has seen intro
+            localStorage.setItem('foodfixr_seen_intro', 'true');
             hasSeenIntro = true;
             
-            console.log('Video intro skipped');
+            console.log('Video intro skipped and marked as seen');
         }
 
         // Video Event Handlers
@@ -1037,9 +1037,15 @@
                 setTimeout(skipVideoIntro, 5000);
             }, 10000); // 10 second timeout
             
-            // Always show intro for testing (remove this condition later)
-            console.log('Page loaded, showing video intro');
-            showVideoIntro();
+            // Show intro only on first visit
+            if (!hasSeenIntro) {
+                console.log('First visit - showing video intro');
+                showVideoIntro();
+            } else {
+                console.log('User has seen intro before - going directly to scanner');
+                overlay.style.display = 'none';
+                overlay.classList.add('hidden');
+            }
             
             // Video loading success
             video.addEventListener('loadeddata', function() {
