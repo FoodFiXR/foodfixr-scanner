@@ -10,7 +10,7 @@ import stripe
 from PIL import Image
 import time
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Stripe Configuration
