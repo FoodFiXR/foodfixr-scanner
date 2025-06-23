@@ -119,7 +119,11 @@ corn_moderate_risk = [
     "inositol",
     "mono- and diglycerides",
     "calcium stearate",
-    "magnesium stearate"
+    "magnesium stearate",
+    "whole grain corn",
+    "masa",
+    "organic masa"
+
 ]
 
 # Low Risk - Count toward total
