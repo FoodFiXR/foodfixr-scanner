@@ -587,6 +587,37 @@ def normalize_ingredient_text(text):
     
     return text
 
+def check_for_safety_labels(text):
+    """Check for explicit safety labels that override ingredient concerns"""
+    if not text:
+        return False
+    
+    normalized_text = normalize_ingredient_text(text)
+    print(f"DEBUG: Checking for safety labels in text: {normalized_text[:200]}...")
+    
+    # Define safety label patterns
+    safety_patterns = [
+        r'\bno\s+msg\b',           # "no msg"
+        r'\bnon\s*gmo\b',          # "non gmo" or "non-gmo"
+        r'\bnon\s*-\s*gmo\b',      # "non-gmo" with hyphen
+        r'\bmsg\s+free\b',         # "msg free"
+        r'\bgmo\s+free\b',         # "gmo free"
+        r'\bwithout\s+msg\b',      # "without msg"
+        r'\bwithout\s+gmo\b',      # "without gmo"
+        r'\bno\s+artificial\s+msg\b',  # "no artificial msg"
+        r'\bno\s+added\s+msg\b',   # "no added msg"
+    ]
+    
+    # Check each pattern
+    for pattern in safety_patterns:
+        matches = re.findall(pattern, normalized_text)
+        if matches:
+            print(f"DEBUG: ✅ SAFETY LABEL FOUND: Pattern '{pattern}' matched: {matches}")
+            return True
+    
+    print("DEBUG: ❌ No safety labels found")
+    return False
+
 def precise_ingredient_matching(text, ingredient_list, category_name=""):
     """MUCH MORE PRECISE matching - avoid false positives"""
     matches = []
@@ -700,11 +731,15 @@ def match_all_ingredients(text):
             "sugar": [],
             "sugar_safe": [],
             "gmo": [],
-            "all_detected": []
+            "all_detected": [],
+            "has_safety_labels": False  # NEW: Track safety labels
         }
     
     print(f"DEBUG: Matching ingredients in text of {len(text)} characters")
     print(f"DEBUG: Text sample: {text[:200]}...")
+    
+    # Check for safety labels FIRST
+    has_safety_labels = check_for_safety_labels(text)
     
     # Match each category using PRECISE matching
     trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
@@ -725,11 +760,16 @@ def match_all_ingredients(text):
         "sugar": list(set(sugar_high_matches)),
         "sugar_safe": list(set(sugar_safe_matches)),
         "gmo": list(set(gmo_matches)),
-        "all_detected": all_detected
+        "all_detected": all_detected,
+        "has_safety_labels": has_safety_labels  # NEW: Include safety label status
     }
     
     print(f"DEBUG: PRECISE INGREDIENT MATCHING RESULTS:")
+    if has_safety_labels:
+        print(f"  🛡️ SAFETY LABELS: Found safety labels (no msg, non-gmo, etc.)")
     for category, ingredients in result.items():
+        if category == "has_safety_labels":
+            continue
         if ingredients:
             print(f"  ✅ {category}: {ingredients}")
         else:
@@ -739,8 +779,9 @@ def match_all_ingredients(text):
 
 def rate_ingredients_according_to_hierarchy(matches, text_quality):
     """
-    Rating system following EXACT hierarchy rules from document:
+    UPDATED Rating system with safety label override:
     
+    NEW RULE 0: If safety labels found (no msg, non-gmo, etc.) = SAFE (overrides everything)
     1. HIGH RISK TRANS FATS - ANY ONE = immediate danger
     2. HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
     3. Count ALL other problematic ingredients (moderate trans fats, moderate excitotoxins, corn, sugar)
@@ -752,6 +793,12 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     # If text quality is very poor, suggest trying again
     if text_quality == "very_poor":
         return "↪️ TRY AGAIN"
+    
+    # NEW RULE 0: SAFETY LABELS OVERRIDE - If safety labels found, it's SAFE
+    if matches.get("has_safety_labels", False):
+        print(f"🛡️ SAFETY LABELS DETECTED - OVERRIDING TO SAFE!")
+        print(f"   Product explicitly states 'no msg', 'non-gmo', or similar safety claims")
+        return "✅ Yay! Safe!"
     
     # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
     high_risk_trans_fat_found = []
@@ -865,16 +912,18 @@ def scan_image_for_ingredients(image_path):
         print("🧬 Starting PRECISE ingredient matching...")
         matches = match_all_ingredients(text)
         
-        # Rate ingredients according to hierarchy
-        print("⚖️ Applying hierarchy-based rating...")
+        # Rate ingredients according to hierarchy (now with safety label override)
+        print("⚖️ Applying hierarchy-based rating with safety label override...")
         rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
         print(f"🏆 Final rating: {rating}")
         
         # Determine confidence
         confidence = determine_confidence(text_quality, text, matches)
         
-        # Check for GMO Alert
-        gmo_alert = "📣 GMO Alert!" if matches["gmo"] else None
+        # Check for GMO Alert (but don't show if safety labels found)
+        gmo_alert = None
+        if matches["gmo"] and not matches.get("has_safety_labels", False):
+            gmo_alert = "📣 GMO Alert!"
         
         # Create comprehensive result
         result = {
@@ -884,7 +933,8 @@ def scan_image_for_ingredients(image_path):
             "extracted_text_length": len(text),
             "text_quality": text_quality,
             "extracted_text": text,
-            "gmo_alert": gmo_alert
+            "gmo_alert": gmo_alert,
+            "has_safety_labels": matches.get("has_safety_labels", False)  # NEW: Include in result
         }
         
         # Print comprehensive summary
@@ -926,12 +976,14 @@ def create_error_result(error_message):
         "rating": "↪️ TRY AGAIN",
         "matched_ingredients": {
             "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": []
+            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": [],
+            "has_safety_labels": False
         },
         "confidence": "very_low",
         "text_quality": "very_poor",
         "extracted_text_length": 0,
         "gmo_alert": None,
+        "has_safety_labels": False,
         "error": error_message
     }
 
@@ -943,11 +995,16 @@ def print_scan_summary(result):
     print(f"📊 Text Quality: {result['text_quality']}")
     print(f"📝 Text Length: {result['extracted_text_length']} characters")
     
+    if result.get('has_safety_labels', False):
+        print(f"🛡️ SAFETY LABELS DETECTED: Product claims to be safe (no msg, non-gmo, etc.)")
+    
     if result['gmo_alert']:
         print(f"📣 {result['gmo_alert']}")
     
     print(f"\n🧬 DETECTED INGREDIENTS BY CATEGORY:")
     for category, ingredients in result['matched_ingredients'].items():
+        if category == "has_safety_labels":
+            continue
         if ingredients:
             emoji = get_category_emoji(category)
             print(f"  {emoji} {category.replace('_', ' ').title()}: {ingredients}")
