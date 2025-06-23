@@ -872,39 +872,28 @@ def success():
         print(f"Success page error: {e}")
         return redirect(url_for('index'))
 
-@app.route('/webhook', methods=['POST'])
-def stripe_webhook():
-    """Handle Stripe webhooks for subscription events"""
-    payload = request.get_data()
-    sig_header = request.headers.get('Stripe-Signature')
-    endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
-    
+@app.route('/create-customer-portal', methods=['POST'])
+def create_customer_portal():
+    """Create Stripe Customer Portal session for subscription management"""
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        return 'Invalid payload', 400
-    except stripe.error.SignatureVerificationError:
-        return 'Invalid signature', 400
-    
-    # Handle the event
-    if event['type'] == 'checkout.session.completed':
-        session_data = event['data']['object']
-        user_id = session_data['metadata'].get('user_id')
-        plan = session_data['metadata'].get('plan')
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
         
-        # Update user premium status in database
-        # For now, we're using Flask sessions, but in production you'd update a database
-        print(f"User {user_id} subscribed to {plan} plan")
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
         
-    elif event['type'] == 'invoice.payment_succeeded':
-        # Handle successful subscription renewal
-        print("Subscription payment succeeded")
+        # Create customer portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{DOMAIN}/account",
+        )
         
-    elif event['type'] == 'customer.subscription.deleted':
-        # Handle subscription cancellation
-        print("Subscription cancelled")
+        return jsonify({'portal_url': portal_session.url})
         
-    return 'Success', 200
+    except Exception as e:
+        print(f"Customer portal error: {e}")
+        return jsonify({'error': 'Unable to create portal session'}), 500
 
 @app.route('/cancel-subscription', methods=['POST'])
 def cancel_subscription():
@@ -922,14 +911,23 @@ def cancel_subscription():
         
         for subscription in subscriptions.data:
             if subscription.status == 'active':
-                # Cancel the subscription
-                stripe.Subscription.delete(subscription.id)
+                # Cancel the subscription at period end (don't end immediately)
+                updated_subscription = stripe.Subscription.modify(
+                    subscription.id,
+                    cancel_at_period_end=True
+                )
                 
-                # Update session
-                session['is_premium'] = False
-                session['premium_end'] = datetime.now().isoformat()
+                # Log cancellation event
+                log_subscription_event('cancelled', updated_subscription)
                 
-                return jsonify({'success': True, 'message': 'Subscription cancelled'})
+                # Send cancellation email (optional)
+                send_cancellation_email(updated_subscription)
+                
+                return jsonify({
+                    'success': True, 
+                    'message': 'Subscription will be cancelled at the end of your billing period',
+                    'period_end': updated_subscription.current_period_end
+                })
         
         return jsonify({'error': 'No active subscription found'}), 400
         
@@ -937,13 +935,139 @@ def cancel_subscription():
         print(f"Cancellation error: {e}")
         return jsonify({'error': 'Failed to cancel subscription'}), 500
 
+@app.route('/webhook', methods=['POST'])
+def stripe_webhook():
+    """Enhanced webhook handler for subscription lifecycle"""
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+    endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+    
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+    except ValueError:
+        return 'Invalid payload', 400
+    except stripe.error.SignatureVerificationError:
+        return 'Invalid signature', 400
+    
+    # Handle different subscription events
+    if event['type'] == 'customer.subscription.created':
+        # New subscription created
+        handle_subscription_created(event['data']['object'])
+        
+    elif event['type'] == 'customer.subscription.updated':
+        # Subscription updated (plan change, etc.)
+        handle_subscription_updated(event['data']['object'])
+        
+    elif event['type'] == 'customer.subscription.deleted':
+        # Subscription cancelled/expired
+        handle_subscription_cancelled(event['data']['object'])
+        
+    elif event['type'] == 'invoice.payment_succeeded':
+        # Successful payment/renewal
+        handle_payment_succeeded(event['data']['object'])
+        
+    elif event['type'] == 'invoice.payment_failed':
+        # Failed payment
+        handle_payment_failed(event['data']['object'])
+        
+    return 'Success', 200
+
+def handle_subscription_created(subscription):
+    """Handle new subscription creation"""
+    print(f"New subscription created: {subscription['id']}")
+    log_subscription_event('created', subscription)
+
+def handle_subscription_updated(subscription):
+    """Handle subscription updates"""
+    print(f"Subscription updated: {subscription['id']}")
+    log_subscription_event('updated', subscription)
+
+def handle_subscription_cancelled(subscription):
+    """Handle subscription cancellation"""
+    print(f"Subscription cancelled: {subscription['id']}")
+    log_subscription_event('cancelled', subscription)
+    
+    # Send a cancellation email
+    send_cancellation_email(subscription)
+
+def handle_payment_succeeded(invoice):
+    """Handle successful payment"""
+    print(f"Payment succeeded for invoice: {invoice['id']}")
+    log_subscription_event('payment_succeeded', invoice)
+
+def handle_payment_failed(invoice):
+    """Handle failed payment"""
+    print(f"Payment failed for invoice: {invoice['id']}")
+    log_subscription_event('payment_failed', invoice)
+    
+    # Send a payment failure notification
+    send_payment_failure_notification(invoice)
+
+def log_subscription_event(event_type, data):
+    """Log subscription events for tracking"""
+    try:
+        event_log = {
+            'timestamp': datetime.now().isoformat(),
+            'event_type': event_type,
+            'subscription_id': data.get('id'),
+            'customer_id': data.get('customer'),
+            'status': data.get('status'),
+            'amount': data.get('amount_paid') if 'amount_paid' in data else data.get('amount'),
+            'period_start': data.get('current_period_start'),
+            'period_end': data.get('current_period_end'),
+            'cancel_at_period_end': data.get('cancel_at_period_end', False)
+        }
+        
+        with open('subscription_events.json', 'a') as f:
+            f.write(json.dumps(event_log) + '\n')
+            
+    except Exception as e:
+        print(f"Error logging subscription event: {e}")
+
+def send_cancellation_email(subscription):
+    """Send cancellation confirmation email"""
+    try:
+        # Get customer email from Stripe
+        customer = stripe.Customer.retrieve(subscription['customer'])
+        customer_email = customer.get('email')
+        
+        if customer_email:
+            print(f"Would send cancellation email to: {customer_email}")
+            print(f"Subscription {subscription['id']} cancelled")
+            print(f"Access continues until: {subscription.get('current_period_end')}")
+            
+            # Here you would implement your email service
+            # Example: send_email_notification(customer_email, subject, content)
+            
+    except Exception as e:
+        print(f"Error sending cancellation email: {e}")
+
+def send_payment_failure_notification(invoice):
+    """Send payment failure notification"""
+    try:
+        customer = stripe.Customer.retrieve(invoice['customer'])
+        customer_email = customer.get('email')
+        
+        if customer_email:
+            print(f"Would send payment failure notification to: {customer_email}")
+            print(f"Invoice {invoice['id']} failed")
+            
+            # Here you would implement your email service
+            
+    except Exception as e:
+        print(f"Error sending payment failure notification: {e}")
+
 @app.route('/account')
 def account():
-    """User account page"""
+    """User account page with subscription management"""
     init_session()
+    
+    trial_expired = is_trial_expired()
+    trial_time_left = get_trial_time_left()
+    
     return render_template('account.html',
-                         trial_expired=is_trial_expired(),
-                         trial_time_left=get_trial_time_left())
+                         trial_expired=trial_expired,
+                         trial_time_left=trial_time_left)
 
 @app.route('/reset-trial')
 def reset_trial():
@@ -1005,6 +1129,18 @@ def debug():
     except Exception as e:
         debug_info.append(f"❌ OCR.space API: Unreachable - {str(e)}")
     
+    # Test Stripe configuration
+    try:
+        if stripe.api_key:
+            debug_info.append("✅ Stripe: API key configured")
+            # Test Stripe connection
+            stripe.Account.retrieve()
+            debug_info.append("✅ Stripe: Connection successful")
+        else:
+            debug_info.append("❌ Stripe: API key not configured")
+    except Exception as e:
+        debug_info.append(f"⚠️ Stripe: {str(e)}")
+    
     html = f"""
     <html>
     <head><title>FoodFixr Debug</title></head>
@@ -1022,7 +1158,7 @@ def debug():
     </html>
     """
     return html
-        
+
 def log_scan_result(user_id, result, scan_count, image_url=None, scan_id=None):
     """Log scan results for analytics with image URL"""
     try:
