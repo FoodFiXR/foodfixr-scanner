@@ -252,7 +252,7 @@
             font-weight: 700;
             cursor: pointer;
             width: 100%;
-            margin: 20px 0 12px 0;  /* Reduced bottom margin */
+            margin: 20px 0;
             box-shadow: 
                 0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED shadow color for pink */
                 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -314,52 +314,6 @@
             cursor: not-allowed;
             transform: none;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        /* History Button Styling */
-        .history-button {
-            background: #e50ce8;
-            color: white;
-            padding: 14px 28px;
-            border: none;
-            border-radius: 14px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            margin: 8px 0 20px 0;
-            box-shadow: 
-                0 6px 20px rgba(33, 150, 243, 0.3),
-                0 3px 10px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .history-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .history-button:hover::before {
-            left: 100%;
-        }
-
-        .history-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 
-                0 8px 24px rgba(33, 150, 243, 0.4),
-                0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .history-button:active {
-            transform: translateY(-1px);
         }
 
         /* Enhanced Loading State */
@@ -690,20 +644,15 @@
         </div>
         {% endif %}
 
-        <!-- Enhanced Scan Button with NEW PINK COLOR -->
+        <!-- Enhanced Scan Button with NEW PINK COLOR and Instructions -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
-                📸 START HERE
+                📸 START HERE<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Take a pic of the food's ingredient list</span>
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
-                📸 START HERE ({{ 10 - session.get('scans_used', 0) }} left)
+                📸 START HERE ({{ 10 - session.get('scans_used', 0) }} left)<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Take a pic of the food's ingredient list</span>
             {% endif %}
-        </button>
-
-        <!-- History Button -->
-        <button class="history-button" onclick="window.location.href='/history'">
-            🗃️ View Scan History
         </button>
 
         <!-- Enhanced Loading State -->
@@ -1092,7 +1041,7 @@
             
             const scanButton = document.getElementById('scanButton');
             if (!isPremium && scansUsed < 10) {
-                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)`;
+                scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Take a pic of the food's ingredient list</span>`;
             } else if (!isPremium && scansUsed >= 10) {
                 scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
                 scanButton.disabled = false; // Make sure button is clickable for upgrade
