@@ -134,6 +134,45 @@
             font-weight: 500;
         }
 
+        /* Navigation Section */
+        .nav-section {
+            margin: 16px 0;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 10px 18px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            border: 2px solid rgba(229, 12, 232, 0.3);
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            background: #e50ce8;
+            color: white;
+            border-color: #c209c5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(229, 12, 232, 0.3);
+        }
+
         /* Scanner Icon - MADE BIGGER */
         .scanner-section {
             margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
@@ -163,21 +202,6 @@
         .scan-icon:active {
             transform: scale(0.98);
         }
-
-        /* Remove Scan Pulse Effect - commented out */
-        /*
-        .scan-pulse {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 400px;        /* Adjusted for bigger logo */
-            height: 400px;       /* Adjusted for bigger logo */
-            border: 3px solid rgba(233, 30, 99, 0.3);
-            border-radius: 20px;
-            transform: translate(-50%, -50%);
-            animation: pulse 2s infinite;
-        }
-        */
 
         @keyframes pulse {
             0% {
@@ -558,9 +582,15 @@
                 height: 340px;       /* BIGGER on mobile too - increased from 270px */
             }
 
-            .scan-pulse {
-                width: 360px;        /* Adjusted for mobile bigger logo */
-                height: 360px;       /* Adjusted for mobile bigger logo */
+            .nav-buttons {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .nav-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 12px 18px;
             }
 
             .emoji {
@@ -610,10 +640,17 @@
             <div class="app-subtitle">Smart Ingredient Scanner</div>
         </div>
 
+        <!-- Navigation Section -->
+        <div class="nav-section">
+            <div class="nav-buttons">
+                <a href="/account" class="nav-btn">👤 My Account</a>
+                <a href="/history" class="nav-btn">📊 Scan History</a>
+            </div>
+        </div>
+
         <!-- Scanner Section -->
         <div class="scanner-section">
             <div class="scan-icon-container">
-                <!-- Removed the scan-pulse div -->
                 <img src="/static/Foodfixr.jpeg" alt="Scanner" class="scan-icon" onclick="handleScanClick()">
             </div>
         </div>
