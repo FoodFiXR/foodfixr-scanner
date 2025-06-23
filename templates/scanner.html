@@ -28,6 +28,122 @@
             padding: 20px 15px;
         }
 
+        /* Video Intro Overlay */
+        .video-intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .video-intro-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .intro-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+        }
+
+        .video-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .video-loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #e50ce8;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .video-loading-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .video-skip-button {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(229, 12, 232, 0.9);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Comfortaa', sans-serif;
+            transition: all 0.3s ease;
+            z-index: 20;
+            backdrop-filter: blur(10px);
+        }
+
+        .video-skip-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #e50ce8;
+            transform: scale(1.05);
+        }
+
+        .video-progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 15;
+        }
+
+        .video-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #e50ce8, #c209c5);
+            width: 0%;
+            transition: width 0.1s ease;
+            box-shadow: 0 0 10px rgba(229, 12, 232, 0.5);
+        }
+
+        .video-foodfixr-logo {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            font-size: 24px;
+            font-weight: 800;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+            z-index: 20;
+        }
+
         /* Enhanced Emoji Shower Styles */
         .emoji-shower {
             position: fixed;
@@ -84,6 +200,30 @@
                 transform: translateY(0) scale(1);
                 opacity: 1;
             }
+        }
+
+        /* Watch Intro Button */
+        .watch-intro-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #e50ce8;
+            border: 2px solid #e50ce8;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .watch-intro-button:hover {
+            background: #e50ce8;
+            color: white;
+            transform: scale(1.05);
         }
 
         /* Main App Container */
@@ -162,32 +302,6 @@
 
         .scan-icon:active {
             transform: scale(0.98);
-        }
-
-        /* Remove Scan Pulse Effect - commented out */
-        /*
-        .scan-pulse {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 400px;        /* Adjusted for bigger logo */
-            height: 400px;       /* Adjusted for bigger logo */
-            border: 3px solid rgba(233, 30, 99, 0.3);
-            border-radius: 20px;
-            transform: translate(-50%, -50%);
-            animation: pulse 2s infinite;
-        }
-        */
-
-        @keyframes pulse {
-            0% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1.2);
-                opacity: 0;
-            }
         }
 
         /* Trial Status - Updated Colors */
@@ -558,11 +672,6 @@
                 height: 340px;       /* BIGGER on mobile too - increased from 270px */
             }
 
-            .scan-pulse {
-                width: 360px;        /* Adjusted for mobile bigger logo */
-                height: 360px;       /* Adjusted for mobile bigger logo */
-            }
-
             .emoji {
                 width: 35px;
                 height: 35px;
@@ -579,6 +688,24 @@
             }
 
             .result-title {
+                font-size: 20px;
+            }
+
+            .watch-intro-button {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .video-skip-button {
+                top: 20px;
+                right: 20px;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            
+            .video-foodfixr-logo {
+                top: 20px;
+                left: 20px;
                 font-size: 20px;
             }
         }
@@ -598,6 +725,42 @@
     </style>
 </head>
 <body>
+    <!-- Video Intro Overlay -->
+    <div class="video-intro-overlay" id="videoIntroOverlay">
+        <div class="video-container">
+            <!-- Logo -->
+            <div class="video-foodfixr-logo">FOOD FIXR</div>
+            
+            <!-- Loading State -->
+            <div class="video-loading" id="videoLoading">
+                <div class="video-loading-spinner"></div>
+                <div class="video-loading-text">Loading video...</div>
+            </div>
+            
+            <!-- Video Element -->
+            <video id="introVideo" class="intro-video" preload="auto" style="display: none;" muted>
+                <source src="uploads/intro-video.mp4" type="video/mp4">
+                <source src="uploads/intro-video.webm" type="video/webm">
+                Your browser does not support the video tag.
+            </video>
+            
+            <!-- Skip Button -->
+            <button class="video-skip-button" onclick="skipVideoIntro()">
+                Skip Intro →
+            </button>
+            
+            <!-- Progress Bar -->
+            <div class="video-progress-container">
+                <div class="video-progress-bar" id="videoProgressBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watch Intro Button -->
+    <button class="watch-intro-button" onclick="showVideoIntro()" id="watchIntroBtn">
+        📺 Watch Intro
+    </button>
+
     <!-- Enhanced Emoji Shower Container -->
     <div class="emoji-shower" id="emojiShower"></div>
 
@@ -820,6 +983,130 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
+        let hasSeenIntro = localStorage.getItem('foodfixr_seen_intro') === 'true';
+
+        // Video Intro Functions
+        function showVideoIntro() {
+            const overlay = document.getElementById('videoIntroOverlay');
+            const video = document.getElementById('introVideo');
+            const loading = document.getElementById('videoLoading');
+            const progressBar = document.getElementById('videoProgressBar');
+            
+            overlay.classList.remove('hidden');
+            loading.style.display = 'block';
+            video.style.display = 'none';
+            progressBar.style.width = '0%';
+            
+            // Load and play video
+            video.load();
+        }
+
+        function skipVideoIntro() {
+            const overlay = document.getElementById('videoIntroOverlay');
+            overlay.style.transition = 'opacity 0.5s ease';
+            overlay.style.opacity = '0';
+            
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.style.opacity = '1';
+            }, 500);
+            
+            // Remember that user has seen intro
+            localStorage.setItem('foodfixr_seen_intro', 'true');
+            hasSeenIntro = true;
+        }
+
+        // Video Event Handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('introVideo');
+            const loading = document.getElementById('videoLoading');
+            const progressBar = document.getElementById('videoProgressBar');
+            const overlay = document.getElementById('videoIntroOverlay');
+            
+            // Show intro on first visit
+            if (!hasSeenIntro) {
+                showVideoIntro();
+            } else {
+                overlay.classList.add('hidden');
+            }
+            
+            // Video loading
+            video.addEventListener('loadeddata', function() {
+                loading.style.display = 'none';
+                video.style.display = 'block';
+                attemptVideoPlay();
+            });
+            
+            // Video progress
+            video.addEventListener('timeupdate', function() {
+                if (video.duration) {
+                    const progress = (video.currentTime / video.duration) * 100;
+                    progressBar.style.width = progress + '%';
+                }
+            });
+            
+            // Video ended
+            video.addEventListener('ended', function() {
+                skipVideoIntro();
+            });
+            
+            // Video error
+            video.addEventListener('error', function() {
+                loading.innerHTML = '<div class="video-loading-text">Video unavailable. <span style="color: #e50ce8; cursor: pointer;" onclick="skipVideoIntro()">Continue to scanner →</span></div>';
+            });
+            
+            // Auto-play attempt
+            function attemptVideoPlay() {
+                video.play().catch(() => {
+                    // Show play prompt for devices requiring user interaction
+                    showPlayPrompt();
+                });
+            }
+            
+            function showPlayPrompt() {
+                const playPrompt = document.createElement('div');
+                playPrompt.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(229, 12, 232, 0.95);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    text-align: center;
+                    z-index: 30;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                playPrompt.innerHTML = `
+                    <h3 style="margin-bottom: 15px;">▶️ Tap to Play</h3>
+                    <p style="margin-bottom: 20px;">Touch to start the introduction video</p>
+                    <div style="font-size: 12px; opacity: 0.8;">Or skip to scanner →</div>
+                `;
+                
+                playPrompt.onclick = function() {
+                    video.play();
+                    playPrompt.remove();
+                };
+                
+                document.querySelector('.video-container').appendChild(playPrompt);
+            }
+            
+            // Keyboard shortcuts for video
+            document.addEventListener('keydown', function(event) {
+                if (!overlay.classList.contains('hidden')) {
+                    switch(event.key) {
+                        case 'Escape':
+                        case ' ':
+                        case 'Enter':
+                            event.preventDefault();
+                            skipVideoIntro();
+                            break;
+                    }
+                }
+            });
+        });
 
         // Enhanced Emoji Shower System
         const emojiShower = {
