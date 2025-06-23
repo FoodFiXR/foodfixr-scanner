@@ -983,7 +983,14 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
-        let hasSeenIntro = localStorage.getItem('foodfixr_seen_intro') === 'true';
+        let hasSeenIntro = true; // TEMPORARILY DISABLED - Set to true to skip video
+
+        // Video Intro Functions
+        function showVideoIntro() {
+            // TEMPORARILY DISABLED
+            console.log('Video intro disabled for troubleshooting');
+            skipVideoIntro();
+        }
 
         // Video Intro Functions
         function showVideoIntro() {
@@ -1037,15 +1044,10 @@
                 setTimeout(skipVideoIntro, 5000);
             }, 10000); // 10 second timeout
             
-            // Show intro only on first visit
-            if (!hasSeenIntro) {
-                console.log('First visit - showing video intro');
-                showVideoIntro();
-            } else {
-                console.log('User has seen intro before - going directly to scanner');
-                overlay.style.display = 'none';
-                overlay.classList.add('hidden');
-            }
+            // TEMPORARILY SKIP VIDEO - Always go to scanner
+            console.log('Video disabled - going directly to scanner');
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
             
             // Video loading success
             video.addEventListener('loadeddata', function() {
