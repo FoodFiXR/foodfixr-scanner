@@ -694,6 +694,7 @@
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
                 📸 START HERE
+            <p>Take a pic of the food's ingredient list</p>
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
@@ -703,7 +704,7 @@
 
         <!-- History Button -->
         <button class="history-button" onclick="window.location.href='/history'">
-            📊 View Scan History
+            🗃️ View Scan History
         </button>
 
         <!-- Enhanced Loading State -->
