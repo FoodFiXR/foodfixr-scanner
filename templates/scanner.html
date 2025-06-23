@@ -739,8 +739,8 @@
             
             <!-- Video Element -->
             <video id="introVideo" class="intro-video" preload="auto" style="display: none;" muted>
-                <source src="uploads/intro-video.mp4" type="video/mp4">
-                <source src="uploads/intro-video.webm" type="video/webm">
+                <source src="intro-video.mp4" type="video/mp4">
+                <source src="intro-video.webm" type="video/webm">
                 Your browser does not support the video tag.
             </video>
             
@@ -983,7 +983,7 @@
         let scansUsed = {{ session.get('scans_used', 0) }};
         let isPremium = {{ 'true' if session.get('is_premium') else 'false' }};
         let trialExpired = {{ 'true' if trial_expired else 'false' }};
-        let hasSeenIntro = localStorage.getItem('foodfixr_seen_intro') === 'true';
+        let hasSeenIntro = false; // Always show intro for now - you can enable localStorage later
 
         // Video Intro Functions
         function showVideoIntro() {
@@ -993,27 +993,33 @@
             const progressBar = document.getElementById('videoProgressBar');
             
             overlay.classList.remove('hidden');
+            overlay.style.display = 'flex';
             loading.style.display = 'block';
             video.style.display = 'none';
             progressBar.style.width = '0%';
             
-            // Load and play video
+            // Reset video and load
+            video.currentTime = 0;
             video.load();
         }
 
         function skipVideoIntro() {
             const overlay = document.getElementById('videoIntroOverlay');
-            overlay.style.transition = 'opacity 0.5s ease';
-            overlay.style.opacity = '0';
+            const video = document.getElementById('introVideo');
             
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-                overlay.style.opacity = '1';
-            }, 500);
+            // Pause and reset video
+            video.pause();
+            video.currentTime = 0;
             
-            // Remember that user has seen intro
-            localStorage.setItem('foodfixr_seen_intro', 'true');
+            // Hide overlay immediately
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
+            
+            // Mark as seen (uncomment when you want to remember preference)
+            // localStorage.setItem('foodfixr_seen_intro', 'true');
             hasSeenIntro = true;
+            
+            console.log('Video intro skipped');
         }
 
         // Video Event Handlers
@@ -1023,15 +1029,20 @@
             const progressBar = document.getElementById('videoProgressBar');
             const overlay = document.getElementById('videoIntroOverlay');
             
-            // Show intro on first visit
-            if (!hasSeenIntro) {
-                showVideoIntro();
-            } else {
-                overlay.classList.add('hidden');
-            }
+            // Always show intro for testing (remove this condition later)
+            console.log('Page loaded, showing video intro');
+            showVideoIntro();
             
             // Video loading
             video.addEventListener('loadeddata', function() {
+                console.log('Video loaded successfully');
+                loading.style.display = 'none';
+                video.style.display = 'block';
+                attemptVideoPlay();
+            });
+            
+            video.addEventListener('canplay', function() {
+                console.log('Video can play');
                 loading.style.display = 'none';
                 video.style.display = 'block';
                 attemptVideoPlay();
@@ -1047,20 +1058,29 @@
             
             // Video ended
             video.addEventListener('ended', function() {
+                console.log('Video ended');
                 skipVideoIntro();
             });
             
             // Video error
-            video.addEventListener('error', function() {
+            video.addEventListener('error', function(e) {
+                console.error('Video error:', e);
                 loading.innerHTML = '<div class="video-loading-text">Video unavailable. <span style="color: #e50ce8; cursor: pointer;" onclick="skipVideoIntro()">Continue to scanner →</span></div>';
             });
             
             // Auto-play attempt
             function attemptVideoPlay() {
-                video.play().catch(() => {
-                    // Show play prompt for devices requiring user interaction
-                    showPlayPrompt();
-                });
+                console.log('Attempting to play video');
+                const playPromise = video.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Video playing successfully');
+                    }).catch((error) => {
+                        console.log('Autoplay failed:', error);
+                        showPlayPrompt();
+                    });
+                }
             }
             
             function showPlayPrompt() {
