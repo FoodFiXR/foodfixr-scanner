@@ -313,6 +313,66 @@ def login():
     print("DEBUG: Rendering login.html template")
     return render_template('login.html')
 
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not all([email, new_password, confirm_password]):
+            flash('All fields are required', 'error')
+            return render_template('reset_password.html')
+        
+        if new_password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('reset_password.html')
+        
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('reset_password.html')
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Check if user exists
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
+            else:
+                cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
+            
+            user = cursor.fetchone()
+            
+            if not user:
+                flash('No account found with this email address', 'error')
+                conn.close()
+                return render_template('reset_password.html')
+            
+            # Update password
+            password_hash = generate_password_hash(new_password)
+            
+            if database_url:
+                cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
+                             (password_hash, email))
+            else:
+                cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
+                             (password_hash, email))
+            
+            conn.commit()
+            conn.close()
+            
+            flash(f'Password successfully reset for {user["name"]}! You can now login with your new password.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            print(f"Password reset error: {e}")
+            flash('Password reset failed. Please try again.', 'error')
+            return render_template('reset_password.html')
+    
+    return render_template('reset_password.html')
+
 @app.route('/logout')
 def logout():
     user_name = session.get('user_name', 'User')
@@ -599,128 +659,355 @@ def simple_login():
             </form>
             
             <div style="text-align: center; margin-top: 25px;">
-                <a href="/reset-all-passwords" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Passwords</a>
-                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Check Users</a>
+                <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
             </div>
         </div>
     </body>
     </html>
     """
 
-# DEBUG ROUTES
-@app.route('/reset-all-passwords')
-def reset_all_passwords():
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        new_hash = generate_password_hash('test123')
-        
-        # Use appropriate placeholder for database type
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            cursor.execute('UPDATE users SET password_hash = %s', (new_hash,))
-        else:
-            cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
-        
-        updated = cursor.rowcount
-        
-        conn.commit()
-        conn.close()
-        
-        return f"""
-        <html>
-        <body style="font-family: Arial; padding: 20px;">
-        <h1>Passwords Reset</h1>
-        <p>{updated} users updated. All passwords are now: <strong>test123</strong></p>
-        <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-        </body>
-        </html>
-        """
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-
-@app.route('/reset-password', methods=['GET', 'POST'])
-def reset_password():
+# IMPROVED PASSWORD MANAGEMENT ROUTES
+@app.route('/admin-password-reset', methods=['GET', 'POST'])
+def admin_password_reset():
+    """Admin route to reset individual user passwords"""
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         new_password = request.form.get('new_password', '')
+        
+        if not email or not new_password:
+            error_msg = "Both email and password are required"
+        elif len(new_password) < 6:
+            error_msg = "Password must be at least 6 characters long"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Check if user exists
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
+                
+                user = cursor.fetchone()
+                
+                if not user:
+                    error_msg = f"No user found with email: {email}"
+                else:
+                    # Update password
+                    password_hash = generate_password_hash(new_password)
+                    
+                    if database_url:
+                        cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
+                                     (password_hash, email))
+                    else:
+                        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
+                                     (password_hash, email))
+                    
+                    conn.commit()
+                    success_msg = f"Password updated for {user['name']} ({email})"
+                
+                conn.close()
+                
+            except Exception as e:
+                error_msg = f"Database error: {str(e)}"
+    else:
+        error_msg = None
+        success_msg = None
+    
+    # Get all users for the dropdown
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT email, name FROM users ORDER BY name')
+        users = cursor.fetchall()
+        conn.close()
+    except:
+        users = []
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Password Reset</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
+            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
+            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Admin Password Reset</h1>
+            
+            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
+            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Select User Email:</label>
+                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
+                        <option value="">-- Select a user --</option>
+                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
+                    </select>
+                    <div class="quick-fill">
+                        Or type manually: 
+                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                    <div class="quick-fill">
+                        Quick passwords: 
+                        <button type="button" onclick="setPassword('password123')">password123</button>
+                        <button type="button" onclick="setPassword('admin123')">admin123</button>
+                        <button type="button" onclick="setPassword('test123')">test123</button>
+                        <button type="button" onclick="setPassword('user123')">user123</button>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
+                </div>
+            </form>
+            
+            <div class="user-list">
+                <h3>📋 Registered Users ({len(users)} total):</h3>
+                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
+            </div>
+        </div>
+        
+        <script>
+            function fillEmail(email) {{
+                document.getElementById('manual_email').value = email;
+            }}
+            
+            function setPassword(password) {{
+                document.getElementById('new_password').value = password;
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/bulk-password-reset', methods=['GET', 'POST'])
+def bulk_password_reset():
+    """Reset all users to the same password (use with caution)"""
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         
-        if not all([email, new_password, confirm_password]):
-            flash('All fields are required', 'error')
-            return render_template('reset_password.html')
-        
-        if new_password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('reset_password.html')
-        
-        if len(new_password) < 6:
-            flash('Password must be at least 6 characters long', 'error')
-            return render_template('reset_password.html')
-        
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # Check if user exists
-            database_url = os.getenv('DATABASE_URL')
-            if database_url:
-                cursor.execute('SELECT id FROM users WHERE email = %s', (email,))
-            else:
-                cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
-            
-            user = cursor.fetchone()
-            
-            if not user:
-                flash('No account found with this email address', 'error')
+        if not new_password or not confirm_password:
+            error_msg = "Both password fields are required"
+        elif new_password != confirm_password:
+            error_msg = "Passwords do not match"
+        elif len(new_password) < 6:
+            error_msg = "Password must be at least 6 characters long"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                new_hash = generate_password_hash(new_password)
+                
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('UPDATE users SET password_hash = %s', (new_hash,))
+                else:
+                    cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
+                
+                updated = cursor.rowcount
+                conn.commit()
                 conn.close()
-                return render_template('reset_password.html')
-            
-            # Update password
-            password_hash = generate_password_hash(new_password)
-            
-            if database_url:
-                cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
-                             (password_hash, email))
-            else:
-                cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
-                             (password_hash, email))
-            
-            conn.commit()
-            conn.close()
-            
-            flash('Password successfully reset! You can now login with your new password.', 'success')
-            return redirect(url_for('login'))
-            
-        except Exception as e:
-            flash('Password reset failed. Please try again.', 'error')
-            return render_template('reset_password.html')
+                
+                success_msg = f"Password updated for {updated} users. All users can now login with: {new_password}"
+                
+            except Exception as e:
+                error_msg = f"Error: {str(e)}"
+    else:
+        error_msg = None
+        success_msg = None
     
-    return render_template('reset_password.html')
-    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Bulk Password Reset</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .warning {{ background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px solid #ffc107; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            input:focus {{ border-color: #e91e63; outline: none; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-danger {{ background: #dc3545; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>⚠️ Bulk Password Reset</h1>
+            
+            <div class="warning">
+                <strong>⚠️ WARNING:</strong> This will change the password for ALL users in the database. Use with caution!
+            </div>
+            
+            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
+            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="new_password">New Password for All Users:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter password (min 6 chars)" required minlength="6">
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password:</label>
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm password" required minlength="6">
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to reset ALL user passwords?')">
+                        ⚠️ Reset All Passwords
+                    </button>
+                    <a href="/admin-password-reset" class="btn btn-secondary">👤 Individual Reset</a>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+
 @app.route('/check-users')
 def check_users():
+    """Enhanced user management interface"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10')
+        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
         users = cursor.fetchall()
         conn.close()
         
-        html = "<html><body style='font-family: Arial; padding: 20px;'><h1>Users in Database</h1><table border='1' style='border-collapse: collapse;'><tr><th style='padding: 8px;'>ID</th><th style='padding: 8px;'>Name</th><th style='padding: 8px;'>Email</th></tr>"
-        
-        for user in users:
-            html += f"<tr><td style='padding: 8px;'>{user['id']}</td><td style='padding: 8px;'>{user['name']}</td><td style='padding: 8px;'>{user['email']}</td></tr>"
-        
-        html += "</table><br><p>All users can login with password: <strong>test123</strong></p><a href='/simple-login' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Try Login</a></body></html>"
-        
-        return html
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>User Management</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
+                tr:hover {{ background-color: #f5f5f5; }}
+                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
+                .btn-primary {{ background: #e91e63; color: white; }}
+                .btn-secondary {{ background: #666; color: white; }}
+                .btn-success {{ background: #28a745; color: white; }}
+                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
+                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
+                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
+                .premium {{ color: #28a745; font-weight: bold; }}
+                .trial {{ color: #ffc107; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>👥 User Management Dashboard</h1>
+                
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-number">{len(users)}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
+                        <div>Premium Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
+                        <div>Total Scans</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
+                    <a href="/bulk-password-reset" class="btn btn-secondary">⚠️ Bulk Password Reset</a>
+                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Scans Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join([f'''
+                        <tr>
+                            <td>{user[0]}</td>
+                            <td>{user[1]}</td>
+                            <td>{user[2]}</td>
+                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
+                            <td>{user[5] or 0}</td>
+                            <td>{user[3]}</td>
+                        </tr>
+                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
         
     except Exception as e:
-        return f"Database error: {str(e)}"
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>❌ Database Error</h1>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
+        </body>
+        </html>
+        """
 
 @app.route('/debug-routes')
 def debug_routes():
@@ -766,7 +1053,7 @@ def test_login_form():
     </form>
     
     <br><br>
-    <a href="/reset-all-passwords">Reset All Passwords to test123</a><br>
+    <a href="/admin-password-reset">Reset Individual Passwords</a><br>
     <a href="/check-users">Check Users</a><br>
     <a href="/simple-login">Simple Login</a>
     </body>
