@@ -591,10 +591,19 @@ def upgrade():
 def create_checkout_session():
     try:
         data = request.get_json()
-        price_id = data.get('price_id')
+        plan = data.get('plan', 'monthly')  # Default to monthly
         
+        # Map plan names to Stripe price IDs
+        # You'll need to create these price IDs in your Stripe dashboard
+        plan_price_mapping = {
+            'weekly': os.getenv('STRIPE_WEEKLY_PRICE_ID', 'price_weekly_placeholder'),
+            'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_placeholder'), 
+            'yearly': os.getenv('STRIPE_YEARLY_PRICE_ID', 'price_yearly_placeholder')
+        }
+        
+        price_id = plan_price_mapping.get(plan)
         if not price_id:
-            return jsonify({'error': 'Price ID is required'}), 400
+            return jsonify({'error': 'Invalid plan selected'}), 400
         
         user_data = get_user_data(session['user_id'])
         if not user_data:
@@ -637,7 +646,8 @@ def create_checkout_session():
             cancel_url=f"{DOMAIN}/upgrade?canceled=true",
             metadata={
                 'user_id': str(user_data['id']),
-                'user_email': user_data['email']
+                'user_email': user_data['email'],
+                'plan': plan
             }
         )
         
@@ -645,7 +655,7 @@ def create_checkout_session():
         
     except Exception as e:
         print(f"Stripe checkout error: {e}")
-        return jsonify({'error': 'Failed to create checkout session'}), 500
+        return jsonify({'error': f'Failed to create checkout session: {str(e)}'}), 500
 
 @app.route('/payment-success')
 @login_required
@@ -787,6 +797,102 @@ def stripe_webhook():
     
     return '', 200
 
+@app.route('/test-upgrade-user', methods=['GET', 'POST'])
+@login_required
+def test_upgrade_user():
+    """Test route to upgrade current user to premium without Stripe"""
+    if request.method == 'POST':
+        plan = request.form.get('plan', 'monthly')
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = TRUE, 
+                        subscription_status = 'active',
+                        subscription_start_date = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (session['user_id'],))
+            else:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, 
+                        subscription_status = 'active',
+                        subscription_start_date = ?
+                    WHERE id = ?
+                ''', (format_datetime_for_db(), session['user_id']))
+            
+            conn.commit()
+            conn.close()
+            
+            # Update session
+            session['is_premium'] = True
+            
+            success_msg = f"✅ Test upgrade successful! You are now Premium ({plan} plan)"
+            
+        except Exception as e:
+            success_msg = f"❌ Test upgrade failed: {str(e)}"
+    else:
+        success_msg = None
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Test Upgrade User</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🧪 Test User Upgrade</h1>
+            
+            <div class="info">
+                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
+                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
+                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
+            </div>
+            
+            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="plan">Select Plan:</label>
+                    <select id="plan" name="plan" required>
+                        <option value="weekly">Weekly ($3.99/week)</option>
+                        <option value="monthly" selected>Monthly ($11.99/month)</option>
+                        <option value="yearly">Yearly ($95.00/year)</option>
+                    </select>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🚀 Test Upgrade to Premium</button>
+                    <a href="/upgrade" class="btn btn-secondary">💳 Real Stripe Upgrade</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to Scanner</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+
 # SIMPLE LOGIN PAGE
 @app.route('/simple-login', methods=['GET', 'POST'])
 def simple_login():
@@ -863,6 +969,7 @@ def simple_login():
             <div style="text-align: center; margin-top: 25px;">
                 <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
                 <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
+                <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
             </div>
         </div>
     </body>
