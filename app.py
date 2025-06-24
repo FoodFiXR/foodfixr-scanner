@@ -101,6 +101,139 @@ def get_user_data(user_id):
     return dict(user) if user else None
 
 def safe_datetime_parse(date_string):
+    """
+
+@app.route('/simple-login', methods=['GET', 'POST'])
+def simple_login():
+    """Simple standalone login that doesn't redirect to registration"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        print(f"DEBUG: Simple login attempt for: {email}")
+        
+        if not email or not password:
+            error_msg = "Please enter both email and password"
+        else:
+            try:
+                conn = sqlite3.connect('foodfixr.db')
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    print(f"DEBUG: Login successful for {user['name']}")
+                    
+                    # Clear and set session
+                    session.clear()
+                    session.permanent = True
+                    session['user_id'] = user['id']
+                    session['user_email'] = user['email']
+                    session['user_name'] = user['name']
+                    session['is_premium'] = bool(user['is_premium'])
+                    session['scans_used'] = user['scans_used']
+                    session['stripe_customer_id'] = user['stripe_customer_id']
+                    
+                    conn.close()
+                    print("DEBUG: Redirecting to scanner...")
+                    return redirect('/')
+                else:
+                    error_msg = "Invalid email or password"
+                    print(f"DEBUG: Login failed for {email}")
+                    
+                conn.close()
+            except Exception as e:
+                error_msg = f"Login error: {str(e)}"
+                print(f"DEBUG: Login exception: {e}")
+    else:
+        error_msg = None
+    
+    # Return the login form
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FoodFixr Login</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family: Arial; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; margin: 0;">
+        <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr</h1>
+            <h2 style="text-align: center; color: #333; margin-bottom: 30px;">Login to Your Account</h2>
+            
+            {f'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">{error_msg}</div>' if error_msg else ''}
+            
+            <form method="POST" action="/simple-login">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Email Address:</label>
+                    <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px;" placeholder="Enter your email">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Password:</label>
+                    <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px;" placeholder="Enter your password">
+                </div>
+                
+                <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold;">
+                    🔑 Login
+                </button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+                <p style="color: #666; margin-bottom: 15px;">Need help getting in?</p>
+                <a href="/reset-all-passwords" style="display: inline-block; background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">🔧 Reset All Passwords</a>
+                <a href="/check-users" style="display: inline-block; background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">👥 Check Users</a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="color: #999; font-size: 14px;">Don't have an account? <a href="/register" style="color: #e91e63;">Create one here</a></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/quick-login')
+def quick_login():
+    """Quick login page to avoid registration confusion"""
+    return f"""
+    <html>
+    <head><title>Quick Login</title></head>
+    <body style="font-family: Arial; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <h1 style="text-align: center; color: #333; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
+    
+    <form method="POST" action="/login">
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
+            <input type="email" name="email" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
+            <input type="password" name="password" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+        </div>
+        
+        <button type="submit" style="width: 100%; padding: 12px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-bottom: 15px;">
+            Login
+        </button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <p style="color: #666;">Don't have an account? <a href="/register" style="color: #e91e63;">Sign up here</a></p>
+        <p style="color: #666; font-size: 14px;">Need help? <a href="/reset-all-passwords" style="color: #2196F3;">Reset all passwords to 'test123'</a></p>
+    </div>
+    
+    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+        <p style="color: #999; font-size: 12px;">Debug Tools:</p>
+        <a href="/check-users" style="color: #666; font-size: 12px; margin: 0 10px;">Check Users</a>
+        <a href="/session-check" style="color: #666; font-size: 12px; margin: 0 10px;">Session Status</a>
+    </div>
+    </div>
+    </body>
+    </html>
     """Safely parse datetime strings with various formats"""
     if not date_string:
         return datetime.now()
@@ -239,6 +372,9 @@ def register():
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
         
+        print(f"DEBUG: Registration attempt for email: {email}")
+        
+        # Validation
         if not all([name, email, password, confirm_password]):
             flash('All fields are required', 'error')
             return render_template('register.html')
@@ -254,9 +390,12 @@ def register():
         conn = sqlite3.connect('foodfixr.db')
         cursor = conn.cursor()
         
+        # Check if email already exists
         cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
-        if cursor.fetchone():
-            flash('An account with this email already exists', 'error')
+        existing_user = cursor.fetchone()
+        
+        if existing_user:
+            flash('An account with this email already exists. Please login instead.', 'error')
             conn.close()
             return render_template('register.html')
         
@@ -273,7 +412,12 @@ def register():
             
             user_id = cursor.lastrowid
             conn.commit()
+            conn.close()
             
+            print(f"DEBUG: User registered successfully with ID: {user_id}")
+            
+            # Auto-login after registration
+            session.clear()
             session.permanent = True
             session['user_id'] = user_id
             session['user_email'] = email
@@ -282,11 +426,10 @@ def register():
             session['scans_used'] = 0
             session['stripe_customer_id'] = None
             
-            flash(f'Welcome to FoodFixr, {name}! Your free trial has started.', 'success')
-            conn.close()
-            return redirect(url_for('index'))
+            return redirect('/')
             
         except Exception as e:
+            print(f"DEBUG: Registration error: {e}")
             flash('Registration failed. Please try again.', 'error')
             conn.close()
             return render_template('register.html')
