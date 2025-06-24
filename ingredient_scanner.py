@@ -1,247 +1,97 @@
-print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
-    
-    # If text quality is very poor, suggest trying again
-    if text_quality == "very_poor":
-        return "↪️ TRY AGAIN"
-    
-    # NEW RULE 0: SAFETY LABELS OVERRIDE - If safety labels found, it's SAFE
-    if matches.get("has_safety_labels", False):
-        print(f"🛡️ SAFETY LABELS DETECTED - OVERRIDING TO SAFE!")
-        print(f"   Product explicitly states 'no msg', 'non-gmo', or similar safety claims")
-        return "✅ Yay! Safe!"
-    
-    # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
-    high_risk_trans_fat_found = []
-    for ingredient in matches["trans_fat"]:
-        # Check against high risk trans fat list from scanner_config
-        for high_risk_item in trans_fat_high_risk:
-            if high_risk_item.lower() in ingredient.lower():
-                high_risk_trans_fat_found.append(ingredient)
-                print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
-                return "🚨 Oh NOOOO! Danger!"
-    
-    # RULE 2: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
-    high_risk_excitotoxin_found = []
-    for ingredient in matches["excitotoxins"]:
-        # Check against high risk excitotoxin list from scanner_config
-        for high_risk_item in excitotoxin_high_risk:
-            if high_risk_item.lower() in ingredient.lower():
-                high_risk_excitotoxin_found.append(ingredient)
-                print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
-                return "🚨 Oh NOOOO! Danger!"
-    
-    # RULE 3: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
-    total_problematic_count = 0
-    
-    # Count moderate trans fats (not already counted as high risk)
-    moderate_trans_fat_count = 0
-    for ingredient in matches["trans_fat"]:
-        if ingredient not in high_risk_trans_fat_found:
-            # Check if it's a moderate risk trans fat
-            for moderate_item in trans_fat_moderate_risk:
-                if moderate_item.lower() in ingredient.lower():
-                    moderate_trans_fat_count += 1
-                    print(f"⚠️ Moderate trans fat counted: {ingredient}")
-                    break
-    
-    # Count moderate excitotoxins (not already counted as high risk)  
-    moderate_excitotoxin_count = 0
-    for ingredient in matches["excitotoxins"]:
-        if ingredient not in high_risk_excitotoxin_found:
-            # Check if it's a moderate risk excitotoxin
-            for moderate_item in excitotoxin_moderate_risk:
-                if moderate_item.lower() in ingredient.lower():
-                    moderate_excitotoxin_count += 1
-                    print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
-                    break
-            # Also check low risk excitotoxins
-            for low_item in excitotoxin_low_risk:
-                if low_item.lower() in ingredient.lower():
-                    moderate_excitotoxin_count += 1
-                    print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
-                    break
-    
-    # Count ALL corn ingredients (as per document: all corn counts)
-    corn_count = len(matches["corn"])
-    
-    # Count ALL sugar ingredients (only high risk sugars count as problematic)  
-    sugar_count = len(matches["sugar"])  # Only high risk sugars
-    
-    # Calculate total problematic count
-    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
-    
-    print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
-    print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
-    print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
-    print(f"   - Corn ingredients: {corn_count}")
-    print(f"   - Sugar ingredients: {sugar_count}")
-    
-    # RULE 4: Apply hierarchy rules per document
-    # "Per category: if 1-2 stays Proceed Carefully, if 3-4 in food = Oh NOOO! Danger!"
-    if total_problematic_count >= 3:
-        return "🚨 Oh NOOOO! Danger!"
-    elif total_problematic_count >= 1:
-        return "⚠️ Proceed carefully"
-    
-    # If some ingredients detected but no problematic ones
-    if len(matches["all_detected"]) > 0:
-        return "✅ Yay! Safe!"
-    
-    # If poor text quality and no ingredients detected
-    if text_quality in ["poor", "fair"]:
-        return "↪️ TRY AGAIN"
-    
-    return "✅ Yay! Safe!"
+import re
+import os
+import gc
+from scanner_config import *
+import requests
+from PIL import Image, ImageOps, ImageEnhance
 
-def scan_image_for_ingredients(image_path):
-    """Main scanning function with comprehensive memory management"""
+import gc
+import psutil  # Add this for memory monitoring
+import os
+import tempfile
+import time
+from PIL import Image
+import requests
+
+# Enhanced memory monitoring function
+def log_memory_usage(stage="", force_gc=False):
+    """Enhanced memory monitoring with optional garbage collection"""
     try:
-        # CRITICAL: Clean up before starting any processing
-        before_scan_cleanup()
+        if force_gc:
+            # Force multiple GC cycles before measuring
+            for _ in range(3):
+                gc.collect()
+            time.sleep(0.1)  # Allow cleanup to complete
         
-        print(f"\n{'='*80}")
-        print(f"🔬 STARTING MEMORY-OPTIMIZED SCAN: {image_path}")
-        print(f"{'='*80}")
-        print(f"DEBUG: File exists: {os.path.exists(image_path)}")
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
         
-        # Extract text using OCR.space with memory management
-        print("🔍 Starting OCR.space text extraction...")
-        text = extract_text_with_multiple_methods(image_path)
-        print(f"📝 Extracted text length: {len(text)} characters")
-        
-        if text:
-            print(f"📋 EXTRACTED TEXT:\n{text}")
-        else:
-            print("❌ No text extracted!")
-        
-        # Assess text quality
-        text_quality = assess_text_quality_enhanced(text)
-        print(f"📊 Text quality assessment: {text_quality}")
-        
-        # Match ingredients using PRECISE system
-        print("🧬 Starting PRECISE ingredient matching...")
-        matches = match_all_ingredients(text)
-        
-        # Rate ingredients according to hierarchy (now with safety label override)
-        print("⚖️ Applying hierarchy-based rating with safety label override...")
-        rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
-        print(f"🏆 Final rating: {rating}")
-        
-        # Determine confidence
-        confidence = determine_confidence(text_quality, text, matches)
-        
-        # Check for GMO Alert (but don't show if safety labels found)
-        gmo_alert = None
-        if matches["gmo"] and not matches.get("has_safety_labels", False):
-            gmo_alert = "📣 GMO Alert!"
-        
-        # Create comprehensive result
-        result = {
-            "rating": rating,
-            "matched_ingredients": matches,
-            "confidence": confidence,
-            "extracted_text_length": len(text),
-            "text_quality": text_quality,
-            "extracted_text": text,
-            "gmo_alert": gmo_alert,
-            "has_safety_labels": matches.get("has_safety_labels", False)  # NEW: Include in result
-        }
-        
-        # Print comprehensive summary
-        print_scan_summary(result)
-        
-        # Final cleanup
-        aggressive_cleanup()
-        
-        return result
-        
+        # Critical memory threshold - force cleanup if too high
+        if memory_mb > 150:  # Lowered threshold for memory-constrained environments
+            print(f"DEBUG: CRITICAL memory usage! Forcing aggressive cleanup...")
+            for _ in range(5):
+                gc.collect()
+            time.sleep(0.2)
+            
+            # Re-measure after cleanup
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            print(f"DEBUG: Memory after emergency cleanup: {memory_mb:.1f} MB")
+            
+        return memory_mb
     except Exception as e:
-        print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"DEBUG: Memory monitoring error: {e}")
+        return 0
+
+def aggressive_cleanup():
+    """Ultra-aggressive memory cleanup"""
+    try:
+        # Force multiple garbage collection cycles
+        for _ in range(5):  # Increased from 3
+            gc.collect()
         
-        # Force cleanup on error
-        aggressive_cleanup()
+        # Clear PIL cache
+        Image.MAX_IMAGE_PIXELS = 50000000  # Set conservative limit
         
-        return create_error_result(str(e))
+        # Force Python to release memory back to OS (if possible)
+        if hasattr(gc, 'set_threshold'):
+            gc.set_threshold(0, 0, 0)  # Disable automatic GC temporarily
+            gc.collect()
+            gc.set_threshold(700, 10, 10)  # Re-enable with aggressive settings
+        
+        print("DEBUG: Aggressive cleanup completed")
+    except Exception as e:
+        print(f"DEBUG: Cleanup error: {e}")
 
-def determine_confidence(text_quality, text, matches):
-    """Determine confidence level based on multiple factors"""
-    if text_quality == "very_poor":
-        return "very_low"
-    elif text_quality == "poor":
-        return "low"
-    elif text_quality == "fair":
-        return "medium"
-    elif len(text) > 50 and len(matches["all_detected"]) > 0:
-        return "high"
-    elif len(text) > 20:
-        return "medium"
-    else:
-        return "low"
-
-def create_error_result(error_message):
-    """Create standardized error result"""
-    return {
-        "rating": "↪️ TRY AGAIN",
-        "matched_ingredients": {
-            "trans_fat": [], "excitotoxins": [], "corn": [], 
-            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": [],
-            "has_safety_labels": False
-        },
-        "confidence": "very_low",
-        "text_quality": "very_poor",
-        "extracted_text_length": 0,
-        "gmo_alert": None,
-        "has_safety_labels": False,
-        "error": error_message
-    }
-
-def print_scan_summary(result):
-    """Print comprehensive scan summary"""
-    print(f"\n{'🎯 SCAN SUMMARY':=^80}")
-    print(f"🏆 FINAL RATING: {result['rating']}")
-    print(f"🎯 Confidence: {result['confidence']}")
-    print(f"📊 Text Quality: {result['text_quality']}")
-    print(f"📝 Text Length: {result['extracted_text_length']} characters")
+def ultra_minimal_compress(image_path, max_size_kb=80):
+    """Ultra-minimal memory footprint compression for emergency situations"""
+    log_memory_usage("before ultra minimal", force_gc=True)
     
-    if result.get('has_safety_labels', False):
-        print(f"🛡️ SAFETY LABELS DETECTED: Product claims to be safe (no msg, non-gmo, etc.)")
+    temp_path = None
+    img = None
     
-    if result['gmo_alert']:
-        print(f"📣 {result['gmo_alert']}")
-    
-    print(f"\n🧬 DETECTED INGREDIENTS BY CATEGORY:")
-    for category, ingredients in result['matched_ingredients'].items():
-        if category == "has_safety_labels":
-            continue
-        if ingredients:
-            emoji = get_category_emoji(category)
-            print(f"  {emoji} {category.replace('_', ' ').title()}: {ingredients}")
-        else:
-            print(f"  ❌ {category.replace('_', ' ').title()}: None detected")
-    
-    total_detected = len(result['matched_ingredients']['all_detected'])
-    print(f"\n📊 TOTAL UNIQUE INGREDIENTS DETECTED: {total_detected}")
-    print(f"{'='*80}\n")
-
-def get_category_emoji(category):
-    """Get emoji for ingredient category"""
-    emoji_map = {
-        'trans_fat': '🚫',
-        'excitotoxins': '⚠️',
-        'corn': '🌽',
-        'sugar': '🍯',
-        'sugar_safe': '✅',
-        'gmo': '👽',
-        'all_detected': '📋'
-    }
-    return emoji_map.get(category, '📝')
-
-# Additional utility function for backwards compatibility
-def analyze_ingredients(text):
-    """Wrapper function for backwards compatibility"""
-    return match_all_ingredients(text)constrained environments
+    try:
+        # Check if compression is even needed
+        current_size_kb = os.path.getsize(image_path) / 1024
+        print(f"DEBUG: Ultra minimal - current size: {current_size_kb:.1f} KB")
+        
+        if current_size_kb <= max_size_kb:
+            print("DEBUG: Size OK, no compression needed")
+            return image_path
+        
+        # Create temp file
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"ultra_compressed_{int(time.time())}.jpg")
+        
+        # Single-pass processing with minimal memory
+        with Image.open(image_path) as img:
+            # Get dimensions without loading full image into memory
+            width, height = img.size
+            mode = img.mode
+            
+            print(f"DEBUG: Original: {width}x{height}, mode: {mode}")
+            
+            # Calculate target size very aggressively for memory-constrained environments
             max_dim = min(350, max(width, height) // 4)  # Very aggressive downsizing
             if width > height:
                 new_width = max_dim
@@ -1012,97 +862,247 @@ def match_all_ingredients(text):
 def rate_ingredients_according_to_hierarchy(matches, text_quality):
     """Rating system with safety label override"""
     
-    print(fimport re
-import os
-import gc
-from scanner_config import *
-import requests
-from PIL import Image, ImageOps, ImageEnhance
-
-import gc
-import psutil  # Add this for memory monitoring
-import os
-import tempfile
-import time
-from PIL import Image
-import requests
-
-# Enhanced memory monitoring function
-def log_memory_usage(stage="", force_gc=False):
-    """Enhanced memory monitoring with optional garbage collection"""
-    try:
-        if force_gc:
-            # Force multiple GC cycles before measuring
-            for _ in range(3):
-                gc.collect()
-            time.sleep(0.1)  # Allow cleanup to complete
-        
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
-        
-        # Critical memory threshold - force cleanup if too high
-        if memory_mb > 150:  # Lowered threshold for memory-constrained environments
-            print(f"DEBUG: CRITICAL memory usage! Forcing aggressive cleanup...")
-            for _ in range(5):
-                gc.collect()
-            time.sleep(0.2)
-            
-            # Re-measure after cleanup
-            memory_mb = process.memory_info().rss / 1024 / 1024
-            print(f"DEBUG: Memory after emergency cleanup: {memory_mb:.1f} MB")
-            
-        return memory_mb
-    except Exception as e:
-        print(f"DEBUG: Memory monitoring error: {e}")
-        return 0
-
-def aggressive_cleanup():
-    """Ultra-aggressive memory cleanup"""
-    try:
-        # Force multiple garbage collection cycles
-        for _ in range(5):  # Increased from 3
-            gc.collect()
-        
-        # Clear PIL cache
-        Image.MAX_IMAGE_PIXELS = 50000000  # Set conservative limit
-        
-        # Force Python to release memory back to OS (if possible)
-        if hasattr(gc, 'set_threshold'):
-            gc.set_threshold(0, 0, 0)  # Disable automatic GC temporarily
-            gc.collect()
-            gc.set_threshold(700, 10, 10)  # Re-enable with aggressive settings
-        
-        print("DEBUG: Aggressive cleanup completed")
-    except Exception as e:
-        print(f"DEBUG: Cleanup error: {e}")
-
-def ultra_minimal_compress(image_path, max_size_kb=80):
-    """Ultra-minimal memory footprint compression for emergency situations"""
-    log_memory_usage("before ultra minimal", force_gc=True)
+    print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
     
-    temp_path = None
-    img = None
+    # If text quality is very poor, suggest trying again
+    if text_quality == "very_poor":
+        return "↪️ TRY AGAIN"
     
+    # NEW RULE 0: SAFETY LABELS OVERRIDE - If safety labels found, it's SAFE
+    if matches.get("has_safety_labels", False):
+        print(f"🛡️ SAFETY LABELS DETECTED - OVERRIDING TO SAFE!")
+        print(f"   Product explicitly states 'no msg', 'non-gmo', or similar safety claims")
+        return "✅ Yay! Safe!"
+    
+    # RULE 1: HIGH RISK TRANS FATS - ANY ONE = immediate danger
+    high_risk_trans_fat_found = []
+    for ingredient in matches["trans_fat"]:
+        # Check against high risk trans fat list from scanner_config
+        for high_risk_item in trans_fat_high_risk:
+            if high_risk_item.lower() in ingredient.lower():
+                high_risk_trans_fat_found.append(ingredient)
+                print(f"🚨 HIGH RISK Trans Fat detected: {ingredient}")
+                return "🚨 Oh NOOOO! Danger!"
+    
+    # RULE 2: HIGH RISK EXCITOTOXINS - ANY ONE = immediate danger  
+    high_risk_excitotoxin_found = []
+    for ingredient in matches["excitotoxins"]:
+        # Check against high risk excitotoxin list from scanner_config
+        for high_risk_item in excitotoxin_high_risk:
+            if high_risk_item.lower() in ingredient.lower():
+                high_risk_excitotoxin_found.append(ingredient)
+                print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
+                return "🚨 Oh NOOOO! Danger!"
+    
+    # RULE 3: COUNT ALL OTHER PROBLEMATIC INGREDIENTS
+    total_problematic_count = 0
+    
+    # Count moderate trans fats (not already counted as high risk)
+    moderate_trans_fat_count = 0
+    for ingredient in matches["trans_fat"]:
+        if ingredient not in high_risk_trans_fat_found:
+            # Check if it's a moderate risk trans fat
+            for moderate_item in trans_fat_moderate_risk:
+                if moderate_item.lower() in ingredient.lower():
+                    moderate_trans_fat_count += 1
+                    print(f"⚠️ Moderate trans fat counted: {ingredient}")
+                    break
+    
+    # Count moderate excitotoxins (not already counted as high risk)  
+    moderate_excitotoxin_count = 0
+    for ingredient in matches["excitotoxins"]:
+        if ingredient not in high_risk_excitotoxin_found:
+            # Check if it's a moderate risk excitotoxin
+            for moderate_item in excitotoxin_moderate_risk:
+                if moderate_item.lower() in ingredient.lower():
+                    moderate_excitotoxin_count += 1
+                    print(f"⚠️ Moderate excitotoxin counted: {ingredient}")
+                    break
+            # Also check low risk excitotoxins
+            for low_item in excitotoxin_low_risk:
+                if low_item.lower() in ingredient.lower():
+                    moderate_excitotoxin_count += 1
+                    print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
+                    break
+    
+    # Count ALL corn ingredients (as per document: all corn counts)
+    corn_count = len(matches["corn"])
+    
+    # Count ALL sugar ingredients (only high risk sugars count as problematic)  
+    sugar_count = len(matches["sugar"])  # Only high risk sugars
+    
+    # Calculate total problematic count
+    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
+    
+    print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
+    print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
+    print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
+    print(f"   - Corn ingredients: {corn_count}")
+    print(f"   - Sugar ingredients: {sugar_count}")
+    
+    # RULE 4: Apply hierarchy rules per document
+    # "Per category: if 1-2 stays Proceed Carefully, if 3-4 in food = Oh NOOO! Danger!"
+    if total_problematic_count >= 3:
+        return "🚨 Oh NOOOO! Danger!"
+    elif total_problematic_count >= 1:
+        return "⚠️ Proceed carefully"
+    
+    # If some ingredients detected but no problematic ones
+    if len(matches["all_detected"]) > 0:
+        return "✅ Yay! Safe!"
+    
+    # If poor text quality and no ingredients detected
+    if text_quality in ["poor", "fair"]:
+        return "↪️ TRY AGAIN"
+    
+    return "✅ Yay! Safe!"
+
+def scan_image_for_ingredients(image_path):
+    """Main scanning function with comprehensive memory management"""
     try:
-        # Check if compression is even needed
-        current_size_kb = os.path.getsize(image_path) / 1024
-        print(f"DEBUG: Ultra minimal - current size: {current_size_kb:.1f} KB")
+        # CRITICAL: Clean up before starting any processing
+        before_scan_cleanup()
         
-        if current_size_kb <= max_size_kb:
-            print("DEBUG: Size OK, no compression needed")
-            return image_path
+        print(f"\n{'='*80}")
+        print(f"🔬 STARTING MEMORY-OPTIMIZED SCAN: {image_path}")
+        print(f"{'='*80}")
+        print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
-        # Create temp file
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"ultra_compressed_{int(time.time())}.jpg")
+        # Extract text using OCR.space with memory management
+        print("🔍 Starting OCR.space text extraction...")
+        text = extract_text_with_multiple_methods(image_path)
+        print(f"📝 Extracted text length: {len(text)} characters")
         
-        # Single-pass processing with minimal memory
-        with Image.open(image_path) as img:
-            # Get dimensions without loading full image into memory
-            width, height = img.size
-            mode = img.mode
-            
-            print(f"DEBUG: Original: {width}x{height}, mode: {mode}")
-            
-            # Calculate target size very aggressively for memory-
+        if text:
+            print(f"📋 EXTRACTED TEXT:\n{text}")
+        else:
+            print("❌ No text extracted!")
+        
+        # Assess text quality
+        text_quality = assess_text_quality_enhanced(text)
+        print(f"📊 Text quality assessment: {text_quality}")
+        
+        # Match ingredients using PRECISE system
+        print("🧬 Starting PRECISE ingredient matching...")
+        matches = match_all_ingredients(text)
+        
+        # Rate ingredients according to hierarchy (now with safety label override)
+        print("⚖️ Applying hierarchy-based rating with safety label override...")
+        rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
+        print(f"🏆 Final rating: {rating}")
+        
+        # Determine confidence
+        confidence = determine_confidence(text_quality, text, matches)
+        
+        # Check for GMO Alert (but don't show if safety labels found)
+        gmo_alert = None
+        if matches["gmo"] and not matches.get("has_safety_labels", False):
+            gmo_alert = "📣 GMO Alert!"
+        
+        # Create comprehensive result
+        result = {
+            "rating": rating,
+            "matched_ingredients": matches,
+            "confidence": confidence,
+            "extracted_text_length": len(text),
+            "text_quality": text_quality,
+            "extracted_text": text,
+            "gmo_alert": gmo_alert,
+            "has_safety_labels": matches.get("has_safety_labels", False)  # NEW: Include in result
+        }
+        
+        # Print comprehensive summary
+        print_scan_summary(result)
+        
+        # Final cleanup
+        aggressive_cleanup()
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Force cleanup on error
+        aggressive_cleanup()
+        
+        return create_error_result(str(e))
+
+def determine_confidence(text_quality, text, matches):
+    """Determine confidence level based on multiple factors"""
+    if text_quality == "very_poor":
+        return "very_low"
+    elif text_quality == "poor":
+        return "low"
+    elif text_quality == "fair":
+        return "medium"
+    elif len(text) > 50 and len(matches["all_detected"]) > 0:
+        return "high"
+    elif len(text) > 20:
+        return "medium"
+    else:
+        return "low"
+
+def create_error_result(error_message):
+    """Create standardized error result"""
+    return {
+        "rating": "↪️ TRY AGAIN",
+        "matched_ingredients": {
+            "trans_fat": [], "excitotoxins": [], "corn": [], 
+            "sugar": [], "sugar_safe": [], "gmo": [], "all_detected": [],
+            "has_safety_labels": False
+        },
+        "confidence": "very_low",
+        "text_quality": "very_poor",
+        "extracted_text_length": 0,
+        "gmo_alert": None,
+        "has_safety_labels": False,
+        "error": error_message
+    }
+
+def print_scan_summary(result):
+    """Print comprehensive scan summary"""
+    print(f"\n{'🎯 SCAN SUMMARY':=^80}")
+    print(f"🏆 FINAL RATING: {result['rating']}")
+    print(f"🎯 Confidence: {result['confidence']}")
+    print(f"📊 Text Quality: {result['text_quality']}")
+    print(f"📝 Text Length: {result['extracted_text_length']} characters")
+    
+    if result.get('has_safety_labels', False):
+        print(f"🛡️ SAFETY LABELS DETECTED: Product claims to be safe (no msg, non-gmo, etc.)")
+    
+    if result['gmo_alert']:
+        print(f"📣 {result['gmo_alert']}")
+    
+    print(f"\n🧬 DETECTED INGREDIENTS BY CATEGORY:")
+    for category, ingredients in result['matched_ingredients'].items():
+        if category == "has_safety_labels":
+            continue
+        if ingredients:
+            emoji = get_category_emoji(category)
+            print(f"  {emoji} {category.replace('_', ' ').title()}: {ingredients}")
+        else:
+            print(f"  ❌ {category.replace('_', ' ').title()}: None detected")
+    
+    total_detected = len(result['matched_ingredients']['all_detected'])
+    print(f"\n📊 TOTAL UNIQUE INGREDIENTS DETECTED: {total_detected}")
+    print(f"{'='*80}\n")
+
+def get_category_emoji(category):
+    """Get emoji for ingredient category"""
+    emoji_map = {
+        'trans_fat': '🚫',
+        'excitotoxins': '⚠️',
+        'corn': '🌽',
+        'sugar': '🍯',
+        'sugar_safe': '✅',
+        'gmo': '👽',
+        'all_detected': '📋'
+    }
+    return emoji_map.get(category, '📝')
+
+# Additional utility function for backwards compatibility
+def analyze_ingredients(text):
+    """Wrapper function for backwards compatibility"""
+    return match_all_ingredients(text)
