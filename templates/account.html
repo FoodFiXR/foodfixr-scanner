@@ -679,16 +679,6 @@
                         {{ total_scans_ever or session.get('scans_used', 0) }}
                     </div>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Customer ID</div>
-                    <div class="detail-value">
-                        {% if session.get('stripe_customer_id') %}
-                            {{ session.get('stripe_customer_id')[:8] }}...
-                        {% else %}
-                            Not Available
-                        {% endif %}
-                    </div>
-                </div>
             </div>
         </div>
 
