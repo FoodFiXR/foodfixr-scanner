@@ -585,6 +585,208 @@ def upgrade():
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
+# STRIPE PAYMENT PROCESSING ROUTES
+@app.route('/create-checkout-session', methods=['POST'])
+@login_required
+def create_checkout_session():
+    try:
+        data = request.get_json()
+        price_id = data.get('price_id')
+        
+        if not price_id:
+            return jsonify({'error': 'Price ID is required'}), 400
+        
+        user_data = get_user_data(session['user_id'])
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Create or retrieve Stripe customer
+        stripe_customer_id = user_data.get('stripe_customer_id')
+        
+        if not stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=user_data['email'],
+                name=user_data['name'],
+                metadata={'user_id': str(user_data['id'])}
+            )
+            stripe_customer_id = customer.id
+            
+            # Update user with Stripe customer ID
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('UPDATE users SET stripe_customer_id = %s WHERE id = %s', 
+                             (stripe_customer_id, user_data['id']))
+            else:
+                cursor.execute('UPDATE users SET stripe_customer_id = ? WHERE id = ?', 
+                             (stripe_customer_id, user_data['id']))
+            conn.commit()
+            conn.close()
+        
+        # Create checkout session
+        checkout_session = stripe.checkout.Session.create(
+            customer=stripe_customer_id,
+            payment_method_types=['card'],
+            line_items=[{
+                'price': price_id,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f"{DOMAIN}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{DOMAIN}/upgrade?canceled=true",
+            metadata={
+                'user_id': str(user_data['id']),
+                'user_email': user_data['email']
+            }
+        )
+        
+        return jsonify({'checkout_url': checkout_session.url})
+        
+    except Exception as e:
+        print(f"Stripe checkout error: {e}")
+        return jsonify({'error': 'Failed to create checkout session'}), 500
+
+@app.route('/payment-success')
+@login_required
+def payment_success():
+    session_id = request.args.get('session_id')
+    
+    if not session_id:
+        flash('Invalid payment session', 'error')
+        return redirect(url_for('upgrade'))
+    
+    try:
+        # Retrieve the checkout session
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+        
+        if checkout_session.payment_status == 'paid':
+            # Update user to premium
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = TRUE, 
+                        subscription_status = 'active',
+                        subscription_start_date = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (session['user_id'],))
+            else:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, 
+                        subscription_status = 'active',
+                        subscription_start_date = ?
+                    WHERE id = ?
+                ''', (format_datetime_for_db(), session['user_id']))
+            
+            conn.commit()
+            conn.close()
+            
+            # Update session
+            session['is_premium'] = True
+            
+            flash('🎉 Welcome to FoodFixr Premium! Enjoy unlimited scans!', 'success')
+            return redirect('/')
+        else:
+            flash('Payment was not completed successfully', 'error')
+            return redirect(url_for('upgrade'))
+            
+    except Exception as e:
+        print(f"Payment success error: {e}")
+        flash('Error processing payment confirmation', 'error')
+        return redirect(url_for('upgrade'))
+
+@app.route('/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+    except ValueError as e:
+        print(f"Invalid payload: {e}")
+        return '', 400
+    except stripe.error.SignatureVerificationError as e:
+        print(f"Invalid signature: {e}")
+        return '', 400
+    
+    # Handle the event
+    if event['type'] == 'checkout.session.completed':
+        session_data = event['data']['object']
+        user_id = session_data['metadata'].get('user_id')
+        
+        if user_id:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('''
+                        UPDATE users 
+                        SET is_premium = TRUE, 
+                            subscription_status = 'active',
+                            subscription_start_date = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (user_id,))
+                else:
+                    cursor.execute('''
+                        UPDATE users 
+                        SET is_premium = 1, 
+                            subscription_status = 'active',
+                            subscription_start_date = ?
+                        WHERE id = ?
+                    ''', (format_datetime_for_db(), user_id))
+                
+                conn.commit()
+                conn.close()
+                print(f"User {user_id} upgraded to premium via webhook")
+                
+            except Exception as e:
+                print(f"Webhook database error: {e}")
+    
+    elif event['type'] == 'customer.subscription.deleted':
+        # Handle subscription cancellation
+        subscription = event['data']['object']
+        customer_id = subscription['customer']
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = FALSE, 
+                        subscription_status = 'canceled'
+                    WHERE stripe_customer_id = %s
+                ''', (customer_id,))
+            else:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 0, 
+                        subscription_status = 'canceled'
+                    WHERE stripe_customer_id = ?
+                ''', (customer_id,))
+            
+            conn.commit()
+            conn.close()
+            print(f"Subscription canceled for customer {customer_id}")
+            
+        except Exception as e:
+            print(f"Webhook cancellation error: {e}")
+    
+    return '', 200
+
 # SIMPLE LOGIN PAGE
 @app.route('/simple-login', methods=['GET', 'POST'])
 def simple_login():
