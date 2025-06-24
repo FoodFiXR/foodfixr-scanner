@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import tempfile
@@ -435,11 +435,16 @@ def scan():
         
         result = scan_image_for_ingredients(filepath)
         
+        # Store more detailed scan information
         conn = get_db_connection()
         cursor = conn.cursor()
         
         new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
         new_total_scans = user_data['total_scans_ever'] + 1
+        
+        # Convert result to JSON string for better storage
+        import json
+        ingredients_json = json.dumps(result.get('matched_ingredients', {}))
         
         # Use appropriate placeholder for database type
         database_url = os.getenv('DATABASE_URL')
@@ -451,9 +456,9 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s)
-            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), str(uuid.uuid4())))
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+            ''', (session['user_id'], result.get('rating', ''), ingredients_json, str(uuid.uuid4()), ''))
         else:
             cursor.execute('''
                 UPDATE users 
@@ -462,10 +467,10 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), 
-                  format_datetime_for_db(), str(uuid.uuid4())))
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (session['user_id'], result.get('rating', ''), ingredients_json, 
+                  format_datetime_for_db(), str(uuid.uuid4()), ''))
         
         conn.commit()
         conn.close()
@@ -556,12 +561,72 @@ def history():
             elif 'Proceed' in rating or 'carefully' in rating:
                 rating_type = 'caution'
             
+            # Parse ingredients_found (it's now stored as JSON)
+            ingredients_found_str = row['ingredients_found'] or '{}'
+            detected_ingredients = []
+            ingredient_summary = {}
+            has_gmo = False
+            
+            try:
+                # Try to parse the ingredients_found as JSON first
+                import json
+                ingredients_dict = json.loads(ingredients_found_str)
+                
+                # Extract ingredients and build summary
+                for category, ingredients_list in ingredients_dict.items():
+                    if isinstance(ingredients_list, list):
+                        detected_ingredients.extend(ingredients_list)
+                        ingredient_summary[category] = len(ingredients_list)
+                        if category == 'gmo' and len(ingredients_list) > 0:
+                            has_gmo = True
+                        stats['ingredients_found'] += len(ingredients_list)
+                    elif isinstance(ingredients_list, str) and ingredients_list:
+                        detected_ingredients.append(ingredients_list)
+                        ingredient_summary[category] = 1
+                        if category == 'gmo':
+                            has_gmo = True
+                        stats['ingredients_found'] += 1
+                        
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try the old string parsing method
+                try:
+                    if ingredients_found_str.startswith('{') and ingredients_found_str.endswith('}'):
+                        import ast
+                        ingredients_dict = ast.literal_eval(ingredients_found_str)
+                        
+                        for category, ingredients_list in ingredients_dict.items():
+                            if isinstance(ingredients_list, list):
+                                detected_ingredients.extend(ingredients_list)
+                                ingredient_summary[category] = len(ingredients_list)
+                                if category == 'gmo' and len(ingredients_list) > 0:
+                                    has_gmo = True
+                            stats['ingredients_found'] += len(ingredients_list) if isinstance(ingredients_list, list) else 0
+                    else:
+                        # If it's just a string, treat it as a single ingredient
+                        if ingredients_found_str.strip():
+                            detected_ingredients = [ingredients_found_str.strip()]
+                            ingredient_summary['other'] = 1
+                            stats['ingredients_found'] += 1
+                except:
+                    # If all parsing fails, just use the raw string
+                    if ingredients_found_str.strip():
+                        detected_ingredients = [ingredients_found_str.strip()]
+                        ingredient_summary['other'] = 1
+                        stats['ingredients_found'] += 1
+            
             scan_entry = {
                 'scan_id': row['scan_id'],
                 'date': scan_date.strftime("%m/%d/%Y"),
                 'time': scan_date.strftime("%I:%M %p"),
                 'rating_type': rating_type,
                 'raw_rating': rating,
+                'detected_ingredients': detected_ingredients,
+                'ingredient_summary': ingredient_summary,
+                'has_gmo': has_gmo,
+                'confidence': 'medium',  # Default confidence level
+                'image_url': row.get('image_url', ''),  # May be empty
+                'extracted_text': '',  # Not currently stored
+                'text_length': 0,  # Not currently stored
             }
             
             scans.append(scan_entry)
@@ -796,6 +861,188 @@ def stripe_webhook():
             print(f"Webhook cancellation error: {e}")
     
     return '', 200
+
+@app.route('/debug-history')
+@login_required
+def debug_history():
+    """Debug route to show raw scan history data"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('''
+                SELECT * FROM scan_history 
+                WHERE user_id = %s 
+                ORDER BY scan_date DESC 
+                LIMIT 20
+            ''', (session['user_id'],))
+        else:
+            cursor.execute('''
+                SELECT * FROM scan_history 
+                WHERE user_id = ? 
+                ORDER BY scan_date DESC 
+                LIMIT 20
+            ''', (session['user_id'],))
+        
+        scans = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Debug History - FoodFixr</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+                th { background-color: #f8f9fa; }
+                .btn { padding: 8px 16px; margin: 5px; background: #e91e63; color: white; text-decoration: none; border-radius: 5px; }
+                .scan-data { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .full-data { max-width: none; white-space: pre-wrap; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔍 Debug Scan History</h1>
+                <a href="/history" class="btn">← Back to History</a>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Rating</th>
+                            <th>Ingredients Found</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        
+        for scan in scans:
+            html += f"""
+                        <tr>
+                            <td>{scan['id']}</td>
+                            <td>{scan['scan_date']}</td>
+                            <td>{scan['result_rating'] or 'None'}</td>
+                            <td class="scan-data" title="{scan['ingredients_found'] or 'None'}">{scan['ingredients_found'] or 'None'}</td>
+                            <td>
+                                <button onclick="toggleData(this)" class="btn" style="font-size: 12px;">Show Full</button>
+                            </td>
+                        </tr>
+            """
+        
+        html += """
+                    </tbody>
+                </table>
+            </div>
+            
+            <script>
+                function toggleData(btn) {
+                    const cell = btn.parentElement.previousElementSibling;
+                    if (cell.classList.contains('full-data')) {
+                        cell.classList.remove('full-data');
+                        btn.textContent = 'Show Full';
+                    } else {
+                        cell.classList.add('full-data');
+                        btn.textContent = 'Hide';
+                    }
+                }
+            </script>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"Debug history error: {str(e)}"
+
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history (Premium feature)"""
+    user_data = get_user_data(session['user_id'])
+    if not user_data or not user_data['is_premium']:
+        return jsonify({'success': False, 'error': 'Premium subscription required'}), 403
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('DELETE FROM scan_history WHERE user_id = %s', (session['user_id'],))
+        else:
+            cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'History cleared successfully'})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to clear history'}), 500
+
+@app.route('/export-history')
+@login_required
+def export_history():
+    """Export user's scan history as CSV (Premium feature)"""
+    user_data = get_user_data(session['user_id'])
+    if not user_data or not user_data['is_premium']:
+        flash('Premium subscription required for history export', 'error')
+        return redirect(url_for('history'))
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('''
+                SELECT scan_date, result_rating, ingredients_found 
+                FROM scan_history 
+                WHERE user_id = %s 
+                ORDER BY scan_date DESC
+            ''', (session['user_id'],))
+        else:
+            cursor.execute('''
+                SELECT scan_date, result_rating, ingredients_found 
+                FROM scan_history 
+                WHERE user_id = ? 
+                ORDER BY scan_date DESC
+            ''', (session['user_id'],))
+        
+        scans = cursor.fetchall()
+        conn.close()
+        
+        # Create CSV content
+        csv_content = "Date,Time,Result,Ingredients\n"
+        for scan in scans:
+            scan_date = safe_datetime_parse(scan['scan_date'])
+            date_str = scan_date.strftime("%Y-%m-%d")
+            time_str = scan_date.strftime("%H:%M:%S")
+            result = (scan['result_rating'] or '').replace(',', ';')  # Replace commas to avoid CSV issues
+            ingredients = (scan['ingredients_found'] or '').replace(',', ';')
+            csv_content += f'"{date_str}","{time_str}","{result}","{ingredients}"\n'
+        
+        # Return CSV file
+        response = make_response(csv_content)
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Export history error: {e}")
+        flash('Failed to export history', 'error')
+        return redirect(url_for('history'))
 
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
 @login_required
@@ -1317,6 +1564,30 @@ def check_users():
         </body>
         </html>
         """
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files including emoji images"""
+    # For now, we'll redirect to a generic emoji or return a placeholder
+    # In production, you'd want to add actual image files
+    from flask import send_from_directory
+    import os
+    
+    # Try to serve from static directory if it exists
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    if os.path.exists(static_dir) and os.path.exists(os.path.join(static_dir, filename)):
+        return send_from_directory(static_dir, filename)
+    
+    # Return a placeholder response for missing static files
+    if filename.endswith('.png'):
+        return """
+        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="15" fill="#e91e63"/>
+            <text x="16" y="20" text-anchor="middle" fill="white" font-size="12">🍎</text>
+        </svg>
+        """, 200, {'Content-Type': 'image/svg+xml'}
+    
+    return "File not found", 404
 
 @app.route('/debug-routes')
 def debug_routes():
