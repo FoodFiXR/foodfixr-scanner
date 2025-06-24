@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import tempfile
@@ -655,8 +655,6 @@ def account():
                          days_until_renewal=days_until_renewal,
                          billing_portal_url='/create-customer-portal')
 
-# Add this debug route to your app.py file (you can add it anywhere after your other routes)
-
 @app.route('/debug-billing')
 @login_required
 def debug_billing():
@@ -756,7 +754,7 @@ def debug_billing():
         </body>
         </html>
         """
-        
+
 @app.route('/history')
 @login_required
 def history():
@@ -877,8 +875,6 @@ def history():
             'ingredients_found': 0
         })
 
-
-# Also add this debug route to check what's actually in your database
 @app.route('/debug-history')
 @login_required
 def debug_history():
@@ -929,7 +925,7 @@ def debug_history():
         
     except Exception as e:
         return f"<html><body><h1>Debug Error</h1><p>{str(e)}</p></body></html>"
-        
+
 @app.route('/upgrade')
 @login_required
 def upgrade():
@@ -1038,24 +1034,65 @@ def success():
 def create_customer_portal():
     """Create Stripe Customer Portal session for subscription management"""
     try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
+        # Debug logging
+        print(f"DEBUG: Portal request from user {session.get('user_id')}")
+        print(f"DEBUG: Is premium: {session.get('is_premium')}")
+        print(f"DEBUG: Customer ID: {session.get('stripe_customer_id')}")
         
+        # Check if Stripe is configured
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured'}), 500
+        
+        # Check if user has premium subscription
+        if not session.get('is_premium'):
+            print("ERROR: User is not premium")
+            return jsonify({'error': 'No active subscription found'}), 400
+        
+        # Get customer ID from session
         customer_id = session.get('stripe_customer_id')
         if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
+            print("ERROR: No customer ID in session")
+            # Try to get it from database
+            user_data = get_user_data(session['user_id'])
+            if user_data and user_data.get('stripe_customer_id'):
+                customer_id = user_data['stripe_customer_id']
+                session['stripe_customer_id'] = customer_id
+                print(f"DEBUG: Retrieved customer ID from DB: {customer_id}")
+            else:
+                print("ERROR: No customer ID found in database either")
+                return jsonify({'error': 'No customer ID found. Please contact support.'}), 400
+        
+        # Validate customer exists in Stripe
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            print(f"DEBUG: Customer retrieved: {customer.id}")
+        except stripe.error.InvalidRequestError as e:
+            print(f"ERROR: Invalid customer ID: {e}")
+            return jsonify({'error': 'Invalid customer ID. Please contact support.'}), 400
         
         # Create customer portal session
-        portal_session = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=f"{DOMAIN}/account",
-        )
-        
-        return jsonify({'portal_url': portal_session.url})
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=f"{DOMAIN}/account",
+            )
+            print(f"DEBUG: Portal session created: {portal_session.id}")
+            
+            return jsonify({
+                'success': True,
+                'portal_url': portal_session.url
+            })
+            
+        except stripe.error.StripeError as e:
+            print(f"ERROR: Stripe API error: {e}")
+            return jsonify({'error': f'Stripe error: {str(e)}'}), 500
         
     except Exception as e:
-        print(f"Customer portal error: {e}")
-        return jsonify({'error': 'Unable to create portal session'}), 500
+        print(f"ERROR: Unexpected error in create_customer_portal: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Unable to create billing portal. Please try again.'}), 500
 
 @app.route('/cancel-subscription', methods=['POST'])
 @login_required
@@ -1137,6 +1174,7 @@ def clear_history():
         print(f"Clear history error: {e}")
         return jsonify({'error': 'Failed to clear history'}), 500
 
+# IMPROVED EXPORT ROUTES
 @app.route('/export-history')
 @login_required
 def export_history():
@@ -1154,29 +1192,206 @@ def export_history():
         
         scans = []
         for row in cursor.fetchall():
-            scans.append(dict(row))
+            # Convert Row object to dict and handle datetime
+            scan_dict = dict(row)
+            
+            # Convert any datetime objects to strings
+            for key, value in scan_dict.items():
+                if key == 'scan_date' and value:
+                    try:
+                        # Parse and format the date consistently
+                        parsed_date = safe_datetime_parse(value)
+                        scan_dict[key] = parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        scan_dict[key] = str(value)
+                elif value is None:
+                    scan_dict[key] = ""
+                else:
+                    scan_dict[key] = str(value)
+            
+            scans.append(scan_dict)
         
         conn.close()
         
+        # Create the export data structure
+        export_data = {
+            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'user_id': session.get('user_id'),
+            'total_scans': len(scans),
+            'scans': scans
+        }
+        
         # Create temporary file for export
-        import tempfile
-        import json
+        temp_dir = tempfile.gettempdir()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_filename = f'foodfixr_export_{timestamp}.json'
+        temp_path = os.path.join(temp_dir, temp_filename)
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(scans, f, indent=2, default=str)
-            temp_path = f.name
+        # Write JSON data to temporary file
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(export_data, f, indent=2, ensure_ascii=False)
         
-        return send_file(
-            temp_path,
-            as_attachment=True,
-            download_name=f'foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json',
-            mimetype='application/json'
-        )
+        print(f"DEBUG: Export file created at: {temp_path}")
+        
+        # Send file and clean up
+        try:
+            return send_file(
+                temp_path,
+                as_attachment=True,
+                download_name=f'foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json',
+                mimetype='application/json'
+            )
+        except Exception as send_error:
+            print(f"ERROR: Failed to send file: {send_error}")
+            # If send_file fails, try alternative approach
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            # Return as direct response
+            return Response(
+                file_content,
+                mimetype='application/json',
+                headers={
+                    'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
+                }
+            )
+        finally:
+            # Clean up temporary file
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    print(f"DEBUG: Cleaned up temp file: {temp_path}")
+            except Exception as cleanup_error:
+                print(f"WARNING: Could not clean up temp file: {cleanup_error}")
         
     except Exception as e:
         print(f"Export error: {e}")
-        flash('Failed to export history', 'error')
+        import traceback
+        traceback.print_exc()
+        
+        flash('Failed to export history. Please try again.', 'error')
         return redirect(url_for('history'))
+
+# Alternative simpler export route if the above doesn't work
+@app.route('/export-history-simple')
+@login_required
+def export_history_simple():
+    """Simple export that returns JSON directly without file download"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
+            FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC
+        ''', (session['user_id'],))
+        
+        scans = []
+        for row in cursor.fetchall():
+            scan_dict = {
+                'id': row['id'],
+                'scan_date': str(row['scan_date']),
+                'result_rating': row['result_rating'] or '',
+                'ingredients_found': row['ingredients_found'] or '',
+                'image_url': row['image_url'] or '',
+                'scan_id': row['scan_id'] or ''
+            }
+            scans.append(scan_dict)
+        
+        conn.close()
+        
+        export_data = {
+            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'user_id': session.get('user_id'),
+            'total_scans': len(scans),
+            'scans': scans
+        }
+        
+        return Response(
+            json.dumps(export_data, indent=2, ensure_ascii=False),
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Simple export error: {e}")
+        return jsonify({'error': 'Export failed', 'details': str(e)}), 500
+
+# Debug export route to test what's happening
+@app.route('/debug-export')
+@login_required
+def debug_export():
+    """Debug export functionality"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM scan_history WHERE user_id = ?
+        ''', (session['user_id'],))
+        
+        count = cursor.fetchone()['count']
+        
+        cursor.execute('''
+            SELECT * FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 3
+        ''', (session['user_id'],))
+        
+        sample_scans = []
+        for row in cursor.fetchall():
+            sample_scans.append(dict(row))
+        
+        conn.close()
+        
+        debug_info = {
+            'user_id': session.get('user_id'),
+            'total_scans_in_db': count,
+            'sample_scans': sample_scans,
+            'temp_dir': tempfile.gettempdir(),
+            'temp_dir_writable': os.access(tempfile.gettempdir(), os.W_OK)
+        }
+        
+        return f"""
+        <html>
+        <head><title>Export Debug</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>📤 Export Debug Information</h1>
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 10px 0;">
+        <h3>Export Status:</h3>
+        <p><strong>User ID:</strong> {debug_info['user_id']}</p>
+        <p><strong>Total Scans:</strong> {debug_info['total_scans_in_db']}</p>
+        <p><strong>Temp Directory:</strong> {debug_info['temp_dir']}</p>
+        <p><strong>Temp Dir Writable:</strong> {debug_info['temp_dir_writable']}</p>
+        
+        <h3>Sample Scan Data:</h3>
+        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">{json.dumps(debug_info['sample_scans'], indent=2, default=str)}</pre>
+        </div>
+        
+        <div style="margin: 20px 0;">
+        <a href="/export-history-simple" style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px;">📤 Try Simple Export</a>
+        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
+        </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        return f"<html><body><h1>Debug Error</h1><pre>{traceback.format_exc()}</pre></body></html>"
 
 # DEBUG AND TESTING ROUTES
 @app.route('/test-password-flow')
@@ -1231,7 +1446,6 @@ def test_password_flow():
         </div>
         
         <div style="background: {'#e8f5e8' if login_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
-        <strong>Direct Verification:</strong> {'✅ PASS' if login_verify else '❌ FAIL'}<br>
         </div>
         
         <div style="background: {'#e8f5e8' if db_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
