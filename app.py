@@ -760,7 +760,7 @@ def debug_billing():
 @app.route('/history')
 @login_required
 def history():
-    """Display scan history from database"""
+    """Display scan history from database with improved ingredient parsing"""
     try:
         conn = sqlite3.connect('foodfixr.db')
         conn.row_factory = sqlite3.Row
@@ -788,31 +788,59 @@ def history():
             # Determine rating type
             rating = row['result_rating'] or ''
             rating_type = 'retry'
-            if 'Safe' in rating:
+            if 'Safe' in rating or 'Yay' in rating:
                 rating_type = 'safe'
                 stats['safe_scans'] += 1
-            elif 'Danger' in rating:
+            elif 'Danger' in rating or 'NOOOO' in rating:
                 rating_type = 'danger'
                 stats['danger_scans'] += 1
-            elif 'Proceed' in rating:
+            elif 'Proceed' in rating or 'carefully' in rating:
                 rating_type = 'caution'
             
             # Process ingredients (stored as JSON string)
             ingredient_summary = {}
             has_gmo = False
+            detected_ingredients = []
             
             try:
                 if row['ingredients_found']:
+                    # Try to parse the JSON data
                     matched_ingredients = json.loads(row['ingredients_found'])
-                    for category, ingredients in matched_ingredients.items():
-                        if isinstance(ingredients, list) and ingredients:
-                            ingredient_summary[category] = len(ingredients)
-                            if category == 'gmo':
-                                has_gmo = True
-                    stats['ingredients_found'] += len(matched_ingredients.get('all_detected', []))
-            except:
-                pass
+                    print(f"DEBUG: Parsed ingredients for scan {row['id']}: {matched_ingredients}")
+                    
+                    # Handle different JSON structures
+                    if isinstance(matched_ingredients, dict):
+                        for category, ingredients in matched_ingredients.items():
+                            if isinstance(ingredients, list) and ingredients:
+                                ingredient_summary[category] = len(ingredients)
+                                detected_ingredients.extend(ingredients)
+                                if category == 'gmo':
+                                    has_gmo = True
+                                stats['ingredients_found'] += len(ingredients)
+                            elif isinstance(ingredients, str) and ingredients:
+                                # Handle single string ingredients
+                                ingredient_summary[category] = 1
+                                detected_ingredients.append(ingredients)
+                                if category == 'gmo':
+                                    has_gmo = True
+                                stats['ingredients_found'] += 1
+                    
+                    # Also check for 'all_detected' key specifically
+                    if 'all_detected' in matched_ingredients:
+                        all_detected = matched_ingredients['all_detected']
+                        if isinstance(all_detected, list):
+                            detected_ingredients.extend(all_detected)
+                    
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: JSON decode error for scan {row['id']}: {e}")
+                # Try to handle as plain text
+                if row['ingredients_found']:
+                    ingredient_summary['other'] = 1
+                    detected_ingredients = [row['ingredients_found']]
+            except Exception as e:
+                print(f"DEBUG: Ingredient parsing error for scan {row['id']}: {e}")
             
+            # Create scan entry with all the details
             scan_entry = {
                 'scan_id': row['scan_id'],
                 'date': scan_date.strftime("%m/%d/%Y"),
@@ -821,19 +849,87 @@ def history():
                 'confidence': 'high',
                 'ingredient_summary': ingredient_summary,
                 'has_gmo': has_gmo,
-                'image_url': row['image_url']
+                'image_url': row['image_url'],
+                'detected_ingredients': detected_ingredients,
+                'raw_rating': rating,  # Keep the original rating text
+                'extracted_text': '',  # Add if you store this
+                'text_length': 0
             }
+            
+            print(f"DEBUG: Scan entry created: {scan_entry['scan_id']} - {len(ingredient_summary)} categories")
             
             scans.append(scan_entry)
             stats['total_scans'] += 1
         
         conn.close()
+        
+        print(f"DEBUG: Returning {len(scans)} scans with stats: {stats}")
         return render_template('history.html', scans=scans, stats=stats)
         
     except Exception as e:
         print(f"History error: {e}")
-        return render_template('history.html', scans=[], stats=None)
+        import traceback
+        traceback.print_exc()
+        return render_template('history.html', scans=[], stats={
+            'total_scans': 0,
+            'safe_scans': 0,
+            'danger_scans': 0,
+            'ingredients_found': 0
+        })
 
+
+# Also add this debug route to check what's actually in your database
+@app.route('/debug-history')
+@login_required
+def debug_history():
+    """Debug route to see raw scan history data"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
+            FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 10
+        ''', (session['user_id'],))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <html>
+        <head><title>Debug Scan History</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>🔍 Debug Scan History</h1>
+        """
+        
+        for row in rows:
+            html += f"""
+            <div style="background: white; padding: 20px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #e50ce8;">
+            <h3>Scan ID: {row['scan_id']}</h3>
+            <p><strong>Date:</strong> {row['scan_date']}</p>
+            <p><strong>Rating:</strong> {row['result_rating']}</p>
+            <p><strong>Image:</strong> {row['image_url'] or 'None'}</p>
+            <p><strong>Ingredients Found (Raw JSON):</strong></p>
+            <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">{row['ingredients_found'] or 'None'}</pre>
+            </div>
+            """
+        
+        html += """
+        <br>
+        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"<html><body><h1>Debug Error</h1><p>{str(e)}</p></body></html>"
+        
 @app.route('/upgrade')
 @login_required
 def upgrade():
