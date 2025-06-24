@@ -255,7 +255,8 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         
-        print(f"DEBUG: Login attempt for email: {email}")  # Debug line
+        print(f"DEBUG: Login attempt for email: {email}")
+        print(f"DEBUG: Password length: {len(password)}")
         
         if not email or not password:
             flash('Please enter both email and password', 'error')
@@ -269,14 +270,24 @@ def login():
         user = cursor.fetchone()
         
         if user:
-            print(f"DEBUG: User found: {user['name']}")  # Debug line
-            print(f"DEBUG: Stored hash: {user['password_hash'][:20]}...")  # Debug line
+            print(f"DEBUG: User found: {user['name']}")
+            print(f"DEBUG: Stored hash starts with: {user['password_hash'][:30]}...")
+            print(f"DEBUG: Hash method: {'pbkdf2' if 'pbkdf2' in user['password_hash'] else 'other'}")
             
-            # Check password
-            is_valid = check_password_hash(user['password_hash'], password)
-            print(f"DEBUG: Password check result: {is_valid}")  # Debug line
+            # Try both hash methods for compatibility
+            is_valid_new = check_password_hash(user['password_hash'], password)
+            print(f"DEBUG: New method check result: {is_valid_new}")
             
-            if is_valid:
+            # Also try with scrypt method (Flask default)
+            try:
+                from werkzeug.security import generate_password_hash as gen_hash
+                test_hash = gen_hash(password, method='scrypt')
+                is_valid_scrypt = check_password_hash(user['password_hash'], password)
+                print(f"DEBUG: Scrypt method available: True")
+            except:
+                print(f"DEBUG: Scrypt method available: False")
+            
+            if is_valid_new:
                 # Update last login
                 cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
                              (format_datetime_for_db(), user['id']))
@@ -295,15 +306,15 @@ def login():
                 conn.close()
                 return redirect(url_for('index'))
             else:
+                print(f"DEBUG: Password verification failed")
                 flash('Invalid email or password', 'error')
                 conn.close()
         else:
-            print(f"DEBUG: No user found with email: {email}")  # Debug line
+            print(f"DEBUG: No user found with email: {email}")
             flash('Invalid email or password', 'error')
             conn.close()
     
     return render_template('login.html')
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
