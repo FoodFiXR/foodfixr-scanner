@@ -484,7 +484,7 @@ def scan():
         print(f"DEBUG: Uploaded file size: {file_size_kb:.1f} KB")
         
         # If file is too large, reject it early
-        if file_size_kb > 2048:  # 2MB limit
+        if file_size_kb > 10240:  # 10MB limit
             cleanup_uploaded_file(filepath)
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
