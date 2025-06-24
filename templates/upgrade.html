@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta charset="UTF-8" />
-    <title>FoodFixr - Upgrade to Premium</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade to Premium - FoodFixr</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,62 +15,44 @@
         }
 
         body {
-            background: linear-gradient(180deg, #f8f9fa 0%, #e1bee7 50%, #e91e63 100%);
+            background: #e50ce8;
             font-family: 'Comfortaa', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            overflow-x: hidden;
-            text-align: center;
             min-height: 100vh;
-            position: relative;
             padding: 20px 15px;
         }
 
-        /* Main App Container */
-        .upgrade-container {
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px 24px;
-            max-width: 480px;
-            width: 100%;
+            margin-bottom: 24px;
+            text-align: center;
             box-shadow: 
-                0 20px 60px rgba(233, 30, 99, 0.15),
+                0 20px 60px rgba(229, 12, 232, 0.15),
                 0 8px 32px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 1;
-            margin-bottom: 20px;
-        }
-
-        /* Header Styling */
-        .upgrade-header {
-            margin-bottom: 32px;
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 16px;
         }
 
         .logo-text {
-            font-size: 32px;
+            font-size: 48px;
             font-weight: 800;
             background: linear-gradient(135deg, #e91e63, #9c27b0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            letter-spacing: -1px;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
         }
 
         .upgrade-title {
             font-size: 28px;
-            font-weight: 800;
+            font-weight: 700;
             color: #333;
             margin-bottom: 8px;
         }
@@ -76,22 +61,55 @@
             font-size: 16px;
             color: #666;
             font-weight: 500;
-            line-height: 1.4;
         }
 
-        /* Trial Expired Notice */
-        .trial-expired-notice {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2);
-            border: 2px solid #f44336;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 32px;
-            color: #c62828;
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #666, #555);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-decoration: none;
             font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
         }
 
-        .notice-title {
-            font-size: 18px;
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 102, 102, 0.4);
+        }
+
+        /* Trial Status */
+        .trial-status {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .trial-status.expired {
+            background: linear-gradient(135deg, #ffcdd2, rgba(255, 205, 210, 0.8));
+            border: 2px solid #f44336;
+        }
+
+        .trial-status.active {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 2px solid #ff9800;
+        }
+
+        .trial-title {
+            font-size: 20px;
             font-weight: 700;
             margin-bottom: 8px;
             display: flex;
@@ -100,167 +118,190 @@
             gap: 8px;
         }
 
-        /* Pricing Plans */
-        .pricing-plans {
-            margin: 24px 0;
+        .trial-title.expired {
+            color: #c62828;
         }
 
-        .plan-card {
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #e0e0e0;
+        .trial-title.active {
+            color: #e65100;
+        }
+
+        .trial-info {
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .trial-info.expired {
+            color: #d32f2f;
+        }
+
+        .trial-info.active {
+            color: #ef6c00;
+        }
+
+        /* Features Section */
+        .features-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 24px 20px;
-            margin-bottom: 16px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: hidden;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .plan-card:hover {
-            border-color: #e91e63;
-            transform: translateY(-4px);
-            box-shadow: 0 12px 32px rgba(233, 30, 99, 0.2);
+        .features-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
-        .plan-card.selected {
-            border-color: #e91e63;
-            background: linear-gradient(135deg, rgba(233, 30, 99, 0.08), rgba(156, 39, 176, 0.08));
+        .features-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(229, 12, 232, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(233, 30, 99, 0.15);
+            box-shadow: 0 8px 20px rgba(229, 12, 232, 0.1);
         }
 
-        .plan-card.recommended {
-            border-color: #4CAF50;
+        .feature-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        /* Pricing Section */
+        .pricing-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .pricing-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .pricing-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(229, 12, 232, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
             position: relative;
+            text-align: center;
         }
 
-        .recommended-badge {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
+        .pricing-card:hover {
+            border-color: #e50ce8;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(229, 12, 232, 0.2);
+        }
+
+        .pricing-card.selected {
+            border-color: #e50ce8;
+            background: linear-gradient(135deg, rgba(229, 12, 232, 0.1), rgba(194, 9, 197, 0.1));
+        }
+
+        .pricing-card.popular::before {
+            content: "Most Popular";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e50ce8;
             color: white;
-            padding: 6px 16px;
+            padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 700;
-            position: absolute;
-            top: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-        }
-
-
-        .plan-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 16px;
-        }
-
-        .plan-info {
-            text-align: left;
-            flex: 1;
         }
 
         .plan-name {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #333;
-            margin-bottom: 4px;
-        }
-
-        .plan-duration {
-            font-size: 14px;
-            color: #666;
-            font-weight: 500;
-        }
-
-        .plan-pricing {
-            text-align: right;
+            margin-bottom: 8px;
         }
 
         .plan-price {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 800;
-            color: #e91e63;
-            line-height: 1;
+            color: #e50ce8;
+            margin-bottom: 4px;
         }
 
         .plan-period {
             font-size: 14px;
             color: #666;
-            font-weight: 500;
+            margin-bottom: 12px;
         }
 
-        .weekly-price {
+        .plan-savings {
+            background: #4CAF50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
             font-size: 12px;
-            color: #999;
-            margin-top: 2px;
-        }
-
-        .plan-features {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.6;
-            text-align: left;
-        }
-
-        .feature-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-
-        .feature-icon {
-            color: #4CAF50;
             font-weight: 600;
         }
 
         /* Upgrade Button */
         .upgrade-button {
-            background: linear-gradient(135deg, #e91e63, #ad1457);
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
             color: white;
-            padding: 18px 32px;
             border: none;
             border-radius: 16px;
             font-size: 18px;
             font-weight: 700;
             cursor: pointer;
-            width: 100%;
-            margin: 24px 0 16px 0;
-            box-shadow: 
-                0 8px 24px rgba(233, 30, 99, 0.4),
-                0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upgrade-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .upgrade-button:hover::before {
-            left: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(229, 12, 232, 0.4);
+            margin-bottom: 16px;
+            font-family: 'Comfortaa', sans-serif;
         }
 
         .upgrade-button:hover {
             transform: translateY(-3px);
-            box-shadow: 
-                0 12px 32px rgba(233, 30, 99, 0.5),
-                0 6px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .upgrade-button:active {
-            transform: translateY(-1px);
+            box-shadow: 0 12px 32px rgba(229, 12, 232, 0.5);
         }
 
         .upgrade-button:disabled {
@@ -270,372 +311,327 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        /* Back Link */
-        .back-link {
-            color: #666;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            padding: 12px 24px;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            border: 2px solid #e0e0e0;
-            background: rgba(255, 255, 255, 0.8);
-        }
-
-        .back-link:hover {
-            background: rgba(0, 0, 0, 0.05);
-            border-color: #ccc;
-            color: #333;
-        }
-
-        /* Features List */
-        .premium-features {
-            background: linear-gradient(135deg, #f8f9fa, #e8f5e8);
-            border-radius: 16px;
-            padding: 20px;
-            margin: 24px 0;
+        /* Guarantee */
+        .guarantee {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
             border: 2px solid #4CAF50;
-        }
-
-        .features-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #2e7d32;
-            margin-bottom: 16px;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
             text-align: center;
         }
 
-        .features-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            text-align: left;
-        }
-
-        .feature {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .guarantee-text {
             font-size: 14px;
-            color: #555;
-        }
-
-        .feature-emoji {
-            font-size: 16px;
-        }
-
-        /* Loading State */
-        .loading {
-            display: none;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .spinner {
-            border: 4px solid rgba(233, 30, 99, 0.1);
-            border-top: 4px solid #e91e63;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 16px;
-            color: #666;
+            color: #2e7d32;
             font-weight: 600;
         }
 
-        /* Mobile Responsiveness */
-        @media (max-width: 480px) {
+        /* Comparison Table */
+        .comparison-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .comparison-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .comparison-table {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 1px;
+            background: rgba(229, 12, 232, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .comparison-header {
+            background: rgba(229, 12, 232, 0.1);
+            padding: 12px;
+            font-weight: 700;
+            text-align: center;
+            color: #333;
+        }
+
+        .comparison-cell {
+            background: white;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .comparison-feature {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .check-mark {
+            color: #4CAF50;
+            font-size: 18px;
+        }
+
+        .x-mark {
+            color: #f44336;
+            font-size: 18px;
+        }
+
+        .limited-mark {
+            color: #ff9800;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
             body {
                 padding: 12px 8px;
             }
             
-            .upgrade-container {
+            .container {
+                max-width: 100%;
+            }
+
+            .header {
                 padding: 24px 20px;
-                margin: 0 3px 12px 3px;
             }
 
             .logo-text {
-                font-size: 28px;
+                font-size: 42px;
             }
 
             .upgrade-title {
                 font-size: 24px;
             }
 
-            .plan-card {
-                padding: 20px 16px;
-            }
-
-            .features-grid {
+            .pricing-cards {
                 grid-template-columns: 1fr;
             }
 
-            .plan-price {
-                font-size: 24px;
+            .nav-buttons {
+                flex-direction: column;
             }
 
-            .plan-name {
-                font-size: 18px;
+            .comparison-table {
+                grid-template-columns: 2fr 80px 80px;
+                font-size: 12px;
+            }
+
+            .comparison-cell,
+            .comparison-feature {
+                padding: 8px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="upgrade-container">
+    <div class="container">
         <!-- Header -->
-        <div class="upgrade-header">
-            <div class="logo-section">
-                <div class="logo-text">FOOD FIXR</div>
-            </div>
-            <h1 class="upgrade-title">🚀 Upgrade to Premium</h1>
-            <p class="upgrade-subtitle">Continue scanning ingredients with unlimited access</p>
-        </div>
-
-        <!-- Trial Expired Notice -->
-        <div class="trial-expired-notice">
-            <div class="notice-title">
-                <span>🔒</span>
-                <span>Free Trial Expired</span>
-            </div>
-            <div>You've used all 10 free scans. Choose a plan below to continue scanning ingredients!</div>
-        </div>
-
-        <!-- Pricing Plans -->
-        <div class="pricing-plans">
-            <!-- 1 Week Plan -->
-            <div class="plan-card" data-plan="weekly" onclick="selectPlan('weekly')">
-                <div class="plan-header">
-                    <div class="plan-info">
-                        <div class="plan-name">1 Week</div>
-                        <div class="plan-duration">Unlimited Scans</div>
-                    </div>
-                    <div class="plan-pricing">
-                        <div class="plan-price">$3.99</div>
-                        <div class="plan-period">7 days</div>
-                    </div>
-                </div>
-                <div class="plan-features">
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Unlimited ingredient scans</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Advanced health insights</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Priority support</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 1 Month Plan (Recommended) -->
-            <div class="plan-card recommended selected" data-plan="monthly" onclick="selectPlan('monthly')">
-                <div class="recommended-badge">MOST POPULAR</div>
-                <div class="plan-header">
-                    <div class="plan-info">
-                        <div class="plan-name">1 Month</div>
-                        <div class="plan-duration">Unlimited Scans</div>
-                    </div>
-                    <div class="plan-pricing">
-                        <div class="plan-price">$11.99</div>
-                        <div class="plan-period">30 days</div>
-                        <div class="weekly-price">($2.99/week)</div>
-                    </div>
-                </div>
-                <div class="plan-features">
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Unlimited ingredient scans</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Advanced health insights</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Priority support</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 1 Year Plan -->
-            <div class="plan-card" data-plan="yearly" onclick="selectPlan('yearly')">
-                <div class="plan-header">
-                    <div class="plan-info">
-                        <div class="plan-name">1 Year</div>
-                        <div class="plan-duration">Unlimited Scans</div>
-                    </div>
-                    <div class="plan-pricing">
-                        <div class="plan-price">$95.00</div>
-                        <div class="plan-period">365 days</div>
-                        <div class="weekly-price">($1.83/week)</div>
-                    </div>
-                </div>
-                <div class="plan-features">
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Unlimited ingredient scans</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Advanced health insights</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Priority support</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Export scan history</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">✅</span>
-                        <span>Premium badge</span>
-                    </div>
-                </div>
+        <div class="header">
+            <div class="logo-text">FOOD FIXR</div>
+            <div class="upgrade-title">🚀 Upgrade to Premium</div>
+            <div class="upgrade-subtitle">Unlock unlimited ingredient scanning power</div>
+            <div class="nav-buttons">
+                <a href="/" class="nav-btn">← Back to Scanner</a>
+                <a href="/account" class="nav-btn">👤 My Account</a>
             </div>
         </div>
+
+        <!-- Trial Status -->
+        {% if trial_expired %}
+        <div class="trial-status expired">
+            <div class="trial-title expired">⏰ Free Trial Expired</div>
+            <div class="trial-info expired">Upgrade now to continue scanning ingredients</div>
+        </div>
+        {% else %}
+        <div class="trial-status active">
+            <div class="trial-title active">⚡ Trial Active</div>
+            <div class="trial-info active">{{ trial_time_left }} remaining • Upgrade to keep access forever</div>
+        </div>
+        {% endif %}
 
         <!-- Premium Features -->
-        <div class="premium-features">
-            <div class="features-title">🌟 What You Get with Premium</div>
+        <div class="features-section">
+            <div class="features-title">✨ What Premium Gets You</div>
             <div class="features-grid">
-                <div class="feature">
-                    <span class="feature-emoji">🔍</span>
-                    <span>Unlimited scans</span>
+                <div class="feature-item">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-text">Unlimited ingredient scans</div>
                 </div>
-                <div class="feature">
-                    <span class="feature-emoji">⚡</span>
-                    <span>Instant results</span>
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-text">Complete scan history & analytics</div>
                 </div>
-                <div class="feature">
-                    <span class="feature-emoji">🧠</span>
-                    <span>AI health insights</span>
+                <div class="feature-item">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-text">Advanced ingredient analysis</div>
                 </div>
-                <div class="feature">
-                    <span class="feature-emoji">📊</span>
-                    <span>Detailed analysis</span>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-text">Priority processing & faster results</div>
                 </div>
-                <div class="feature">
-                    <span class="feature-emoji">📱</span>
-                    <span>Mobile optimized</span>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <div class="feature-text">Ad-free experience forever</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💬</div>
+                    <div class="feature-text">Premium customer support</div>
                 </div>
             </div>
         </div>
 
-        <!-- Upgrade Button -->
-        <button class="upgrade-button" id="upgradeButton" onclick="startUpgrade()">
-            🚀 Start 1 Month Plan - $11.99
-        </button>
+        <!-- Pricing -->
+        <div class="pricing-section">
+            <div class="pricing-title">💎 Choose Your Plan</div>
+            <div class="pricing-cards">
+                <div class="pricing-card" onclick="selectPlan('weekly')" id="weekly-card">
+                    <div class="plan-name">Weekly</div>
+                    <div class="plan-price">$3.99</div>
+                    <div class="plan-period">per week</div>
+                </div>
+                
+                <div class="pricing-card popular selected" onclick="selectPlan('monthly')" id="monthly-card">
+                    <div class="plan-name">Monthly</div>
+                    <div class="plan-price">$11.99</div>
+                    <div class="plan-period">per month</div>
+                    <div class="plan-savings">Best Value</div>
+                </div>
+                
+                <div class="pricing-card" onclick="selectPlan('yearly')" id="yearly-card">
+                    <div class="plan-name">Yearly</div>
+                    <div class="plan-price">$95.00</div>
+                    <div class="plan-period">per year</div>
+                    <div class="plan-savings">Save 33%</div>
+                </div>
+            </div>
 
-        <!-- Loading State -->
-        <div class="loading" id="loadingState">
-            <div class="spinner"></div>
-            <div class="loading-text">⏳ Setting up your premium account...</div>
+            <!-- Upgrade Button -->
+            <button class="upgrade-button" onclick="startUpgrade()" id="upgradeBtn">
+                🚀 Upgrade to Premium Monthly - $11.99
+            </button>
+
+            <!-- Guarantee -->
+            <div class="guarantee">
+                <div class="guarantee-text">
+                    ✅ 30-day money-back guarantee • Cancel anytime • Secure payment by Stripe
+                </div>
+            </div>
         </div>
 
-        <!-- Back Link -->
-        <a href="/" class="back-link">← Back to Scanner</a>
+        <!-- Comparison Table -->
+        <div class="comparison-section">
+            <div class="comparison-title">📋 Free vs Premium Comparison</div>
+            <div class="comparison-table">
+                <div class="comparison-header">Feature</div>
+                <div class="comparison-header">Free Trial</div>
+                <div class="comparison-header">Premium</div>
+                
+                <div class="comparison-feature">Ingredient Scans</div>
+                <div class="comparison-cell"><span class="limited-mark">10 scans</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span> Unlimited</div>
+                
+                <div class="comparison-feature">Trial Time</div>
+                <div class="comparison-cell"><span class="limited-mark">48 hours</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span> Forever</div>
+                
+                <div class="comparison-feature">Scan History</div>
+                <div class="comparison-cell"><span class="check-mark">✓</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span> Advanced</div>
+                
+                <div class="comparison-feature">Priority Processing</div>
+                <div class="comparison-cell"><span class="x-mark">✗</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span></div>
+                
+                <div class="comparison-feature">Ad-Free Experience</div>
+                <div class="comparison-cell"><span class="x-mark">✗</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span></div>
+                
+                <div class="comparison-feature">Premium Support</div>
+                <div class="comparison-cell"><span class="x-mark">✗</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span></div>
+                
+                <div class="comparison-feature">Export Data</div>
+                <div class="comparison-cell"><span class="x-mark">✗</span></div>
+                <div class="comparison-cell"><span class="check-mark">✓</span></div>
+            </div>
+        </div>
     </div>
 
     <script>
-        let selectedPlan = 'monthly'; // Default to recommended plan
+        let selectedPlan = 'monthly';
+        
+        const planDetails = {
+            weekly: { price: '$3.99', period: 'Weekly' },
+            monthly: { price: '$11.99', period: 'Monthly' },
+            yearly: { price: '$95.00', period: 'Yearly' }
+        };
 
         function selectPlan(plan) {
             selectedPlan = plan;
             
             // Update UI
-            document.querySelectorAll('.plan-card').forEach(el => {
-                el.classList.remove('selected');
+            document.querySelectorAll('.pricing-card').forEach(card => {
+                card.classList.remove('selected');
             });
-            document.querySelector(`[data-plan="${plan}"]`).classList.add('selected');
+            document.getElementById(plan + '-card').classList.add('selected');
             
             // Update button text
-            const button = document.getElementById('upgradeButton');
-            const planDetails = {
-                'weekly': { name: '1 Week Plan', price: '$3.99' },
-                'monthly': { name: '1 Month Plan', price: '$11.99' },
-                'yearly': { name: '1 Year Plan', price: '$95.00' }
-            };
-            
-            button.textContent = `🚀 Start ${planDetails[plan].name} - ${planDetails[plan].price}`;
+            const details = planDetails[plan];
+            document.getElementById('upgradeBtn').textContent = 
+                `🚀 Upgrade to Premium ${details.period} - ${details.price}`;
         }
 
         function startUpgrade() {
-    console.log(`Starting upgrade for ${selectedPlan} plan`);
-    
-    // Show loading state
-    const button = document.getElementById('upgradeButton');
-    const originalText = button.textContent;
-    
-    document.getElementById('upgradeButton').style.display = 'none';
-    document.getElementById('loadingState').style.display = 'block';
-    
-    // Create checkout session
-    fetch('/create-checkout-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            plan: selectedPlan
-        })
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        return response.json().then(data => {
-            if (!response.ok) {
-                throw new Error(data.error || `Server error: ${response.status}`);
-            }
-            return data;
-        });
-    })
-    .then(data => {
-        console.log('Response data:', data);
-        if (data.checkout_url) {
-            // Redirect to Stripe checkout
-            window.location.href = data.checkout_url;
-        } else {
-            throw new Error('No checkout URL received');
+            const button = document.getElementById('upgradeBtn');
+            button.disabled = true;
+            button.textContent = '⏳ Creating checkout session...';
+            
+            fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    plan: selectedPlan,
+                    email: '{{ session.get("user_email", "") }}'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to create checkout session'));
+                    button.disabled = false;
+                    const details = planDetails[selectedPlan];
+                    button.textContent = `🚀 Upgrade to Premium ${details.period} - ${details.price}`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Please try again.');
+                button.disabled = false;
+                const details = planDetails[selectedPlan];
+                button.textContent = `🚀 Upgrade to Premium ${details.period} - ${details.price}`;
+            });
         }
-    })
-    .catch(error => {
-        console.error('Upgrade error:', error);
-        
-        // Show more detailed error message
-        let errorMessage = '❌ Unable to start upgrade process. ';
-        if (error.message.includes('Payment system not configured')) {
-            errorMessage += 'The payment system is not properly configured. Please try again later or contact support.';
-        } else if (error.message.includes('Price not configured')) {
-            errorMessage += 'This plan is not available yet. Please try another plan or contact support.';
-        } else if (error.message.includes('Network')) {
-            errorMessage += 'Network error. Please check your connection and try again.';
-        } else {
-            errorMessage += error.message || 'Please try again.';
-        }
-        
-        alert(errorMessage);
-        
-        // Restore button
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('upgradeButton').style.display = 'block';
-        button.textContent = originalText;
-    });
-}
 
-        // Auto-select monthly plan on load
+        // Initialize with monthly plan selected
         document.addEventListener('DOMContentLoaded', function() {
             selectPlan('monthly');
         });
