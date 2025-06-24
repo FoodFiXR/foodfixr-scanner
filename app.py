@@ -1,4 +1,773 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response
+return f"""
+        <html>
+        <head><title>Debug Error</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>❌ Debug Error</h1>
+        <div style="background: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3>Error Details:</h3>
+        <pre>{str(e)}</pre>
+        <h3>Full Traceback:</h3>
+        <pre>{error_details}</pre>
+        </div>
+        <a href="/account" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to Account</a>
+        </body>
+        </html>
+        """
+
+@app.route('/history')
+@login_required
+def history():
+    """Display scan history from database with improved ingredient parsing"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 50
+        ''', (session['user_id'],))
+        
+        scans = []
+        stats = {
+            'total_scans': 0,
+            'safe_scans': 0,
+            'danger_scans': 0,
+            'ingredients_found': 0
+        }
+        
+        for row in cursor.fetchall():
+            # Parse timestamp safely
+            scan_date = safe_datetime_parse(row['scan_date'])
+            
+            # Determine rating type
+            rating = row['result_rating'] or ''
+            rating_type = 'retry'
+            if 'Safe' in rating or 'Yay' in rating:
+                rating_type = 'safe'
+                stats['safe_scans'] += 1
+            elif 'Danger' in rating or 'NOOOO' in rating:
+                rating_type = 'danger'
+                stats['danger_scans'] += 1
+            elif 'Proceed' in rating or 'carefully' in rating:
+                rating_type = 'caution'
+            
+            # Process ingredients (stored as JSON string)
+            ingredient_summary = {}
+            has_gmo = False
+            detected_ingredients = []
+            
+            try:
+                if row['ingredients_found']:
+                    # Try to parse the JSON data
+                    matched_ingredients = json.loads(row['ingredients_found'])
+                    print(f"DEBUG: Parsed ingredients for scan {row['id']}: {matched_ingredients}")
+                    
+                    # Handle different JSON structures
+                    if isinstance(matched_ingredients, dict):
+                        for category, ingredients in matched_ingredients.items():
+                            if isinstance(ingredients, list) and ingredients:
+                                ingredient_summary[category] = len(ingredients)
+                                detected_ingredients.extend(ingredients)
+                                if category == 'gmo':
+                                    has_gmo = True
+                                stats['ingredients_found'] += len(ingredients)
+                            elif isinstance(ingredients, str) and ingredients:
+                                # Handle single string ingredients
+                                ingredient_summary[category] = 1
+                                detected_ingredients.append(ingredients)
+                                if category == 'gmo':
+                                    has_gmo = True
+                                stats['ingredients_found'] += 1
+                    
+                    # Also check for 'all_detected' key specifically
+                    if 'all_detected' in matched_ingredients:
+                        all_detected = matched_ingredients['all_detected']
+                        if isinstance(all_detected, list):
+                            detected_ingredients.extend(all_detected)
+                    
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: JSON decode error for scan {row['id']}: {e}")
+                # Try to handle as plain text
+                if row['ingredients_found']:
+                    ingredient_summary['other'] = 1
+                    detected_ingredients = [row['ingredients_found']]
+            except Exception as e:
+                print(f"DEBUG: Ingredient parsing error for scan {row['id']}: {e}")
+            
+            # Create scan entry with all the details
+            scan_entry = {
+                'scan_id': row['scan_id'],
+                'date': scan_date.strftime("%m/%d/%Y"),
+                'time': scan_date.strftime("%I:%M %p"),
+                'rating_type': rating_type,
+                'confidence': 'high',
+                'ingredient_summary': ingredient_summary,
+                'has_gmo': has_gmo,
+                'image_url': row['image_url'],
+                'detected_ingredients': detected_ingredients,
+                'raw_rating': rating,  # Keep the original rating text
+                'extracted_text': '',  # Add if you store this
+                'text_length': 0
+            }
+            
+            print(f"DEBUG: Scan entry created: {scan_entry['scan_id']} - {len(ingredient_summary)} categories")
+            
+            scans.append(scan_entry)
+            stats['total_scans'] += 1
+        
+        conn.close()
+        
+        print(f"DEBUG: Returning {len(scans)} scans with stats: {stats}")
+        return render_template('history.html', scans=scans, stats=stats)
+        
+    except Exception as e:
+        print(f"History error: {e}")
+        import traceback
+        traceback.print_exc()
+        return render_template('history.html', scans=[], stats={
+            'total_scans': 0,
+            'safe_scans': 0,
+            'danger_scans': 0,
+            'ingredients_found': 0
+        })
+
+@app.route('/debug-history')
+@login_required
+def debug_history():
+    """Debug route to see raw scan history data"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
+            FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 10
+        ''', (session['user_id'],))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <html>
+        <head><title>Debug Scan History</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>🔍 Debug Scan History</h1>
+        """
+        
+        for row in rows:
+            html += f"""
+            <div style="background: white; padding: 20px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #e50ce8;">
+            <h3>Scan ID: {row['scan_id']}</h3>
+            <p><strong>Date:</strong> {row['scan_date']}</p>
+            <p><strong>Rating:</strong> {row['result_rating']}</p>
+            <p><strong>Image:</strong> {row['image_url'] or 'None'}</p>
+            <p><strong>Ingredients Found (Raw JSON):</strong></p>
+            <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">{row['ingredients_found'] or 'None'}</pre>
+            </div>
+            """
+        
+        html += """
+        <br>
+        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"<html><body><h1>Debug Error</h1><p>{str(e)}</p></body></html>"
+
+@app.route('/upgrade')
+@login_required
+def upgrade():
+    """Upgrade page for premium plans"""
+    user_data = get_user_data(session['user_id'])
+    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    return render_template('upgrade.html',
+                         trial_expired=trial_expired,
+                         trial_time_left=trial_time_left,
+                         stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+
+# STRIPE AND PAYMENT ROUTES
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    """Create Stripe checkout session"""
+    try:
+        data = request.get_json()
+        plan = data.get('plan', 'monthly')
+        
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
+        
+        prices = {
+            'weekly': {'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'), 'amount': 3.99},
+            'monthly': {'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'), 'amount': 11.99},
+            'yearly': {'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'), 'amount': 95.00}
+        }
+        
+        if plan not in prices:
+            return jsonify({'error': 'Invalid plan selected'}), 400
+        
+        price_id = prices[plan]['price_id']
+        if not price_id:
+            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
+        
+        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
+        cancel_url = f"{DOMAIN}/upgrade"
+        
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'user_id': session.get('user_id'),
+                'plan': plan
+            },
+            customer_email=data.get('email') if data.get('email') else None,
+        )
+        
+        return jsonify({'checkout_url': checkout_session.url})
+        
+    except Exception as e:
+        print(f"Unexpected error in create_checkout_session: {str(e)}")
+        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
+
+@app.route('/success')
+@login_required
+def success():
+    """Handle successful payment"""
+    try:
+        session_id = request.args.get('session_id')
+        plan = request.args.get('plan', 'monthly')
+        
+        if session_id:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            
+            if checkout_session.payment_status == 'paid':
+                # Update user in database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                
+                now = datetime.now()
+                next_billing = now + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
+                
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, subscription_status = 'active', 
+                        subscription_start_date = ?, next_billing_date = ?,
+                        stripe_customer_id = ?, scans_used = 0
+                    WHERE id = ?
+                ''', (format_datetime_for_db(now), format_datetime_for_db(next_billing), 
+                      checkout_session.customer, session['user_id']))
+                
+                conn.commit()
+                conn.close()
+                
+                # Update session
+                session['is_premium'] = True
+                session['stripe_customer_id'] = checkout_session.customer
+                session['scans_used'] = 0
+                
+                return render_template('success.html', plan=plan)
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"Success page error: {e}")
+        return redirect(url_for('index'))
+
+@app.route('/create-customer-portal', methods=['POST'])
+@login_required
+def create_customer_portal():
+    """Create Stripe Customer Portal session for subscription management"""
+    try:
+        # Debug logging
+        print(f"DEBUG: Portal request from user {session.get('user_id')}")
+        print(f"DEBUG: Is premium: {session.get('is_premium')}")
+        print(f"DEBUG: Customer ID: {session.get('stripe_customer_id')}")
+        
+        # Check if Stripe is configured
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured'}), 500
+        
+        # Check if user has premium subscription
+        if not session.get('is_premium'):
+            print("ERROR: User is not premium")
+            return jsonify({'error': 'No active subscription found'}), 400
+        
+        # Get customer ID from session
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            print("ERROR: No customer ID in session")
+            # Try to get it from database
+            user_data = get_user_data(session['user_id'])
+            if user_data and user_data.get('stripe_customer_id'):
+                customer_id = user_data['stripe_customer_id']
+                session['stripe_customer_id'] = customer_id
+                print(f"DEBUG: Retrieved customer ID from DB: {customer_id}")
+            else:
+                print("ERROR: No customer ID found in database either")
+                return jsonify({'error': 'No customer ID found. Please contact support.'}), 400
+        
+        # Validate customer exists in Stripe
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            print(f"DEBUG: Customer retrieved: {customer.id}")
+        except stripe.error.InvalidRequestError as e:
+            print(f"ERROR: Invalid customer ID: {e}")
+            return jsonify({'error': 'Invalid customer ID. Please contact support.'}), 400
+        
+        # Create customer portal session
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=f"{DOMAIN}/account",
+            )
+            print(f"DEBUG: Portal session created: {portal_session.id}")
+            
+            return jsonify({
+                'success': True,
+                'portal_url': portal_session.url
+            })
+            
+        except stripe.error.StripeError as e:
+            print(f"ERROR: Stripe API error: {e}")
+            return jsonify({'error': f'Stripe error: {str(e)}'}), 500
+        
+    except Exception as e:
+        print(f"ERROR: Unexpected error in create_customer_portal: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Unable to create billing portal. Please try again.'}), 500
+
+@app.route('/cancel-subscription', methods=['POST'])
+@login_required
+def cancel_subscription():
+    """Cancel user's subscription"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
+        
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
+        
+        # Get customer's subscriptions
+        subscriptions = stripe.Subscription.list(customer=customer_id)
+        
+        for subscription in subscriptions.data:
+            if subscription.status == 'active':
+                # Cancel the subscription at period end
+                stripe.Subscription.modify(
+                    subscription.id,
+                    cancel_at_period_end=True
+                )
+                
+                # Update database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE users 
+                    SET subscription_status = 'cancelled'
+                    WHERE id = ?
+                ''', (session['user_id'],))
+                conn.commit()
+                conn.close()
+                
+                return jsonify({
+                    'success': True, 
+                    'message': 'Subscription will be cancelled at the end of your billing period'
+                })
+        
+        return jsonify({'error': 'No active subscription found'}), 400
+        
+    except Exception as e:
+        print(f"Cancellation error: {e}")
+        return jsonify({'error': 'Failed to cancel subscription'}), 500
+
+# UTILITY ROUTES
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Get user's image URLs before deleting
+        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Delete user's scan history
+        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        conn.commit()
+        conn.close()
+        
+        # Delete user's images
+        for image_url in image_urls:
+            try:
+                if image_url.startswith('/static/'):
+                    image_path = image_url[1:]  # Remove leading slash
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                        print(f"Deleted image: {image_path}")
+            except Exception as e:
+                print(f"Error deleting image {image_url}: {e}")
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'error': 'Failed to clear history'}), 500
+
+# IMPROVED EXPORT ROUTES
+@app.route('/export-history')
+@login_required
+def export_history():
+    """Export user's scan history as JSON"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC
+        ''', (session['user_id'],))
+        
+        scans = []
+        for row in cursor.fetchall():
+            # Convert Row object to dict and handle datetime
+            scan_dict = dict(row)
+            
+            # Convert any datetime objects to strings
+            for key, value in scan_dict.items():
+                if key == 'scan_date' and value:
+                    try:
+                        # Parse and format the date consistently
+                        parsed_date = safe_datetime_parse(value)
+                        scan_dict[key] = parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        scan_dict[key] = str(value)
+                elif value is None:
+                    scan_dict[key] = ""
+                else:
+                    scan_dict[key] = str(value)
+            
+            scans.append(scan_dict)
+        
+        conn.close()
+        
+        # Create the export data structure
+        export_data = {
+            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'user_id': session.get('user_id'),
+            'total_scans': len(scans),
+            'scans': scans
+        }
+        
+        # Return as direct response
+        return Response(
+            json.dumps(export_data, indent=2, ensure_ascii=False),
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Export error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        flash('Failed to export history. Please try again.', 'error')
+        return redirect(url_for('history'))
+
+# Alternative simpler export route
+@app.route('/export-history-simple')
+@login_required
+def export_history_simple():
+    """Simple export that returns JSON directly without file download"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
+            FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC
+        ''', (session['user_id'],))
+        
+        scans = []
+        for row in cursor.fetchall():
+            scan_dict = {
+                'id': row['id'],
+                'scan_date': str(row['scan_date']),
+                'result_rating': row['result_rating'] or '',
+                'ingredients_found': row['ingredients_found'] or '',
+                'image_url': row['image_url'] or '',
+                'scan_id': row['scan_id'] or ''
+            }
+            scans.append(scan_dict)
+        
+        conn.close()
+        
+        export_data = {
+            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'user_id': session.get('user_id'),
+            'total_scans': len(scans),
+            'scans': scans
+        }
+        
+        return Response(
+            json.dumps(export_data, indent=2, ensure_ascii=False),
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Simple export error: {e}")
+        return jsonify({'error': 'Export failed', 'details': str(e)}), 500
+
+# Debug export route
+@app.route('/debug-export')
+@login_required
+def debug_export():
+    """Debug export functionality"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM scan_history WHERE user_id = ?
+        ''', (session['user_id'],))
+        
+        count = cursor.fetchone()['count']
+        
+        cursor.execute('''
+            SELECT * FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 3
+        ''', (session['user_id'],))
+        
+        sample_scans = []
+        for row in cursor.fetchall():
+            sample_scans.append(dict(row))
+        
+        conn.close()
+        
+        debug_info = {
+            'user_id': session.get('user_id'),
+            'total_scans_in_db': count,
+            'sample_scans': sample_scans,
+            'temp_dir': tempfile.gettempdir(),
+            'temp_dir_writable': os.access(tempfile.gettempdir(), os.W_OK)
+        }
+        
+        return f"""
+        <html>
+        <head><title>Export Debug</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>📤 Export Debug Information</h1>
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 10px 0;">
+        <h3>Export Status:</h3>
+        <p><strong>User ID:</strong> {debug_info['user_id']}</p>
+        <p><strong>Total Scans:</strong> {debug_info['total_scans_in_db']}</p>
+        <p><strong>Temp Directory:</strong> {debug_info['temp_dir']}</p>
+        <p><strong>Temp Dir Writable:</strong> {debug_info['temp_dir_writable']}</p>
+        
+        <h3>Sample Scan Data:</h3>
+        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">{json.dumps(debug_info['sample_scans'], indent=2, default=str)}</pre>
+        </div>
+        
+        <div style="margin: 20px 0;">
+        <a href="/export-history-simple" style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px;">📤 Try Simple Export</a>
+        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
+        </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        return f"<html><body><h1>Debug Error</h1><pre>{traceback.format_exc()}</pre></body></html>"
+
+# DEBUG AND TESTING ROUTES
+@app.route('/debug')
+def debug():
+    """Debug endpoint to check system status"""
+    import sys
+    import platform
+    
+    debug_info = []
+    debug_info.append(f"Python version: {sys.version}")
+    debug_info.append(f"Platform: {platform.platform()}")
+    debug_info.append(f"Upload folder: {app.config['UPLOAD_FOLDER']}")
+    debug_info.append(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
+    
+    try:
+        from ingredient_scanner import extract_text_with_multiple_methods
+        debug_info.append("✅ OCR.space functions: Available")
+    except Exception as e:
+        debug_info.append(f"❌ OCR.space functions: Failed - {str(e)}")
+    
+    try:
+        from PIL import Image
+        test_img = Image.new('RGB', (100, 30), color='white')
+        debug_info.append("✅ PIL/Pillow: Working")
+    except Exception as e:
+        debug_info.append(f"❌ PIL/Pillow: Failed - {str(e)}")
+    
+    try:
+        import requests
+        response = requests.get('https://httpbin.org/get', timeout=5)
+        if response.status_code == 200:
+            debug_info.append("✅ Internet connectivity: Working")
+        else:
+            debug_info.append(f"⚠️ Internet connectivity: HTTP {response.status_code}")
+    except Exception as e:
+        debug_info.append(f"❌ Internet connectivity: Failed - {str(e)}")
+    
+    try:
+        from ingredient_scanner import scan_image_for_ingredients
+        debug_info.append("✅ Modules: All imported successfully")
+    except Exception as e:
+        debug_info.append(f"❌ Modules: Import failed - {str(e)}")
+    
+    debug_info.append(f"Templates folder exists: {os.path.exists('templates')}")
+    debug_info.append(f"Scanner.html exists: {os.path.exists('templates/scanner.html')}")
+    debug_info.append(f"Static folder exists: {os.path.exists('static')}")
+    
+    # Test database
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users')
+        user_count = cursor.fetchone()[0]
+        debug_info.append(f"✅ Database: {user_count} users registered")
+        conn.close()
+    except Exception as e:
+        debug_info.append(f"❌ Database: Failed - {str(e)}")
+    
+    # Test Stripe configuration
+    try:
+        if stripe.api_key:
+            debug_info.append("✅ Stripe: API key configured")
+            stripe.Account.retrieve()
+            debug_info.append("✅ Stripe: Connection successful")
+        else:
+            debug_info.append("❌ Stripe: API key not configured")
+    except Exception as e:
+        debug_info.append(f"⚠️ Stripe: {str(e)}")
+    
+    # Test password hashing
+    try:
+        test_pass = "test123"
+        test_hash = generate_password_hash(test_pass)
+        test_verify = check_password_hash(test_hash, test_pass)
+        debug_info.append(f"✅ Password hashing: Hash={test_hash[:20]}... Verify={test_verify}")
+    except Exception as e:
+        debug_info.append(f"❌ Password hashing: Failed - {str(e)}")
+    
+    html = f"""
+    <html>
+    <head><title>FoodFixr System Debug</title></head>
+    <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+    <h1>🔍 FoodFixr System Debug</h1>
+    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    {'<br>'.join(debug_info)}
+    </div>
+    <div style="margin: 20px 0;">
+    <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to App</a>
+    </div>
+    </body>
+    </html>
+    """
+    return html
+
+# DEMO AND SETUP FUNCTIONS
+def create_demo_user():
+    """Create demo user for testing"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        demo_email = 'demo@foodfixr.com'
+        demo_password = 'demo123'
+        
+        # Check if demo user exists
+        cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
+        if cursor.fetchone():
+            print("Demo user already exists")
+            conn.close()
+            return
+        
+        # Create demo user with consistent hashing
+        password_hash = generate_password_hash(demo_password)
+        now = datetime.now()
+        trial_start = now - timedelta(hours=2)
+        trial_end = trial_start + timedelta(hours=48)
+        
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
+                              scans_used, total_scans_ever, last_login)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ('Demo User', demo_email, password_hash, format_datetime_for_db(trial_start), 
+              format_datetime_for_db(trial_end), 3, 15, format_datetime_for_db(now)))
+        
+        demo_user_id = cursor.lastrowid
+        
+        # Add sample scan history
+        sample_scans = [
+            ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
+            ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
+        # Add sample scan history
+        sample_scans = [
+            ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
+            ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
+            ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', now - timedelta(minutes=10))
+        ]
+        
+        for rating, ingredients, scan_date in sample_scans:
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (demo_user_id, rating, ingredients, format_datetime_for_db(scan_date), str(uuid.uuid4())))
+        
+        conn.commit()
+        conn.close()
+        print("✅ Demo user created: demo@foodfixr.com / demo123")
+        
+    except Exception as e:
+        print(f"Error creating demo user: {e}")
+
+if __name__ == '__main__':
+    # Create demo user on startup
+    create_demo_user()
+    
+    # Start the application
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import tempfile
@@ -249,7 +1018,7 @@ def format_datetime_for_db(dt=None):
         dt = datetime.now()
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-# AUTHENTICATION ROUTES - FIXED VERSION
+# AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -741,1107 +1510,4 @@ def debug_billing():
         error_details = traceback.format_exc()
         return f"""
         <html>
-        <head><title>Debug Error</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
-        <h1>❌ Debug Error</h1>
-        <div style="background: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3>Error Details:</h3>
-        <pre>{str(e)}</pre>
-        <h3>Full Traceback:</h3>
-        <pre>{error_details}</pre>
-        </div>
-        <a href="/account" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to Account</a>
-        </body>
-        </html>
-        """
-
-@app.route('/history')
-@login_required
-def history():
-    """Display scan history from database with improved ingredient parsing"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC 
-            LIMIT 50
-        ''', (session['user_id'],))
-        
-        scans = []
-        stats = {
-            'total_scans': 0,
-            'safe_scans': 0,
-            'danger_scans': 0,
-            'ingredients_found': 0
-        }
-        
-        for row in cursor.fetchall():
-            # Parse timestamp safely
-            scan_date = safe_datetime_parse(row['scan_date'])
-            
-            # Determine rating type
-            rating = row['result_rating'] or ''
-            rating_type = 'retry'
-            if 'Safe' in rating or 'Yay' in rating:
-                rating_type = 'safe'
-                stats['safe_scans'] += 1
-            elif 'Danger' in rating or 'NOOOO' in rating:
-                rating_type = 'danger'
-                stats['danger_scans'] += 1
-            elif 'Proceed' in rating or 'carefully' in rating:
-                rating_type = 'caution'
-            
-            # Process ingredients (stored as JSON string)
-            ingredient_summary = {}
-            has_gmo = False
-            detected_ingredients = []
-            
-            try:
-                if row['ingredients_found']:
-                    # Try to parse the JSON data
-                    matched_ingredients = json.loads(row['ingredients_found'])
-                    print(f"DEBUG: Parsed ingredients for scan {row['id']}: {matched_ingredients}")
-                    
-                    # Handle different JSON structures
-                    if isinstance(matched_ingredients, dict):
-                        for category, ingredients in matched_ingredients.items():
-                            if isinstance(ingredients, list) and ingredients:
-                                ingredient_summary[category] = len(ingredients)
-                                detected_ingredients.extend(ingredients)
-                                if category == 'gmo':
-                                    has_gmo = True
-                                stats['ingredients_found'] += len(ingredients)
-                            elif isinstance(ingredients, str) and ingredients:
-                                # Handle single string ingredients
-                                ingredient_summary[category] = 1
-                                detected_ingredients.append(ingredients)
-                                if category == 'gmo':
-                                    has_gmo = True
-                                stats['ingredients_found'] += 1
-                    
-                    # Also check for 'all_detected' key specifically
-                    if 'all_detected' in matched_ingredients:
-                        all_detected = matched_ingredients['all_detected']
-                        if isinstance(all_detected, list):
-                            detected_ingredients.extend(all_detected)
-                    
-            except json.JSONDecodeError as e:
-                print(f"DEBUG: JSON decode error for scan {row['id']}: {e}")
-                # Try to handle as plain text
-                if row['ingredients_found']:
-                    ingredient_summary['other'] = 1
-                    detected_ingredients = [row['ingredients_found']]
-            except Exception as e:
-                print(f"DEBUG: Ingredient parsing error for scan {row['id']}: {e}")
-            
-            # Create scan entry with all the details
-            scan_entry = {
-                'scan_id': row['scan_id'],
-                'date': scan_date.strftime("%m/%d/%Y"),
-                'time': scan_date.strftime("%I:%M %p"),
-                'rating_type': rating_type,
-                'confidence': 'high',
-                'ingredient_summary': ingredient_summary,
-                'has_gmo': has_gmo,
-                'image_url': row['image_url'],
-                'detected_ingredients': detected_ingredients,
-                'raw_rating': rating,  # Keep the original rating text
-                'extracted_text': '',  # Add if you store this
-                'text_length': 0
-            }
-            
-            print(f"DEBUG: Scan entry created: {scan_entry['scan_id']} - {len(ingredient_summary)} categories")
-            
-            scans.append(scan_entry)
-            stats['total_scans'] += 1
-        
-        conn.close()
-        
-        print(f"DEBUG: Returning {len(scans)} scans with stats: {stats}")
-        return render_template('history.html', scans=scans, stats=stats)
-        
-    except Exception as e:
-        print(f"History error: {e}")
-        import traceback
-        traceback.print_exc()
-        return render_template('history.html', scans=[], stats={
-            'total_scans': 0,
-            'safe_scans': 0,
-            'danger_scans': 0,
-            'ingredients_found': 0
-        })
-
-@app.route('/debug-history')
-@login_required
-def debug_history():
-    """Debug route to see raw scan history data"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
-            FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC 
-            LIMIT 10
-        ''', (session['user_id'],))
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        html = """
-        <html>
-        <head><title>Debug Scan History</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
-        <h1>🔍 Debug Scan History</h1>
-        """
-        
-        for row in rows:
-            html += f"""
-            <div style="background: white; padding: 20px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #e50ce8;">
-            <h3>Scan ID: {row['scan_id']}</h3>
-            <p><strong>Date:</strong> {row['scan_date']}</p>
-            <p><strong>Rating:</strong> {row['result_rating']}</p>
-            <p><strong>Image:</strong> {row['image_url'] or 'None'}</p>
-            <p><strong>Ingredients Found (Raw JSON):</strong></p>
-            <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;">{row['ingredients_found'] or 'None'}</pre>
-            </div>
-            """
-        
-        html += """
-        <br>
-        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
-        </body>
-        </html>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"<html><body><h1>Debug Error</h1><p>{str(e)}</p></body></html>"
-
-@app.route('/upgrade')
-@login_required
-def upgrade():
-    """Upgrade page for premium plans"""
-    user_data = get_user_data(session['user_id'])
-    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
-    
-    return render_template('upgrade.html',
-                         trial_expired=trial_expired,
-                         trial_time_left=trial_time_left,
-                         stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
-
-# STRIPE AND PAYMENT ROUTES
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    """Create Stripe checkout session"""
-    try:
-        data = request.get_json()
-        plan = data.get('plan', 'monthly')
-        
-        if not stripe.api_key:
-            print("ERROR: Stripe API key not configured")
-            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
-        
-        prices = {
-            'weekly': {'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'), 'amount': 3.99},
-            'monthly': {'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'), 'amount': 11.99},
-            'yearly': {'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'), 'amount': 95.00}
-        }
-        
-        if plan not in prices:
-            return jsonify({'error': 'Invalid plan selected'}), 400
-        
-        price_id = prices[plan]['price_id']
-        if not price_id:
-            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
-        
-        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
-        cancel_url = f"{DOMAIN}/upgrade"
-        
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{'price': price_id, 'quantity': 1}],
-            mode='subscription',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
-                'user_id': session.get('user_id'),
-                'plan': plan
-            },
-            customer_email=data.get('email') if data.get('email') else None,
-        )
-        
-        return jsonify({'checkout_url': checkout_session.url})
-        
-    except Exception as e:
-        print(f"Unexpected error in create_checkout_session: {str(e)}")
-        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
-
-@app.route('/success')
-@login_required
-def success():
-    """Handle successful payment"""
-    try:
-        session_id = request.args.get('session_id')
-        plan = request.args.get('plan', 'monthly')
-        
-        if session_id:
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            
-            if checkout_session.payment_status == 'paid':
-                # Update user in database
-                conn = sqlite3.connect('foodfixr.db')
-                cursor = conn.cursor()
-                
-                now = datetime.now()
-                next_billing = now + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
-                
-                cursor.execute('''
-                    UPDATE users 
-                    SET is_premium = 1, subscription_status = 'active', 
-                        subscription_start_date = ?, next_billing_date = ?,
-                        stripe_customer_id = ?, scans_used = 0
-                    WHERE id = ?
-                ''', (format_datetime_for_db(now), format_datetime_for_db(next_billing), 
-                      checkout_session.customer, session['user_id']))
-                
-                conn.commit()
-                conn.close()
-                
-                # Update session
-                session['is_premium'] = True
-                session['stripe_customer_id'] = checkout_session.customer
-                session['scans_used'] = 0
-                
-                return render_template('success.html', plan=plan)
-        
-        return redirect(url_for('index'))
-        
-    except Exception as e:
-        print(f"Success page error: {e}")
-        return redirect(url_for('index'))
-
-@app.route('/create-customer-portal', methods=['POST'])
-@login_required
-def create_customer_portal():
-    """Create Stripe Customer Portal session for subscription management"""
-    try:
-        # Debug logging
-        print(f"DEBUG: Portal request from user {session.get('user_id')}")
-        print(f"DEBUG: Is premium: {session.get('is_premium')}")
-        print(f"DEBUG: Customer ID: {session.get('stripe_customer_id')}")
-        
-        # Check if Stripe is configured
-        if not stripe.api_key:
-            print("ERROR: Stripe API key not configured")
-            return jsonify({'error': 'Payment system not configured'}), 500
-        
-        # Check if user has premium subscription
-        if not session.get('is_premium'):
-            print("ERROR: User is not premium")
-            return jsonify({'error': 'No active subscription found'}), 400
-        
-        # Get customer ID from session
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            print("ERROR: No customer ID in session")
-            # Try to get it from database
-            user_data = get_user_data(session['user_id'])
-            if user_data and user_data.get('stripe_customer_id'):
-                customer_id = user_data['stripe_customer_id']
-                session['stripe_customer_id'] = customer_id
-                print(f"DEBUG: Retrieved customer ID from DB: {customer_id}")
-            else:
-                print("ERROR: No customer ID found in database either")
-                return jsonify({'error': 'No customer ID found. Please contact support.'}), 400
-        
-        # Validate customer exists in Stripe
-        try:
-            customer = stripe.Customer.retrieve(customer_id)
-            print(f"DEBUG: Customer retrieved: {customer.id}")
-        except stripe.error.InvalidRequestError as e:
-            print(f"ERROR: Invalid customer ID: {e}")
-            return jsonify({'error': 'Invalid customer ID. Please contact support.'}), 400
-        
-        # Create customer portal session
-        try:
-            portal_session = stripe.billing_portal.Session.create(
-                customer=customer_id,
-                return_url=f"{DOMAIN}/account",
-            )
-            print(f"DEBUG: Portal session created: {portal_session.id}")
-            
-            return jsonify({
-                'success': True,
-                'portal_url': portal_session.url
-            })
-            
-        except stripe.error.StripeError as e:
-            print(f"ERROR: Stripe API error: {e}")
-            return jsonify({'error': f'Stripe error: {str(e)}'}), 500
-        
-    except Exception as e:
-        print(f"ERROR: Unexpected error in create_customer_portal: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Unable to create billing portal. Please try again.'}), 500
-
-@app.route('/cancel-subscription', methods=['POST'])
-@login_required
-def cancel_subscription():
-    """Cancel user's subscription"""
-    try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
-        
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
-        
-        # Get customer's subscriptions
-        subscriptions = stripe.Subscription.list(customer=customer_id)
-        
-        for subscription in subscriptions.data:
-            if subscription.status == 'active':
-                # Cancel the subscription at period end
-                stripe.Subscription.modify(
-                    subscription.id,
-                    cancel_at_period_end=True
-                )
-                
-                # Update database
-                conn = sqlite3.connect('foodfixr.db')
-                cursor = conn.cursor()
-                cursor.execute('''
-                    UPDATE users 
-                    SET subscription_status = 'cancelled'
-                    WHERE id = ?
-                ''', (session['user_id'],))
-                conn.commit()
-                conn.close()
-                
-                return jsonify({
-                    'success': True, 
-                    'message': 'Subscription will be cancelled at the end of your billing period'
-                })
-        
-        return jsonify({'error': 'No active subscription found'}), 400
-        
-    except Exception as e:
-        print(f"Cancellation error: {e}")
-        return jsonify({'error': 'Failed to cancel subscription'}), 500
-
-# UTILITY ROUTES
-@app.route('/clear-history', methods=['POST'])
-@login_required
-def clear_history():
-    """Clear user's scan history"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Get user's image URLs before deleting
-        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
-        
-        # Delete user's scan history
-        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        conn.commit()
-        conn.close()
-        
-        # Delete user's images
-        for image_url in image_urls:
-            try:
-                if image_url.startswith('/static/'):
-                    image_path = image_url[1:]  # Remove leading slash
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                        print(f"Deleted image: {image_path}")
-            except Exception as e:
-                print(f"Error deleting image {image_url}: {e}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        print(f"Clear history error: {e}")
-        return jsonify({'error': 'Failed to clear history'}), 500
-
-# IMPROVED EXPORT ROUTES
-@app.route('/export-history')
-@login_required
-def export_history():
-    """Export user's scan history as JSON"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC
-        ''', (session['user_id'],))
-        
-        scans = []
-        for row in cursor.fetchall():
-            # Convert Row object to dict and handle datetime
-            scan_dict = dict(row)
-            
-            # Convert any datetime objects to strings
-            for key, value in scan_dict.items():
-                if key == 'scan_date' and value:
-                    try:
-                        # Parse and format the date consistently
-                        parsed_date = safe_datetime_parse(value)
-                        scan_dict[key] = parsed_date.strftime('%Y-%m-%d %H:%M:%S')
-                    except:
-                        scan_dict[key] = str(value)
-                elif value is None:
-                    scan_dict[key] = ""
-                else:
-                    scan_dict[key] = str(value)
-            
-            scans.append(scan_dict)
-        
-        conn.close()
-        
-        # Create the export data structure
-        export_data = {
-            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'user_id': session.get('user_id'),
-            'total_scans': len(scans),
-            'scans': scans
-        }
-        
-        # Create temporary file for export
-        temp_dir = tempfile.gettempdir()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_filename = f'foodfixr_export_{timestamp}.json'
-        temp_path = os.path.join(temp_dir, temp_filename)
-        
-        # Write JSON data to temporary file
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(export_data, f, indent=2, ensure_ascii=False)
-        
-        print(f"DEBUG: Export file created at: {temp_path}")
-        
-        # Send file and clean up
-        try:
-            return send_file(
-                temp_path,
-                as_attachment=True,
-                download_name=f'foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json',
-                mimetype='application/json'
-            )
-        except Exception as send_error:
-            print(f"ERROR: Failed to send file: {send_error}")
-            # If send_file fails, try alternative approach
-            with open(temp_path, 'r', encoding='utf-8') as f:
-                file_content = f.read()
-            
-            # Clean up temp file
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-            
-            # Return as direct response
-            return Response(
-                file_content,
-                mimetype='application/json',
-                headers={
-                    'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
-                }
-            )
-        finally:
-            # Clean up temporary file
-            try:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                    print(f"DEBUG: Cleaned up temp file: {temp_path}")
-            except Exception as cleanup_error:
-                print(f"WARNING: Could not clean up temp file: {cleanup_error}")
-        
-    except Exception as e:
-        print(f"Export error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        flash('Failed to export history. Please try again.', 'error')
-        return redirect(url_for('history'))
-
-# Alternative simpler export route if the above doesn't work
-@app.route('/export-history-simple')
-@login_required
-def export_history_simple():
-    """Simple export that returns JSON directly without file download"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, scan_date, result_rating, ingredients_found, image_url, scan_id
-            FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC
-        ''', (session['user_id'],))
-        
-        scans = []
-        for row in cursor.fetchall():
-            scan_dict = {
-                'id': row['id'],
-                'scan_date': str(row['scan_date']),
-                'result_rating': row['result_rating'] or '',
-                'ingredients_found': row['ingredients_found'] or '',
-                'image_url': row['image_url'] or '',
-                'scan_id': row['scan_id'] or ''
-            }
-            scans.append(scan_dict)
-        
-        conn.close()
-        
-        export_data = {
-            'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'user_id': session.get('user_id'),
-            'total_scans': len(scans),
-            'scans': scans
-        }
-        
-        return Response(
-            json.dumps(export_data, indent=2, ensure_ascii=False),
-            mimetype='application/json',
-            headers={
-                'Content-Disposition': f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
-            }
-        )
-        
-    except Exception as e:
-        print(f"Simple export error: {e}")
-        return jsonify({'error': 'Export failed', 'details': str(e)}), 500
-
-# Debug export route to test what's happening
-@app.route('/debug-export')
-@login_required
-def debug_export():
-    """Debug export functionality"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT COUNT(*) as count FROM scan_history WHERE user_id = ?
-        ''', (session['user_id'],))
-        
-        count = cursor.fetchone()['count']
-        
-        cursor.execute('''
-            SELECT * FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC 
-            LIMIT 3
-        ''', (session['user_id'],))
-        
-        sample_scans = []
-        for row in cursor.fetchall():
-            sample_scans.append(dict(row))
-        
-        conn.close()
-        
-        debug_info = {
-            'user_id': session.get('user_id'),
-            'total_scans_in_db': count,
-            'sample_scans': sample_scans,
-            'temp_dir': tempfile.gettempdir(),
-            'temp_dir_writable': os.access(tempfile.gettempdir(), os.W_OK)
-        }
-        
-        return f"""
-        <html>
-        <head><title>Export Debug</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
-        <h1>📤 Export Debug Information</h1>
-        <div style="background: white; padding: 20px; border-radius: 8px; margin: 10px 0;">
-        <h3>Export Status:</h3>
-        <p><strong>User ID:</strong> {debug_info['user_id']}</p>
-        <p><strong>Total Scans:</strong> {debug_info['total_scans_in_db']}</p>
-        <p><strong>Temp Directory:</strong> {debug_info['temp_dir']}</p>
-        <p><strong>Temp Dir Writable:</strong> {debug_info['temp_dir_writable']}</p>
-        
-        <h3>Sample Scan Data:</h3>
-        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">{json.dumps(debug_info['sample_scans'], indent=2, default=str)}</pre>
-        </div>
-        
-        <div style="margin: 20px 0;">
-        <a href="/export-history-simple" style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px;">📤 Try Simple Export</a>
-        <a href="/history" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to History</a>
-        </div>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        import traceback
-        return f"<html><body><h1>Debug Error</h1><pre>{traceback.format_exc()}</pre></body></html>"
-
-# DEBUG AND TESTING ROUTES
-@app.route('/test-password-flow')
-def test_password_flow():
-    """Test the complete registration and login flow"""
-    try:
-        # Test password hashing and verification
-        test_password = "testpass123"
-        
-        # Test 1: Hash with your registration method
-        reg_hash = generate_password_hash(test_password)
-        
-        # Test 2: Verify with your login method  
-        login_verify = check_password_hash(reg_hash, test_password)
-        
-        # Test 3: Database round trip
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Create a test entry
-        test_email = f"test_{int(time.time())}@example.com"
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', ('Test User', test_email, reg_hash, format_datetime_for_db(), 
-              format_datetime_for_db(datetime.now() + timedelta(hours=48)), format_datetime_for_db()))
-        
-        # Retrieve and test
-        cursor.execute('SELECT password_hash FROM users WHERE email = ?', (test_email,))
-        db_hash = cursor.fetchone()[0]
-        db_verify = check_password_hash(db_hash, test_password)
-        
-        # Clean up
-        cursor.execute('DELETE FROM users WHERE email = ?', (test_email,))
-        conn.commit()
-        conn.close()
-        
-        # Test 4: Check if werkzeug version changed
-        from werkzeug import __version__ as werkzeug_version
-        
-        results = f"""
-        <html>
-        <head><title>Password Flow Test</title></head>
-        <body style="font-family: monospace; padding: 20px;">
-        <h1>🔐 Password Flow Test Results</h1>
-        
-        <div style="background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px;">
-        <strong>Werkzeug Version:</strong> {werkzeug_version}<br>
-        <strong>Test Password:</strong> {test_password}<br>
-        <strong>Generated Hash:</strong> {reg_hash[:50]}...<br>
-        <strong>Hash Method:</strong> {'pbkdf2' if 'pbkdf2' in reg_hash else 'scrypt' if 'scrypt' in reg_hash else 'other'}<br>
-        </div>
-        
-        <div style="background: {'#e8f5e8' if login_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
-        </div>
-        
-        <div style="background: {'#e8f5e8' if db_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
-        <strong>Database Round Trip:</strong> {'✅ PASS' if db_verify else '❌ FAIL'}<br>
-        <strong>DB Hash Matches:</strong> {'✅ YES' if reg_hash == db_hash else '❌ NO'}<br>
-        </div>
-        
-        <div style="margin: 20px 0;">
-        <a href="/register" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Register</a>
-        <a href="/login" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Try Login</a>
-        </div>
-        </body>
-        </html>
-        """
-        return results
-        
-    except Exception as e:
-        return f"<html><body><h1>Test Failed</h1><p>Error: {str(e)}</p></body></html>"
-
-@app.route('/diagnose-user/<email>')
-def diagnose_user(email):
-    """Diagnose a specific user's password hash"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM users WHERE email = ?', (email.lower(),))
-        user = cursor.fetchone()
-        conn.close()
-        
-        if not user:
-            return f"<html><body><h1>User not found: {email}</h1></body></html>"
-        
-        hash_info = user['password_hash']
-        hash_method = "unknown"
-        
-        if hash_info.startswith('pbkdf2:'):
-            hash_method = "pbkdf2"
-        elif hash_info.startswith('scrypt:'):
-            hash_method = "scrypt"
-        elif '
-         in hash_info:
-            hash_method = hash_info.split('
-        )[0]
-        
-        return f"""
-        <html>
-        <head><title>User Diagnosis: {email}</title></head>
-        <body style="font-family: monospace; padding: 20px;">
-        <h1>🔍 User Diagnosis: {email}</h1>
-        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
-        <strong>Name:</strong> {user['name']}<br>
-        <strong>Email:</strong> {user['email']}<br>
-        <strong>Created:</strong> {user['created_at']}<br>
-        <strong>Hash Method:</strong> {hash_method}<br>
-        <strong>Hash Preview:</strong> {hash_info[:50]}...<br>
-        <strong>Full Hash:</strong> {hash_info}<br>
-        </div>
-        <br>
-        <a href="/fix-user-password/{email}" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Fix This User's Password</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>"
-
-@app.route('/fix-user-password/<email>')
-def fix_user_password(email):
-    """Fix a specific user's password to a known value"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Set password to 'reset123'
-        new_password = 'reset123'
-        new_hash = generate_password_hash(new_password)
-        
-        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', (new_hash, email.lower()))
-        updated = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
-        if updated:
-            return f"""
-            <html>
-            <head><title>Password Fixed</title></head>
-            <body style="font-family: Arial; padding: 20px;">
-            <h1>✅ Password Fixed for {email}</h1>
-            <p><strong>New Password:</strong> reset123</p>
-            <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-            </body>
-            </html>
-            """
-        else:
-            return f"<html><body><h1>User not found: {email}</h1></body></html>"
-            
-    except Exception as e:
-        return f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>"
-
-@app.route('/debug-users')
-def debug_users():
-    """Debug route to check users in database"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, password_hash, created_at FROM users ORDER BY created_at DESC LIMIT 10')
-        users = cursor.fetchall()
-        
-        conn.close()
-        
-        html = """
-        <html>
-        <head><title>Debug Users</title></head>
-        <body style="font-family: monospace; padding: 20px;">
-        <h1>🔍 Users in Database</h1>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 8px;">ID</th>
-            <th style="padding: 8px;">Name</th>
-            <th style="padding: 8px;">Email</th>
-            <th style="padding: 8px;">Hash Method</th>
-            <th style="padding: 8px;">Created At</th>
-            <th style="padding: 8px;">Actions</th>
-        </tr>
-        """
-        
-        for user in users:
-            hash_method = "pbkdf2" if "pbkdf2" in user['password_hash'] else "scrypt" if "scrypt" in user['password_hash'] else "other"
-            html += f"""
-            <tr>
-                <td style="padding: 8px;">{user['id']}</td>
-                <td style="padding: 8px;">{user['name']}</td>
-                <td style="padding: 8px;">{user['email']}</td>
-                <td style="padding: 8px;">{hash_method}</td>
-                <td style="padding: 8px;">{user['created_at']}</td>
-                <td style="padding: 8px;"><a href="/diagnose-user/{user['email']}">Diagnose</a></td>
-            </tr>
-            """
-        
-        html += """
-        </table>
-        <br>
-        <a href="/fix-all-passwords" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔧 Fix All Passwords</a>
-        <a href="/create-test-user" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👤 Create Test User</a>
-        <a href="/test-password-flow" style="background: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔐 Test Password Flow</a>
-        <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back</a>
-        </body>
-        </html>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"Database error: {str(e)}"
-
-@app.route('/fix-all-passwords')
-def fix_all_passwords():
-    """Fix all password hashes to use consistent format"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Set all users to have a default password with consistent hashing
-        default_password = 'foodfixr123'
-        consistent_hash = generate_password_hash(default_password)
-        
-        cursor.execute('UPDATE users SET password_hash = ?', (consistent_hash,))
-        updated_count = cursor.rowcount
-        
-        conn.commit()
-        conn.close()
-        
-        return f"""
-        <html>
-        <head><title>Password Fix Complete</title></head>
-        <body style="font-family: Arial; padding: 20px;">
-        <h1>✅ Password Fix Complete</h1>
-        <p><strong>{updated_count} users updated</strong></p>
-        <p>All users can now login with password: <code>foodfixr123</code></p>
-        <br>
-        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-        <a href="/debug-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Check Users</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-@app.route('/create-test-user')
-def create_test_user():
-    """Create a test user with known credentials"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        test_email = 'test@foodfixr.com'
-        test_password = 'test123'
-        
-        # Delete existing test user
-        cursor.execute('DELETE FROM users WHERE email = ?', (test_email,))
-        
-        # Create new test user with consistent hashing
-        password_hash = generate_password_hash(test_password)
-        now = datetime.now()
-        trial_start = format_datetime_for_db(now)
-        trial_end = format_datetime_for_db(now + timedelta(hours=48))
-        
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', ('Test User', test_email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
-        
-        conn.commit()
-        conn.close()
-        
-        return f"""
-        <html>
-        <head><title>Test User Created</title></head>
-        <body style="font-family: Arial; padding: 20px;">
-        <h1>✅ Test User Created Successfully</h1>
-        <div style="background: #f0f8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <p><strong>Email:</strong> test@foodfixr.com</p>
-        <p><strong>Password:</strong> test123</p>
-        </div>
-        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-@app.route('/debug')
-def debug():
-    """Debug endpoint to check system status"""
-    import sys
-    import platform
-    
-    debug_info = []
-    debug_info.append(f"Python version: {sys.version}")
-    debug_info.append(f"Platform: {platform.platform()}")
-    debug_info.append(f"Upload folder: {app.config['UPLOAD_FOLDER']}")
-    debug_info.append(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
-    
-    try:
-        from ingredient_scanner import extract_text_with_multiple_methods
-        debug_info.append("✅ OCR.space functions: Available")
-    except Exception as e:
-        debug_info.append(f"❌ OCR.space functions: Failed - {str(e)}")
-    
-    try:
-        from PIL import Image
-        test_img = Image.new('RGB', (100, 30), color='white')
-        debug_info.append("✅ PIL/Pillow: Working")
-    except Exception as e:
-        debug_info.append(f"❌ PIL/Pillow: Failed - {str(e)}")
-    
-    try:
-        import requests
-        response = requests.get('https://httpbin.org/get', timeout=5)
-        if response.status_code == 200:
-            debug_info.append("✅ Internet connectivity: Working")
-        else:
-            debug_info.append(f"⚠️ Internet connectivity: HTTP {response.status_code}")
-    except Exception as e:
-        debug_info.append(f"❌ Internet connectivity: Failed - {str(e)}")
-    
-    try:
-        from ingredient_scanner import scan_image_for_ingredients
-        debug_info.append("✅ Modules: All imported successfully")
-    except Exception as e:
-        debug_info.append(f"❌ Modules: Import failed - {str(e)}")
-    
-    debug_info.append(f"Templates folder exists: {os.path.exists('templates')}")
-    debug_info.append(f"Scanner.html exists: {os.path.exists('templates/scanner.html')}")
-    debug_info.append(f"Static folder exists: {os.path.exists('static')}")
-    
-    # Test database
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM users')
-        user_count = cursor.fetchone()[0]
-        debug_info.append(f"✅ Database: {user_count} users registered")
-        conn.close()
-    except Exception as e:
-        debug_info.append(f"❌ Database: Failed - {str(e)}")
-    
-    # Test Stripe configuration
-    try:
-        if stripe.api_key:
-            debug_info.append("✅ Stripe: API key configured")
-            stripe.Account.retrieve()
-            debug_info.append("✅ Stripe: Connection successful")
-        else:
-            debug_info.append("❌ Stripe: API key not configured")
-    except Exception as e:
-        debug_info.append(f"⚠️ Stripe: {str(e)}")
-    
-    # Test password hashing
-    try:
-        test_pass = "test123"
-        test_hash = generate_password_hash(test_pass)
-        test_verify = check_password_hash(test_hash, test_pass)
-        debug_info.append(f"✅ Password hashing: Hash={test_hash[:20]}... Verify={test_verify}")
-    except Exception as e:
-        debug_info.append(f"❌ Password hashing: Failed - {str(e)}")
-    
-    # Test Werkzeug version
-    try:
-        from werkzeug import __version__ as werkzeug_version
-        debug_info.append(f"✅ Werkzeug version: {werkzeug_version}")
-    except Exception as e:
-        debug_info.append(f"❌ Werkzeug version: Failed - {str(e)}")
-    
-    html = f"""
-    <html>
-    <head><title>FoodFixr System Debug</title></head>
-    <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
-    <h1>🔍 FoodFixr System Debug</h1>
-    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    {'<br>'.join(debug_info)}
-    </div>
-    <div style="margin: 20px 0;">
-    <a href="/debug-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👥 Debug Users</a>
-    <a href="/create-test-user" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👤 Create Test User</a>
-    <a href="/fix-all-passwords" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔧 Fix Passwords</a>
-    <a href="/test-password-flow" style="background: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔐 Test Password Flow</a>
-    <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to App</a>
-    </div>
-    </body>
-    </html>
-    """
-    return html
-
-# DEMO AND SETUP FUNCTIONS
-def create_demo_user():
-    """Create demo user for testing"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        demo_email = 'demo@foodfixr.com'
-        demo_password = 'demo123'
-        
-        # Check if demo user exists
-        cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
-        if cursor.fetchone():
-            print("Demo user already exists")
-            conn.close()
-            return
-        
-        # Create demo user with consistent hashing
-        password_hash = generate_password_hash(demo_password)
-        now = datetime.now()
-        trial_start = now - timedelta(hours=2)
-        trial_end = trial_start + timedelta(hours=48)
-        
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
-                              scans_used, total_scans_ever, last_login)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', ('Demo User', demo_email, password_hash, format_datetime_for_db(trial_start), 
-              format_datetime_for_db(trial_end), 3, 15, format_datetime_for_db(now)))
-        
-        demo_user_id = cursor.lastrowid
-        
-        # Add sample scan history
-        sample_scans = [
-            ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
-            ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
-            ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', now - timedelta(minutes=10))
-        ]
-        
-        for rating, ingredients, scan_date in sample_scans:
-            cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (demo_user_id, rating, ingredients, format_datetime_for_db(scan_date), str(uuid.uuid4())))
-        
-        conn.commit()
-        conn.close()
-        print("✅ Demo user created: demo@foodfixr.com / demo123")
-        
-    except Exception as e:
-        print(f"Error creating demo user: {e}")
-
-if __name__ == '__main__':
-    # Create demo user on startup
-    create_demo_user()
-    
-    # Start the application
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+        <head><title>Debug
