@@ -12,6 +12,8 @@ from PIL import Image
 import time
 import sqlite3
 from functools import wraps
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -30,41 +32,53 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.permanent_session_lifetime = timedelta(days=30)
 
+# Database connection function
+def get_db_connection():
+    """Get database connection - PostgreSQL for production, SQLite for local"""
+    database_url = os.getenv('DATABASE_URL')
+    if database_url:
+        return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+    else:
+        # Fallback to SQLite for local development
+        import sqlite3
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        return conn
+
 # Database initialization
 def init_db():
-    conn = sqlite3.connect('foodfixr.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now', 'localtime')),
-            is_premium BOOLEAN DEFAULT 0,
-            stripe_customer_id TEXT,
-            subscription_status TEXT DEFAULT 'trial',
-            subscription_start_date TEXT,
-            next_billing_date TEXT,
-            trial_start_date TEXT DEFAULT (datetime('now', 'localtime')),
-            trial_end_date TEXT,
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_premium BOOLEAN DEFAULT FALSE,
+            stripe_customer_id VARCHAR(255),
+            subscription_status VARCHAR(50) DEFAULT 'trial',
+            subscription_start_date TIMESTAMP,
+            next_billing_date TIMESTAMP,
+            trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            trial_end_date TIMESTAMP,
             scans_used INTEGER DEFAULT 0,
             total_scans_ever INTEGER DEFAULT 0,
-            last_login TEXT
+            last_login TIMESTAMP
         )
     ''')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS scan_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            scan_date TEXT DEFAULT (datetime('now', 'localtime')),
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             result_rating TEXT,
             ingredients_found TEXT,
             image_url TEXT,
-            scan_id TEXT,
-            FOREIGN KEY (user_id) REFERENCES users (id)
+            scan_id VARCHAR(255)
         )
     ''')
     
@@ -84,10 +98,9 @@ def login_required(f):
     return decorated_function
 
 def get_user_data(user_id):
-    conn = sqlite3.connect('foodfixr.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
     user = cursor.fetchone()
     conn.close()
     return dict(user) if user else None
@@ -177,27 +190,43 @@ def register():
             flash('Password must be at least 6 characters long', 'error')
             return render_template('register.html')
         
-        conn = sqlite3.connect('foodfixr.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        cursor.execute('SELECT id FROM users WHERE email = %s', (email,))
         if cursor.fetchone():
             flash('An account with this email already exists. Please login instead.', 'error')
             conn.close()
             return render_template('register.html')
         
         password_hash = generate_password_hash(password)
-        now = datetime.now()
-        trial_start = format_datetime_for_db(now)
-        trial_end = format_datetime_for_db(now + timedelta(hours=48))
         
         try:
-            cursor.execute('''
-                INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (name, email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
+            # Check if we're using PostgreSQL or SQLite
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                # PostgreSQL version
+                cursor.execute('''
+                    INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '48 hours', CURRENT_TIMESTAMP)
+                    RETURNING id
+                ''', (name, email, password_hash))
+                
+                user_result = cursor.fetchone()
+                user_id = user_result['id']
+            else:
+                # SQLite version (for local development)
+                now = datetime.now()
+                trial_start = format_datetime_for_db(now)
+                trial_end = format_datetime_for_db(now + timedelta(hours=48))
+                
+                cursor.execute('''
+                    INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (name, email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
+                
+                user_id = cursor.lastrowid
             
-            user_id = cursor.lastrowid
             conn.commit()
             conn.close()
             
@@ -213,6 +242,7 @@ def register():
             return redirect('/')
             
         except Exception as e:
+            print(f"Registration error: {e}")
             flash('Registration failed. Please try again.', 'error')
             conn.close()
             return render_template('register.html')
@@ -233,11 +263,16 @@ def login():
             flash('Please enter both email and password', 'error')
             return render_template('login.html')
         
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        # Use appropriate placeholder for database type
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+        else:
+            cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        
         user = cursor.fetchone()
         
         if user:
@@ -245,8 +280,12 @@ def login():
             if check_password_hash(user['password_hash'], password):
                 print("DEBUG: Password correct, logging in...")
                 
-                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                             (format_datetime_for_db(), user['id']))
+                if database_url:
+                    cursor.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s', (user['id'],))
+                else:
+                    cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                                 (format_datetime_for_db(), user['id']))
+                
                 conn.commit()
                 conn.close()
                 
@@ -336,23 +375,37 @@ def scan():
         
         result = scan_image_for_ingredients(filepath)
         
-        conn = sqlite3.connect('foodfixr.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
         new_total_scans = user_data['total_scans_ever'] + 1
         
-        cursor.execute('''
-            UPDATE users 
-            SET scans_used = ?, total_scans_ever = ?
-            WHERE id = ?
-        ''', (new_scans_used, new_total_scans, session['user_id']))
-        
-        cursor.execute('''
-            INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), 
-              format_datetime_for_db(), str(uuid.uuid4())))
+        # Use appropriate placeholder for database type
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('''
+                UPDATE users 
+                SET scans_used = %s, total_scans_ever = %s
+                WHERE id = %s
+            ''', (new_scans_used, new_total_scans, session['user_id']))
+            
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s)
+            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), str(uuid.uuid4())))
+        else:
+            cursor.execute('''
+                UPDATE users 
+                SET scans_used = ?, total_scans_ever = ?
+                WHERE id = ?
+            ''', (new_scans_used, new_total_scans, session['user_id']))
+            
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), 
+                  format_datetime_for_db(), str(uuid.uuid4())))
         
         conn.commit()
         conn.close()
@@ -406,16 +459,25 @@ def account():
 @login_required
 def history():
     try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT * FROM scan_history 
-            WHERE user_id = ? 
-            ORDER BY scan_date DESC 
-            LIMIT 50
-        ''', (session['user_id'],))
+        # Use appropriate placeholder for database type
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('''
+                SELECT * FROM scan_history 
+                WHERE user_id = %s 
+                ORDER BY scan_date DESC 
+                LIMIT 50
+            ''', (session['user_id'],))
+        else:
+            cursor.execute('''
+                SELECT * FROM scan_history 
+                WHERE user_id = ? 
+                ORDER BY scan_date DESC 
+                LIMIT 50
+            ''', (session['user_id'],))
         
         scans = []
         stats = {'total_scans': 0, 'safe_scans': 0, 'danger_scans': 0, 'ingredients_found': 0}
@@ -449,6 +511,7 @@ def history():
         return render_template('history.html', scans=scans, stats=stats)
         
     except Exception as e:
+        print(f"History error: {e}")
         return render_template('history.html', scans=[], stats={'total_scans': 0, 'safe_scans': 0, 'danger_scans': 0, 'ingredients_found': 0})
 
 @app.route('/upgrade')
@@ -473,11 +536,16 @@ def simple_login():
             error_msg = "Please enter both email and password"
         else:
             try:
-                conn = sqlite3.connect('foodfixr.db')
-                conn.row_factory = sqlite3.Row
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                # Use appropriate placeholder for database type
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                
                 user = cursor.fetchone()
                 
                 if user and check_password_hash(user['password_hash'], password):
@@ -543,11 +611,18 @@ def simple_login():
 @app.route('/reset-all-passwords')
 def reset_all_passwords():
     try:
-        conn = sqlite3.connect('foodfixr.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         new_hash = generate_password_hash('test123')
-        cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
+        
+        # Use appropriate placeholder for database type
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('UPDATE users SET password_hash = %s', (new_hash,))
+        else:
+            cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
+        
         updated = cursor.rowcount
         
         conn.commit()
@@ -568,8 +643,7 @@ def reset_all_passwords():
 @app.route('/check-users')
 def check_users():
     try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute('SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10')
