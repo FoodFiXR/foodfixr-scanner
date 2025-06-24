@@ -299,6 +299,9 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         
+        print(f"DEBUG: Login attempt for email: {email}")
+        print(f"DEBUG: Password provided: {'Yes' if password else 'No'}")
+        
         if not email or not password:
             flash('Please enter both email and password', 'error')
             return render_template('login.html')
@@ -310,25 +313,49 @@ def login():
         cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
         user = cursor.fetchone()
         
-        if user and check_password_hash(user['password_hash'], password):
-            cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                         (format_datetime_for_db(), user['id']))
-            conn.commit()
+        if user:
+            print(f"DEBUG: User found: {user['name']}")
+            print(f"DEBUG: Stored hash starts with: {user['password_hash'][:30]}...")
             
-            session.permanent = True
-            session['user_id'] = user['id']
-            session['user_email'] = user['email']
-            session['user_name'] = user['name']
-            session['is_premium'] = bool(user['is_premium'])
-            session['scans_used'] = user['scans_used']
-            session['stripe_customer_id'] = user['stripe_customer_id']
+            # Test password verification
+            is_valid = check_password_hash(user['password_hash'], password)
+            print(f"DEBUG: Password verification result: {is_valid}")
             
-            flash(f'Welcome back, {user["name"]}!', 'success')
-            conn.close()
-            return redirect(url_for('index'))
+            if is_valid:
+                print("DEBUG: Password verified successfully, setting session...")
+                
+                # Update last login
+                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                             (format_datetime_for_db(), user['id']))
+                conn.commit()
+                conn.close()
+                
+                # Set session
+                session.permanent = True
+                session['user_id'] = user['id']
+                session['user_email'] = user['email']
+                session['user_name'] = user['name']
+                session['is_premium'] = bool(user['is_premium'])
+                session['scans_used'] = user['scans_used']
+                session['stripe_customer_id'] = user['stripe_customer_id']
+                
+                print(f"DEBUG: Session set - user_id: {session.get('user_id')}")
+                print("DEBUG: About to redirect to scanner...")
+                
+                # DIRECT REDIRECT TO SCANNER PAGE
+                flash(f'Welcome back, {user["name"]}!', 'success')
+                
+                # Force redirect with full URL
+                return redirect('/')
+            else:
+                print(f"DEBUG: Password verification failed")
+                flash('Invalid email or password', 'error')
+                conn.close()
         else:
+            print(f"DEBUG: No user found with email: {email}")
             flash('Invalid email or password', 'error')
-            conn.close()
+            if 'conn' in locals():
+                conn.close()
     
     return render_template('login.html')
 
@@ -822,6 +849,152 @@ def debug_history():
         
     except Exception as e:
         return f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>"
+
+# QUICK FIX ROUTES
+@app.route('/reset-all-passwords')
+def reset_all_passwords():
+    """Emergency route to reset all passwords to 'test123'"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Set all users to have password 'test123'
+        new_hash = generate_password_hash('test123')
+        cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
+        updated = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        return f"""
+        <html>
+        <head><title>Passwords Reset</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>✅ All Passwords Reset</h1>
+        <p><strong>{updated} users updated</strong></p>
+        <p>All users can now login with password: <strong>test123</strong></p>
+        <br>
+        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+        <a href="/check-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Check Users</a>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+@app.route('/check-users')
+def check_users():
+    """Check what users exist in the database"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10')
+        users = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <html>
+        <head><title>Users in Database</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>👥 Users in Database</h1>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 8px;">ID</th>
+            <th style="padding: 8px;">Name</th>
+            <th style="padding: 8px;">Email</th>
+            <th style="padding: 8px;">Created</th>
+        </tr>
+        """
+        
+        for user in users:
+            html += f"""
+            <tr>
+                <td style="padding: 8px;">{user['id']}</td>
+                <td style="padding: 8px;">{user['name']}</td>
+                <td style="padding: 8px;">{user['email']}</td>
+                <td style="padding: 8px;">{user['created_at']}</td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <br>
+        <p><strong>All users can login with password: test123</strong></p>
+        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"Database error: {str(e)}"
+
+@app.route('/test-login')
+def test_login():
+    """Test route to check if user is logged in"""
+    if 'user_id' in session:
+        return f"""
+        <html>
+        <head><title>Login Test</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>✅ You are logged in!</h1>
+        <p><strong>User ID:</strong> {session.get('user_id')}</p>
+        <p><strong>Email:</strong> {session.get('user_email')}</p>
+        <p><strong>Name:</strong> {session.get('user_name')}</p>
+        <p><strong>Is Premium:</strong> {session.get('is_premium')}</p>
+        <br>
+        <a href="/" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Scanner</a>
+        <a href="/logout" style="background: #f44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Logout</a>
+        </body>
+        </html>
+        """
+    else:
+        return f"""
+        <html>
+        <head><title>Login Test</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>❌ You are NOT logged in</h1>
+        <p>Session data: {dict(session)}</p>
+        <br>
+        <a href="/login" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a>
+        </body>
+        </html>
+        """
+
+@app.route('/force-login/<email>')
+def force_login(email):
+    """Force login a user for testing (remove in production)"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email.lower(),))
+        user = cursor.fetchone()
+        
+        if user:
+            # Force set session
+            session.permanent = True
+            session['user_id'] = user['id']
+            session['user_email'] = user['email']
+            session['user_name'] = user['name']
+            session['is_premium'] = bool(user['is_premium'])
+            session['scans_used'] = user['scans_used']
+            session['stripe_customer_id'] = user['stripe_customer_id']
+            
+            conn.close()
+            flash(f'Force logged in as {user["name"]}!', 'success')
+            return redirect('/')
+        else:
+            conn.close()
+            return f"User {email} not found. <a href='/check-users'>Check users</a>"
+            
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     # Start the application
