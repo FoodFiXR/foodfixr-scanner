@@ -300,7 +300,6 @@ def login():
         password = request.form.get('password', '')
         
         print(f"DEBUG: Login attempt for email: {email}")
-        print(f"DEBUG: Password provided: {'Yes' if password else 'No'}")
         
         if not email or not password:
             flash('Please enter both email and password', 'error')
@@ -315,14 +314,16 @@ def login():
         
         if user:
             print(f"DEBUG: User found: {user['name']}")
-            print(f"DEBUG: Stored hash starts with: {user['password_hash'][:30]}...")
             
             # Test password verification
             is_valid = check_password_hash(user['password_hash'], password)
             print(f"DEBUG: Password verification result: {is_valid}")
             
             if is_valid:
-                print("DEBUG: Password verified successfully, setting session...")
+                print("DEBUG: Setting session and redirecting...")
+                
+                # Clear any existing session first
+                session.clear()
                 
                 # Update last login
                 cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
@@ -330,7 +331,7 @@ def login():
                 conn.commit()
                 conn.close()
                 
-                # Set session
+                # Set session data
                 session.permanent = True
                 session['user_id'] = user['id']
                 session['user_email'] = user['email']
@@ -339,20 +340,17 @@ def login():
                 session['scans_used'] = user['scans_used']
                 session['stripe_customer_id'] = user['stripe_customer_id']
                 
-                print(f"DEBUG: Session set - user_id: {session.get('user_id')}")
-                print("DEBUG: About to redirect to scanner...")
+                print(f"DEBUG: Session set successfully for user {user['id']}")
                 
-                # DIRECT REDIRECT TO SCANNER PAGE
-                flash(f'Welcome back, {user["name"]}!', 'success')
-                
-                # Force redirect with full URL
+                # DON'T use flash message to avoid conflicts
+                # Instead redirect immediately without flash
                 return redirect('/')
             else:
-                print(f"DEBUG: Password verification failed")
+                print("DEBUG: Password verification failed")
                 flash('Invalid email or password', 'error')
                 conn.close()
         else:
-            print(f"DEBUG: No user found with email: {email}")
+            print("DEBUG: User not found")
             flash('Invalid email or password', 'error')
             if 'conn' in locals():
                 conn.close()
@@ -373,17 +371,24 @@ def index():
     """Main scanner page"""
     user_data = get_user_data(session['user_id'])
     if not user_data:
+        print("DEBUG: No user data found, logging out")
         return redirect(url_for('logout'))
+    
+    print(f"DEBUG: Scanner page loaded for user: {user_data['name']}")
     
     trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
     session['scans_used'] = user_data['scans_used']
     session['is_premium'] = bool(user_data['is_premium'])
     
+    # Check if this is right after login (no flash messages to avoid conflicts)
+    just_logged_in = request.args.get('login') == 'success'
+    
     return render_template('scanner.html', 
                          trial_expired=trial_expired,
                          trial_time_left=trial_time_left,
                          user_name=user_data['name'],
-                         stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+                         stripe_publishable_key=STRIPE_PUBLISHABLE_KEY,
+                         just_logged_in=just_logged_in)
 
 @app.route('/', methods=['POST'])
 @login_required
@@ -881,7 +886,34 @@ def reset_all_passwords():
         """
         
     except Exception as e:
-        return f"Error: {str(e)}"
+                    return f"Error: {str(e)}"
+
+@app.route('/session-check')
+def session_check():
+    """Check current session status"""
+    return f"""
+    <html>
+    <head><title>Session Check</title></head>
+    <body style="font-family: monospace; padding: 20px;">
+    <h1>🔍 Session Status</h1>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+    <h3>Session Data:</h3>
+    <pre>{json.dumps(dict(session), indent=2, default=str)}</pre>
+    </div>
+    <div style="margin: 20px 0;">
+    <h3>Login Status:</h3>
+    <p><strong>Logged In:</strong> {'Yes' if 'user_id' in session else 'No'}</p>
+    <p><strong>User ID:</strong> {session.get('user_id', 'None')}</p>
+    <p><strong>User Name:</strong> {session.get('user_name', 'None')}</p>
+    <p><strong>User Email:</strong> {session.get('user_email', 'None')}</p>
+    </div>
+    <br>
+    <a href="/login" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login</a>
+    <a href="/" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Scanner</a>
+    <a href="/logout" style="background: #f44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Logout</a>
+    </body>
+    </html>
+    """
 
 @app.route('/check-users')
 def check_users():
