@@ -15,7 +15,7 @@
         }
 
         body {
-            background: #e50ce8;  /* Changed to solid pink background */
+            background: #e50ce8;
             font-family: 'Comfortaa', sans-serif;
             display: flex;
             flex-direction: column;
@@ -92,7 +92,7 @@
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px 24px;
-            max-width: 420px;  /* Increased from 380px to accommodate bigger logo */
+            max-width: 420px;
             width: 100%;
             box-shadow: 
                 0 20px 60px rgba(229, 12, 232, 0.15),
@@ -105,7 +105,7 @@
 
         /* Header Styling */
         .app-header {
-            margin-bottom: 16px;        /* Reduced from 28px */
+            margin-bottom: 16px;
         }
 
         .app-logo {
@@ -113,7 +113,7 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            margin-bottom: 6px;         /* Reduced from 8px */
+            margin-bottom: 6px;
         }
 
         .logo-text {
@@ -132,6 +132,28 @@
             font-size: 15px;
             color: #000;
             font-weight: 500;
+        }
+
+        /* Welcome Message */
+        .welcome-message {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border-radius: 16px;
+            padding: 16px;
+            margin: 16px 0;
+            border: 2px solid rgba(76, 175, 80, 0.2);
+            text-align: center;
+        }
+
+        .welcome-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 4px;
+        }
+
+        .welcome-subtext {
+            font-size: 14px;
+            color: #4caf50;
         }
 
         /* Navigation Section */
@@ -173,25 +195,25 @@
             box-shadow: 0 4px 12px rgba(229, 12, 232, 0.3);
         }
 
-        /* Scanner Icon - MADE BIGGER */
+        /* Scanner Icon */
         .scanner-section {
-            margin: 20px 0 24px 0;      /* Reduced top margin from 32px to 20px */
+            margin: 20px 0 24px 0;
         }
 
         .scan-icon-container {
             position: relative;
             display: inline-block;
-            margin-bottom: 12px;        /* Reduced from 20px */
+            margin-bottom: 12px;
         }
 
         .scan-icon {
-            width: 380px;        /* INCREASED from 300px to 380px - Much bigger! */
-            height: 380px;       /* INCREASED from 300px to 380px - Much bigger! */
+            width: 380px;
+            height: 380px;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             border-radius: 20px;
             filter: drop-shadow(0 8px 24px rgba(233, 30, 99, 0.2));
-            object-fit: contain;  /* Ensures proper aspect ratio */
+            object-fit: contain;
         }
 
         .scan-icon:hover {
@@ -201,17 +223,6 @@
 
         .scan-icon:active {
             transform: scale(0.98);
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1.2);
-                opacity: 0;
-            }
         }
 
         /* Trial Status - Updated Colors */
@@ -246,18 +257,25 @@
             color: #2F4F4F !important;
         }
 
-        .trial-status.expired .trial-title {
+        .trial-status.premium {
+            background: linear-gradient(135deg, #4CAF50, rgba(76, 175, 80, 0.8)) !important;
+            border-color: #388E3C !important;
+        }
+
+        .trial-status.expired .trial-title,
+        .trial-status.expired .trial-info {
             color: #2F4F4F !important;
         }
 
-        .trial-status.expired .trial-info {
-            color: #556B7D !important;
+        .trial-status.premium .trial-title,
+        .trial-status.premium .trial-info {
+            color: white !important;
         }
 
         .trial-title {
             font-size: 18px;
             font-weight: 700;
-            color: #0e4b9e !important;  
+            color: #0e4b9e !important;
             margin-bottom: 8px;
             display: flex;
             align-items: center;
@@ -265,9 +283,15 @@
             gap: 8px;
         }
 
-        /* Modern Scan Button with NEW PINK COLOR */
+        .trial-info {
+            font-size: 14px;
+            color: #0e4b9e;
+            font-weight: 600;
+        }
+
+        /* Modern Scan Button */
         .scan-button {
-            background: linear-gradient(135deg, #e50ce8, #c209c5);  /* CHANGED TO PINK #e50ce8 */
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
             color: white;
             padding: 18px 32px;
             border: none;
@@ -278,7 +302,7 @@
             width: 100%;
             margin: 20px 0;
             box-shadow: 
-                0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED shadow color for pink */
+                0 8px 24px rgba(229, 12, 232, 0.4),
                 0 4px 12px rgba(0, 0, 0, 0.1);
             transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             position: relative;
@@ -289,44 +313,22 @@
         @keyframes button-pulse {
             0% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
+                    0 8px 24px rgba(229, 12, 232, 0.4),
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 0 rgba(229, 12, 232, 0.5);  /* UPDATED for pink */
+                    0 0 0 0 rgba(229, 12, 232, 0.5);
             }
             50% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.6),  /* UPDATED for pink */
+                    0 8px 24px rgba(229, 12, 232, 0.6),
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 8px rgba(229, 12, 232, 0.2);  /* UPDATED for pink */
+                    0 0 0 8px rgba(229, 12, 232, 0.2);
             }
             100% {
                 box-shadow: 
-                    0 8px 24px rgba(229, 12, 232, 0.4),  /* UPDATED for pink */
+                    0 8px 24px rgba(229, 12, 232, 0.4),
                     0 4px 12px rgba(0, 0, 0, 0.1),
-                    0 0 0 0 rgba(229, 12, 232, 0);  /* UPDATED for pink */
+                    0 0 0 0 rgba(229, 12, 232, 0);
             }
-        }
-
-        .scan-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .scan-button:hover::before {
-            left: 100%;
-        }
-
-        .scan-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 
-                0 12px 32px rgba(229, 12, 232, 0.5),  /* UPDATED hover shadow for pink */
-                0 6px 16px rgba(0, 0, 0, 0.15);
         }
 
         .scan-button:active {
@@ -474,10 +476,6 @@
             }
         }
 
-        .gmo-alert-icon {
-            font-size: 24px;
-        }
-
         .category-title {
             font-weight: 700;
             margin-bottom: 8px;
@@ -502,7 +500,6 @@
             color: #000;
         }
 
-        /* Add "Detected:" before ingredient lists */
         .ingredient-list::before {
             content: "Detected: ";
             font-weight: 700;
@@ -548,6 +545,32 @@
             font-weight: 600;
         }
 
+        /* Success/Error Messages */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            font-weight: 600;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 2px solid #4CAF50;
+        }
+
+        .alert-error {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 2px solid #f44336;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+            color: #0c5460;
+            border: 2px solid #17a2b8;
+        }
+
         /* Hidden Elements */
         video, canvas, form {
             display: none;
@@ -556,21 +579,21 @@
         /* Mobile Responsiveness */
         @media (max-width: 480px) {
             body {
-                padding: 12px 8px;      /* Reduced from 15px 10px */
+                padding: 12px 8px;
             }
             
             .app-container {
-                padding: 20px 18px;     /* Reduced from 24px 20px */
-                margin: 0 3px 12px 3px; /* Reduced margins */
-                max-width: 390px;       /* Slightly wider for mobile to fit bigger logo */
+                padding: 20px 18px;
+                margin: 0 3px 12px 3px;
+                max-width: 390px;
             }
 
             .app-header {
-                margin-bottom: 12px;    /* Reduced from default */
+                margin-bottom: 12px;
             }
 
             .scanner-section {
-                margin: 16px 0 20px 0;  /* Reduced spacing on mobile */
+                margin: 16px 0 20px 0;
             }
 
             .logo-text {
@@ -578,8 +601,8 @@
             }
 
             .scan-icon {
-                width: 340px;        /* BIGGER on mobile too - increased from 270px */
-                height: 340px;       /* BIGGER on mobile too - increased from 270px */
+                width: 340px;
+                height: 340px;
             }
 
             .nav-buttons {
@@ -613,7 +636,6 @@
             }
         }
 
-        /* Extra small mobile devices */
         @media (max-width: 360px) {
             .app-container {
                 max-width: 350px;
@@ -621,8 +643,8 @@
             }
             
             .scan-icon {
-                width: 310px;        /* Slightly smaller for very small screens */
-                height: 310px;       /* Slightly smaller for very small screens */
+                width: 310px;
+                height: 310px;
             }
         }
     </style>
@@ -632,6 +654,17 @@
     <div class="emoji-shower" id="emojiShower"></div>
 
     <div class="app-container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <!-- Modern Header -->
         <div class="app-header">
             <div class="app-logo">
@@ -639,6 +672,14 @@
             </div>
             <div class="app-subtitle">Smart Ingredient Scanner</div>
         </div>
+
+        <!-- Welcome Message for Logged In Users -->
+        {% if user_name %}
+        <div class="welcome-message">
+            <div class="welcome-text">Welcome back, {{ user_name }}! 👋</div>
+            <div class="welcome-subtext">Ready to scan some ingredients?</div>
+        </div>
+        {% endif %}
 
         <!-- Navigation Section -->
         <div class="nav-section">
@@ -656,7 +697,7 @@
         </div>
 
         <!-- Enhanced Trial Status -->
-        <div class="trial-status{% if trial_expired %} expired{% endif %}" id="trialStatus">
+        <div class="trial-status{% if trial_expired %} expired{% elif session.get('is_premium') %} premium{% endif %}" id="trialStatus">
             <div class="trial-title" id="trialTitle">
                 {% if session.get('is_premium') %}
                     💎 Premium Active
@@ -666,12 +707,16 @@
                     🎉 Free Trial Active
                 {% endif %}
             </div>
-            {% if not session.get('is_premium') %}
             <div class="trial-info">
-                Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
-                Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
+                {% if session.get('is_premium') %}
+                    Unlimited scans • Premium member since {{ user_created_date or 'recently' }}
+                {% elif not trial_expired %}
+                    Scans: <span id="scansUsed">{{ session.get('scans_used', 0) }}</span>/10 • 
+                    Time: <span id="timeLeft">{{ trial_time_left or '48h 0m' }}</span>
+                {% else %}
+                    Trial ended • Upgrade to continue scanning
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         <!-- Error Message -->
@@ -681,10 +726,10 @@
         </div>
         {% endif %}
 
-        <!-- Enhanced Scan Button with NEW PINK COLOR and Instructions -->
+        <!-- Enhanced Scan Button -->
         <button class="scan-button" id="scanButton" onclick="handleScanClick()">
             {% if session.get('is_premium') %}
-                📸 START HERE<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Take a pic of the food's ingredient list</span>
+                📸 START SCANNING<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Unlimited scans available</span>
             {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
                 💳 UPGRADE TO CONTINUE
             {% else %}
@@ -753,7 +798,6 @@
                 <div class="category-title">
                     <img src="/static/Trans Fats.png" class="villain-icon" alt="Trans Fat Villain" />
                     Trans Fats : Contribute to heart disease, diabetes, stroke, brain decline, infertility and even some types of cancer.
-
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.trans_fat | join(", ") }}
@@ -766,8 +810,6 @@
                 <div class="category-title">
                     <img src="/static/Excitotoxins.jpg" class="villain-icon" alt="Excitotoxins Villain" />
                     Excitotoxins :  Over stimulates nerve cells and can lead to migraines, neurological disorders (Alzheimer's, Parkinsosn's) and ADHD.
-
-
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.excitotoxins | join(", ") }}
@@ -780,9 +822,6 @@
                 <div class="category-title">
                     <img src="/static/Corn.jpg" class="villain-icon" alt="Corn Villain" />
                    Corn :  Exponentially increases inflammation, pain, and gut damage.
-                   
-
-
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.corn | join(", ") }}
@@ -795,8 +834,6 @@
                 <div class="category-title">
                     <img src="/static/Sugar.jpg" class="villain-icon" alt="Sugar Villain" />
                     Sugar : In excess can increase pain, cause diabetes, and make the body acidic.
-        
-
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.sugar | join(", ") }}
@@ -818,8 +855,6 @@
                 <div class="category-title">
                     <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
                     GMO : Affects allergies, gut problems, infertility, hormones, immune system and kidney and liver damage.
-                    
-
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.gmo | join(", ") }}
@@ -885,12 +920,10 @@
                 
                 console.log(`🎊 Starting enhanced ${type} emoji shower`);
                 
-                // More frequent emoji creation for denser shower
                 const interval = setInterval(() => {
                     this.createEmoji(emojiImage);
-                }, 200); // Faster creation rate
+                }, 200);
 
-                // Also create bursts of emojis
                 let burstCount = 0;
                 const burstInterval = setInterval(() => {
                     if (burstCount >= 3) {
@@ -898,20 +931,17 @@
                         return;
                     }
                     
-                    // Create burst of 3-5 emojis
                     for (let i = 0; i < 3 + Math.random() * 3; i++) {
                         setTimeout(() => this.createEmoji(emojiImage), i * 100);
                     }
                     burstCount++;
                 }, 1000);
 
-                // Stop after duration
                 setTimeout(() => {
                     clearInterval(interval);
                     clearInterval(burstInterval);
                     this.isActive = false;
                     
-                    // Clean up after additional 6 seconds
                     setTimeout(() => {
                         this.cleanup();
                     }, 6000);
@@ -924,29 +954,23 @@
                 emoji.src = imageSrc;
                 emoji.alt = 'emoji';
                 
-                // More varied horizontal positions
                 emoji.style.left = (Math.random() * 120 - 10) + '%';
                 
-                // Varied animation duration (3-7 seconds)
                 const duration = 3 + Math.random() * 4;
                 emoji.style.animationDuration = duration + 's';
                 
-                // Enhanced horizontal drift
                 const drift = (Math.random() - 0.5) * 300;
                 emoji.style.setProperty('--drift', drift + 'px');
                 
-                // More size variety (35-55px)
                 const size = 35 + Math.random() * 20;
                 emoji.style.width = size + 'px';
                 emoji.style.height = size + 'px';
                 
-                // Random delay for staggered effect
                 const delay = Math.random() * 1000;
                 emoji.style.animationDelay = delay + 'ms';
                 
                 this.container.appendChild(emoji);
                 
-                // Remove emoji after animation completes
                 setTimeout(() => {
                     if (emoji.parentNode) {
                         emoji.parentNode.removeChild(emoji);
@@ -982,7 +1006,6 @@
            
         function handleScanClick() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                // Redirect to upgrade page instead of showing alert
                 window.location.href = '/upgrade';
                 return;
             }
@@ -1000,10 +1023,8 @@
             }
         }
 
-        // Update the handleFileSelected function
         function handleFileSelected() {
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                // Redirect to upgrade page instead of showing alert
                 window.location.href = '/upgrade';
                 return;
             }
@@ -1031,7 +1052,6 @@
                 });
         }
 
-        // Update the capturePhoto function
         function capturePhoto() {
             const video = document.getElementById("webcam");
             const canvas = document.getElementById("snapshot");
@@ -1053,7 +1073,6 @@
                 document.getElementById("hiddenImage").files = container.files;
                 
                 if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                    // Redirect to upgrade page instead of showing alert
                     window.location.href = '/upgrade';
                     return;
                 }
@@ -1081,7 +1100,7 @@
                 scanButton.innerHTML = `📸 START HERE (${10 - scansUsed} left)<br><span style="font-size: 12px; font-weight: 500; opacity: 0.9;">Take a pic of the food's ingredient list</span>`;
             } else if (!isPremium && scansUsed >= 10) {
                 scanButton.innerHTML = '💳 UPGRADE TO CONTINUE';
-                scanButton.disabled = false; // Make sure button is clickable for upgrade
+                scanButton.disabled = false;
             }
         }
 
@@ -1099,12 +1118,33 @@
         document.addEventListener('DOMContentLoaded', function() {
             const scanButton = document.getElementById('scanButton');
             
-            // Update the button to be clickable even when trial expires
             if (!isPremium && (scansUsed >= 10 || trialExpired)) {
-                scanButton.disabled = false; // Make sure button is not disabled
+                scanButton.disabled = false;
                 scanButton.style.cursor = 'pointer';
             }
         });
     </script>
 </body>
-</html>
+</html>:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .scan-button:hover::before {
+            left: 100%;
+        }
+
+        .scan-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 32px rgba(229, 12, 232, 0.5),
+                0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .scan-button:
