@@ -1616,7 +1616,7 @@ def check_users():
 
 @app.route('/uploads/history/<filename>')
 @login_required
-def serve_history_image(filename):
+def serve_scan_image(filename):
     """Serve uploaded scan history images"""
     try:
         # Security check - only serve images for the current user
