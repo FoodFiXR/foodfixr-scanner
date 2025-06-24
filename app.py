@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import tempfile
 from werkzeug.utils import secure_filename
@@ -9,16 +10,18 @@ import uuid
 import stripe
 from PIL import Image
 import time
+import sqlite3
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Stripe Configuration
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')  # Add this to your environment variables
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 
 # Your domain for Stripe redirects
-DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner.onrender.com')
+DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 
 # Configuration
 UPLOAD_FOLDER = tempfile.gettempdir()
@@ -27,51 +30,161 @@ MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+app.permanent_session_lifetime = timedelta(days=30)
+
+# Database initialization
+def init_db():
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    # Enhanced users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_premium BOOLEAN DEFAULT 0,
+            stripe_customer_id TEXT,
+            subscription_status TEXT DEFAULT 'trial',
+            subscription_start_date TIMESTAMP,
+            next_billing_date TIMESTAMP,
+            trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            trial_end_date TIMESTAMP,
+            scans_used INTEGER DEFAULT 0,
+            total_scans_ever INTEGER DEFAULT 0,
+            last_login TIMESTAMP
+        )
+    ''')
+    
+    # Scan history table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scan_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            result_rating TEXT,
+            ingredients_found TEXT,
+            image_url TEXT,
+            scan_id TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Initialize database
+init_db()
+
+# Helper functions
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_user_data(user_id):
+    conn = sqlite3.connect('foodfixr.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    
+    conn.close()
+    return dict(user) if user else None
+
+def calculate_trial_time_left(trial_start_date):
+    if isinstance(trial_start_date, str):
+        trial_start = datetime.strptime(trial_start_date, '%Y-%m-%d %H:%M:%S')
+    else:
+        trial_start = trial_start_date
+    
+    trial_end = trial_start + timedelta(hours=48)
+    now = datetime.now()
+    
+    if now >= trial_end:
+        return "0h 0m", True, 0, 0
+    
+    time_left = trial_end - now
+    hours = int(time_left.total_seconds() // 3600)
+    minutes = int((time_left.total_seconds() % 3600) // 60)
+    
+    return f"{hours}h {minutes}m", False, hours, minutes
+
+def calculate_renewal_days(next_billing_date):
+    if not next_billing_date:
+        return None
+    
+    if isinstance(next_billing_date, str):
+        billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d %H:%M:%S')
+    else:
+        billing_date = next_billing_date
+    
+    now = datetime.now()
+    days_left = (billing_date - now).days
+    
+    return max(0, days_left)
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def init_session():
-    """Initialize session with trial data"""
+    """Initialize session - now checks for authenticated users"""
     if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
-        session['trial_start'] = datetime.now().isoformat()
-        session['scans_used'] = 0
-        session['is_premium'] = False
-        session.permanent = True
+        # For non-authenticated users, redirect to login
+        return False
+    return True
 
 def is_trial_expired():
     """Check if 48-hour trial has expired"""
-    if 'trial_start' not in session:
+    if 'user_id' not in session:
         return True
-    
-    trial_start = datetime.fromisoformat(session['trial_start'])
+        
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return True
+        
+    if user_data['is_premium']:
+        return False
+        
+    trial_start = datetime.strptime(user_data['trial_start_date'], '%Y-%m-%d %H:%M:%S')
     trial_end = trial_start + timedelta(hours=48)
     return datetime.now() > trial_end
 
 def get_trial_time_left():
     """Get remaining trial time as formatted string"""
-    if 'trial_start' not in session:
+    if 'user_id' not in session:
         return "0h 0m"
-    
-    trial_start = datetime.fromisoformat(session['trial_start'])
-    trial_end = trial_start + timedelta(hours=48)
-    time_left = trial_end - datetime.now()
-    
-    if time_left.total_seconds() <= 0:
+        
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
         return "0h 0m"
-    
-    hours = int(time_left.total_seconds() // 3600)
-    minutes = int((time_left.total_seconds() % 3600) // 60)
-    return f"{hours}h {minutes}m"
+        
+    if user_data['is_premium']:
+        return "Premium"
+        
+    trial_time_left, _, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+    return trial_time_left
 
 def can_scan():
     """Check if user can perform a scan"""
-    if session.get('is_premium'):
+    if 'user_id' not in session:
+        return False
+        
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return False
+        
+    if user_data['is_premium']:
         return True
     
-    if session.get('scans_used', 0) >= 10:
+    if user_data['scans_used'] >= 10:
         return False
         
     if is_trial_expired():
@@ -91,7 +204,7 @@ def save_scan_image(image_path, user_id, scan_id=None):
         
         # Copy image to permanent location
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        image_filename = f"{user_id[:8]}_{scan_id[:8]}_{timestamp}.jpg"
+        image_filename = f"{user_id}_{scan_id[:8]}_{timestamp}.jpg"
         permanent_path = os.path.join(images_dir, image_filename)
         
         # Copy and compress image
@@ -110,53 +223,182 @@ def save_scan_image(image_path, user_id, scan_id=None):
         print(f"Error saving scan image: {e}")
         return None
 
+# AUTHENTICATION ROUTES
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            flash('Please enter both email and password', 'error')
+            return render_template('login.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if user and check_password_hash(user['password_hash'], password):
+            # Update last login
+            cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                         (datetime.now(), user['id']))
+            conn.commit()
+            
+            # Set session
+            session.permanent = True
+            session['user_id'] = user['id']
+            session['user_email'] = user['email']
+            session['user_name'] = user['name']
+            session['is_premium'] = bool(user['is_premium'])
+            session['scans_used'] = user['scans_used']
+            session['stripe_customer_id'] = user['stripe_customer_id']
+            
+            flash(f'Welcome back, {user["name"]}!', 'success')
+            conn.close()
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password', 'error')
+            conn.close()
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validation
+        if not all([name, email, password, confirm_password]):
+            flash('All fields are required', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('register.html')
+        
+        if len(name) < 2:
+            flash('Name must be at least 2 characters long', 'error')
+            return render_template('register.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Check if email already exists
+        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            flash('An account with this email already exists', 'error')
+            conn.close()
+            return render_template('register.html')
+        
+        # Create new user with trial period
+        password_hash = generate_password_hash(password)
+        trial_start = datetime.now()
+        trial_end = trial_start + timedelta(hours=48)
+        
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, email, password_hash, trial_start, trial_end, trial_start))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Auto-login after registration
+        session.permanent = True
+        session['user_id'] = user_id
+        session['user_email'] = email
+        session['user_name'] = name
+        session['is_premium'] = False
+        session['scans_used'] = 0
+        session['stripe_customer_id'] = None
+        
+        flash(f'Welcome to FoodFixr, {name}! Your free trial has started.', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    user_name = session.get('user_name', 'User')
+    session.clear()
+    flash(f'Goodbye {user_name}! You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     """Main scanner page"""
-    init_session()
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
     
-    trial_expired = is_trial_expired()
-    trial_time_left = get_trial_time_left()
+    # Calculate trial status
+    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    # Update session with latest data
+    session['scans_used'] = user_data['scans_used']
+    session['is_premium'] = bool(user_data['is_premium'])
     
     return render_template('scanner.html', 
                          trial_expired=trial_expired,
                          trial_time_left=trial_time_left,
+                         user_name=user_data['name'],
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
 @app.route('/', methods=['POST'])
+@login_required
 def scan():
     """Handle image scanning with trial limits"""
     try:
-        init_session()
+        user_data = get_user_data(session['user_id'])
+        if not user_data:
+            return redirect(url_for('logout'))
         
         # Check if user can scan
         if not can_scan():
-            return render_template('scanner.html',
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
-                                 error="Trial limit reached. Please upgrade to continue scanning.",
-                                 stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
+            flash('You have used all your free scans. Please upgrade to continue.', 'error')
+            return redirect(url_for('upgrade'))
+        
+        # Check if trial expired
+        trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+        if not user_data['is_premium'] and trial_expired:
+            flash('Your free trial has expired. Please upgrade to continue scanning.', 'error')
+            return redirect(url_for('upgrade'))
         
         # Check if image was uploaded
         if 'image' not in request.files:
             return render_template('scanner.html',
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
                                  error="No image uploaded.",
                                  stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
         
         file = request.files['image']
         if file.filename == '':
             return render_template('scanner.html',
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
                                  error="No image selected.",
                                  stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
         
         if not allowed_file(file.filename):
             return render_template('scanner.html',
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
                                  error="Invalid file type. Please upload an image.",
                                  stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
         
@@ -166,27 +408,45 @@ def scan():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{timestamp}_{filename}"
             
-            # Use temp directory instead of uploads folder
-            import tempfile
             filepath = os.path.join(tempfile.gettempdir(), filename)
             file.save(filepath)
             
             print(f"DEBUG: File saved to {filepath}")
-            print(f"DEBUG: File exists: {os.path.exists(filepath)}")
             
             # SAVE IMAGE FOR HISTORY BEFORE SCANNING
             scan_id = str(uuid.uuid4())
             image_url = save_scan_image(filepath, session.get('user_id'), scan_id)
             print(f"DEBUG: Image URL for history: {image_url}")
             
-            # Increment scan count for non-premium users
-            if not session.get('is_premium'):
-                session['scans_used'] = session.get('scans_used', 0) + 1
-            
             # Scan the image
             print("DEBUG: Starting image scan...")
             result = scan_image_for_ingredients(filepath)
             print(f"DEBUG: Scan result: {result}")
+            
+            # Update scan count in database
+            conn = sqlite3.connect('foodfixr.db')
+            cursor = conn.cursor()
+            
+            new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
+            new_total_scans = user_data['total_scans_ever'] + 1
+            
+            cursor.execute('''
+                UPDATE users 
+                SET scans_used = ?, total_scans_ever = ?
+                WHERE id = ?
+            ''', (new_scans_used, new_total_scans, session['user_id']))
+            
+            # Save scan to history
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, image_url, scan_id)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), image_url, scan_id))
+            
+            conn.commit()
+            conn.close()
+            
+            # Update session
+            session['scans_used'] = new_scans_used
             
             # Clean up uploaded file
             try:
@@ -195,13 +455,14 @@ def scan():
             except Exception as cleanup_error:
                 print(f"DEBUG: Cleanup error: {cleanup_error}")
             
-            # Log scan for analytics WITH IMAGE URL
-            log_scan_result(session.get('user_id'), result, session.get('scans_used', 0), image_url, scan_id)
+            # Calculate updated trial status
+            trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
             
             return render_template('scanner.html',
                                  result=result,
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
                                  stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
             
         except Exception as scan_error:
@@ -210,8 +471,9 @@ def scan():
             traceback.print_exc()
             
             return render_template('scanner.html',
-                                 trial_expired=is_trial_expired(),
-                                 trial_time_left=get_trial_time_left(),
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
                                  error=f"Scanning failed: {str(scan_error)}. Please try again.",
                                  stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
     
@@ -220,7 +482,6 @@ def scan():
         import traceback
         traceback.print_exc()
         
-        # Return a basic error page if template rendering fails
         return f"""
         <html>
         <head><title>FoodFixr Error</title></head>
@@ -232,13 +493,73 @@ def scan():
         </html>
         """, 500
 
-@app.route('/history')
-def history():
-    """Display scan history"""
-    init_session()
+@app.route('/account')
+@login_required
+def account():
+    """User account page with subscription management"""
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
     
+    # Calculate trial time left
+    trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    # Calculate renewal days for premium users
+    days_until_renewal = None
+    if user_data['is_premium'] and user_data['next_billing_date']:
+        days_until_renewal = calculate_renewal_days(user_data['next_billing_date'])
+    
+    # Format dates
+    created_date = datetime.strptime(user_data['created_at'], '%Y-%m-%d %H:%M:%S')
+    formatted_created_date = created_date.strftime('%B %d, %Y')
+    
+    trial_start = datetime.strptime(user_data['trial_start_date'], '%Y-%m-%d %H:%M:%S')
+    formatted_trial_start = trial_start.strftime('%B %d, %Y')
+    
+    # Format subscription dates for premium users
+    subscription_start_formatted = None
+    next_billing_formatted = None
+    
+    if user_data['is_premium']:
+        if user_data['subscription_start_date']:
+            sub_start = datetime.strptime(user_data['subscription_start_date'], '%Y-%m-%d %H:%M:%S')
+            subscription_start_formatted = sub_start.strftime('%B %d, %Y')
+        
+        if user_data['next_billing_date']:
+            next_billing = datetime.strptime(user_data['next_billing_date'], '%Y-%m-%d %H:%M:%S')
+            next_billing_formatted = next_billing.strftime('%B %d, %Y')
+    
+    return render_template('account.html',
+                         user_name=user_data['name'],
+                         user_created_date=formatted_created_date,
+                         total_scans_ever=user_data['total_scans_ever'],
+                         trial_start_date=formatted_trial_start,
+                         trial_time_left=trial_time_left,
+                         trial_expired=trial_expired,
+                         trial_hours_left=trial_hours,
+                         trial_minutes_left=trial_minutes,
+                         subscription_status=user_data['subscription_status'],
+                         subscription_start_date=subscription_start_formatted,
+                         next_billing_date=next_billing_formatted,
+                         days_until_renewal=days_until_renewal,
+                         billing_portal_url='/create-customer-portal')
+
+@app.route('/history')
+@login_required
+def history():
+    """Display scan history from database"""
     try:
-        # Read scan logs
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY scan_date DESC 
+            LIMIT 50
+        ''', (session['user_id'],))
+        
         scans = []
         stats = {
             'total_scans': 0,
@@ -247,834 +568,73 @@ def history():
             'ingredients_found': 0
         }
         
-        user_id = session.get('user_id')
+        for row in cursor.fetchall():
+            # Parse timestamp
+            scan_date = datetime.strptime(row['scan_date'], '%Y-%m-%d %H:%M:%S')
+            
+            # Determine rating type
+            rating = row['result_rating'] or ''
+            rating_type = 'retry'
+            if 'Safe' in rating:
+                rating_type = 'safe'
+                stats['safe_scans'] += 1
+            elif 'Danger' in rating:
+                rating_type = 'danger'
+                stats['danger_scans'] += 1
+            elif 'Proceed' in rating:
+                rating_type = 'caution'
+            
+            # Process ingredients (stored as JSON string)
+            ingredient_summary = {}
+            has_gmo = False
+            
+            try:
+                if row['ingredients_found']:
+                    matched_ingredients = json.loads(row['ingredients_found'])
+                    for category, ingredients in matched_ingredients.items():
+                        if isinstance(ingredients, list) and ingredients:
+                            ingredient_summary[category] = len(ingredients)
+                            if category == 'gmo':
+                                has_gmo = True
+                    stats['ingredients_found'] += len(matched_ingredients.get('all_detected', []))
+            except:
+                pass
+            
+            scan_entry = {
+                'scan_id': row['scan_id'],
+                'date': scan_date.strftime("%m/%d/%Y"),
+                'time': scan_date.strftime("%I:%M %p"),
+                'rating_type': rating_type,
+                'confidence': 'high',
+                'ingredient_summary': ingredient_summary,
+                'has_gmo': has_gmo,
+                'image_url': row['image_url']
+            }
+            
+            scans.append(scan_entry)
+            stats['total_scans'] += 1
         
-        if os.path.exists('scan_logs.json'):
-            with open('scan_logs.json', 'r') as f:
-                for line in f:
-                    try:
-                        log_data = json.loads(line.strip())
-                        if log_data.get('user_id') == user_id:
-                            # Parse timestamp
-                            timestamp = datetime.fromisoformat(log_data['timestamp'])
-                            
-                            # Determine rating type
-                            rating = log_data.get('rating', '')
-                            rating_type = 'retry'
-                            if 'Safe' in rating:
-                                rating_type = 'safe'
-                                stats['safe_scans'] += 1
-                            elif 'Danger' in rating:
-                                rating_type = 'danger'
-                                stats['danger_scans'] += 1
-                            elif 'Proceed' in rating:
-                                rating_type = 'caution'
-                            
-                            # Process ingredients
-                            matched_ingredients = log_data.get('matched_ingredients', {})
-                            ingredient_summary = {}
-                            has_gmo = False
-                            
-                            for category, ingredients in matched_ingredients.items():
-                                if isinstance(ingredients, list) and ingredients:
-                                    ingredient_summary[category] = len(ingredients)
-                                    if category == 'gmo':
-                                        has_gmo = True
-                            
-                            stats['ingredients_found'] += log_data.get('ingredients_found', 0)
-                            
-                            scan_entry = {
-                                'scan_id': log_data.get('scan_id'),
-                                'date': timestamp.strftime("%m/%d/%Y"),
-                                'time': timestamp.strftime("%I:%M %p"),
-                                'rating_type': rating_type,
-                                'confidence': log_data.get('confidence', 'unknown'),
-                                'ingredient_summary': ingredient_summary,
-                                'has_gmo': has_gmo,
-                                'extracted_text': log_data.get('extracted_text', ''),
-                                'text_length': len(log_data.get('extracted_text', '')),
-                                'detected_ingredients': matched_ingredients.get('all_detected', []),
-                                'image_url': log_data.get('image_url')  # Add image URL
-                            }
-                            
-                            scans.append(scan_entry)
-                            stats['total_scans'] += 1
-                            
-                    except Exception as e:
-                        print(f"Error parsing scan log: {e}")
-                        continue
-        
-        # Sort scans by date (newest first)
-        scans.sort(key=lambda x: datetime.strptime(f"{x['date']} {x['time']}", "%m/%d/%Y %I:%M %p"), reverse=True)
-        
+        conn.close()
         return render_template('history.html', scans=scans, stats=stats)
         
     except Exception as e:
         print(f"History error: {e}")
         return render_template('history.html', scans=[], stats=None)
 
-@app.route('/clear-history', methods=['POST'])
-def clear_history():
-    """Clear user's scan history"""
-    try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'error': 'No user session'}), 400
-        
-        # Read existing logs and filter out current user's logs
-        remaining_logs = []
-        user_image_urls = []
-        
-        if os.path.exists('scan_logs.json'):
-            with open('scan_logs.json', 'r') as f:
-                for line in f:
-                    try:
-                        log_data = json.loads(line.strip())
-                        if log_data.get('user_id') != user_id:
-                            remaining_logs.append(line)
-                        else:
-                            # Collect image URLs for deletion
-                            image_url = log_data.get('image_url')
-                            if image_url:
-                                user_image_urls.append(image_url)
-                    except:
-                        remaining_logs.append(line)  # Keep malformed logs
-        
-        # Write back remaining logs
-        with open('scan_logs.json', 'w') as f:
-            f.writelines(remaining_logs)
-        
-        # Delete user's images
-        for image_url in user_image_urls:
-            try:
-                if image_url.startswith('/static/'):
-                    image_path = image_url[1:]  # Remove leading slash
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                        print(f"Deleted image: {image_path}")
-            except Exception as e:
-                print(f"Error deleting image {image_url}: {e}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        print(f"Clear history error: {e}")
-        return jsonify({'error': 'Failed to clear history'}), 500
-
-@app.route('/export-history')
-def export_history():
-    """Export scan history as JSON (premium feature)"""
-    init_session()
-    
-    if not session.get('is_premium'):
-        return redirect(url_for('upgrade'))
-    
-    try:
-        user_id = session.get('user_id')
-        user_scans = []
-        
-        if os.path.exists('scan_logs.json'):
-            with open('scan_logs.json', 'r') as f:
-                for line in f:
-                    try:
-                        log_data = json.loads(line.strip())
-                        if log_data.get('user_id') == user_id:
-                            user_scans.append(log_data)
-                    except:
-                        continue
-        
-        # Create export data
-        export_data = {
-            'export_date': datetime.now().isoformat(),
-            'user_id': user_id,
-            'total_scans': len(user_scans),
-            'scans': user_scans
-        }
-        
-        # Return as downloadable JSON
-        response = jsonify(export_data)
-        response.headers['Content-Disposition'] = f'attachment; filename=foodfixr_history_{datetime.now().strftime("%Y%m%d")}.json'
-        return response
-        
-    except Exception as e:
-        print(f"Export error: {e}")
-        return "Export failed", 500
-
-@app.route('/test-manual', methods=['GET', 'POST'])
-def test_manual():
-    """Manual text input for testing ingredient detection"""
-    if request.method == 'GET':
-        return '''
-        <html>
-        <head>
-            <title>Manual Ingredient Test</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #e91e63; border-radius: 5px; font-size: 16px; }
-                button { background: #e91e63; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
-                button:hover { background: #c2185b; }
-                .preset { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; cursor: pointer; }
-                .preset:hover { background: #e0e0e0; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🧪 Manual Ingredient Testing</h1>
-                <p>Enter ingredient text to test the detection system:</p>
-                
-                <form method="post">
-                    <textarea name="ingredients" placeholder="Enter ingredients here... e.g., corn syrup, monosodium glutamate, natural flavors"></textarea>
-                    <br><br>
-                    <button type="submit">🔬 Test Ingredients</button>
-                </form>
-                
-                <h3>Quick Test Presets:</h3>
-                <div class="preset" onclick="fillText('corn syrup, monosodium glutamate, natural flavors, salt')">
-                    🚨 High Risk Test: corn syrup, monosodium glutamate, natural flavors, salt
-                </div>
-                <div class="preset" onclick="fillText('partially hydrogenated soybean oil, sugar, salt')">
-                    🚨 Trans Fat Test: partially hydrogenated soybean oil, sugar, salt
-                </div>
-                <div class="preset" onclick="fillText('chicken stock, modified cornstarch, vegetable oil, wheat flour, cream, chicken meat, chicken fat, salt, whey, dried chicken, monosodium glutamate, soy protein concentrate, water, natural flavoring, yeast extract, beta carotene for color, soy protein isolate, sodium phosphate, celery extract, onion extract, butter, garlic juice concentrate')">
-                    📸 Campbell's Soup Test (from your image)
-                </div>
-                
-                <script>
-                function fillText(text) {
-                    document.querySelector('textarea[name="ingredients"]').value = text;
-                }
-                </script>
-                
-                <p><a href="/">← Back to Main Scanner</a></p>
-            </div>
-        </body>
-        </html>
-        '''
-    
-    # Handle POST request
-    ingredients_text = request.form.get('ingredients', '').strip()
-    
-    if not ingredients_text:
-        return redirect('/test-manual')
-    
-    try:
-        # Test the ingredient detection system directly
-        from ingredient_scanner import match_all_ingredients, rate_ingredients_according_to_hierarchy, assess_text_quality_enhanced
-        
-        print(f"DEBUG: Manual test with text: {ingredients_text}")
-        
-        # Assess quality
-        quality = assess_text_quality_enhanced(ingredients_text)
-        print(f"DEBUG: Text quality: {quality}")
-        
-        # Match ingredients
-        matches = match_all_ingredients(ingredients_text)
-        print(f"DEBUG: Matches: {matches}")
-        
-        # Rate ingredients
-        rating = rate_ingredients_according_to_hierarchy(matches, quality)
-        print(f"DEBUG: Rating: {rating}")
-        
-        # Create result object
-        result = {
-            "rating": rating,
-            "matched_ingredients": matches,
-            "confidence": "high",
-            "text_quality": quality,
-            "extracted_text_length": len(ingredients_text),
-            "gmo_alert": "📣 GMO Alert!" if matches["gmo"] else None
-        }
-        
-        # Render result using the same template as main scanner
-        return render_template('scanner.html',
-                             result=result,
-                             trial_expired=False,
-                             trial_time_left="Manual Test",
-                             stripe_publishable_key="test")
-                             
-    except Exception as e:
-        print(f"ERROR in manual test: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        return f'''
-        <html>
-        <body>
-        <h1>❌ Test Error</h1>
-        <p>Error: {str(e)}</p>
-        <a href="/test-manual">← Try Again</a>
-        </body>
-        </html>
-        '''
-        
-@app.route('/debug-ocr', methods=['GET', 'POST'])
-def debug_ocr():
-    """Debug what OCR is actually reading - Enhanced version"""
-    if request.method == 'GET':
-        return '''
-        <html>
-        <head>
-            <title>OCR Debug Tool</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                .upload-area { border: 2px dashed #e91e63; border-radius: 10px; padding: 40px; text-align: center; margin: 20px 0; }
-                .upload-area:hover { background: #fafafa; }
-                input[type="file"] { margin: 10px 0; }
-                button { background: #e91e63; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-                button:hover { background: #c2185b; }
-                .back-link { color: #666; text-decoration: none; margin-top: 20px; display: inline-block; }
-                .back-link:hover { color: #e91e63; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🔍 OCR Debug Tool</h1>
-                <p>Upload an image with ingredient text to see exactly what the OCR system detects and how it's processed.</p>
-                
-                <form method="post" enctype="multipart/form-data">
-                    <div class="upload-area">
-                        <h3>📸 Select Image</h3>
-                        <input type="file" name="image" accept="image/*" required>
-                        <br><br>
-                        <button type="submit">🔬 Analyze Image</button>
-                    </div>
-                </form>
-                
-                <a href="/" class="back-link">← Back to Main Scanner</a>
-            </div>
-        </body>
-        </html>
-        '''
-    
-    if 'image' not in request.files:
-        return "No image uploaded"
-    
-    file = request.files['image']
-    if file.filename == '':
-        return "No image selected"
-    
-    try:
-        import tempfile
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"debug_{timestamp}_{filename}"
-        filepath = os.path.join(tempfile.gettempdir(), filename)
-        file.save(filepath)
-        
-        print(f"DEBUG OCR: Processing {filepath}")
-        
-        # Use the NEW function names from updated ingredient_scanner
-        from ingredient_scanner import extract_text_with_multiple_methods, assess_text_quality_enhanced, match_all_ingredients, rate_ingredients_according_to_hierarchy
-        
-        # Extract text with full debug output
-        text = extract_text_with_multiple_methods(filepath)
-        quality = assess_text_quality_enhanced(text)
-        matches = match_all_ingredients(text)
-        rating = rate_ingredients_according_to_hierarchy(matches, quality)
-        
-        # Clean up
-        os.remove(filepath)
-        
-        # Format matches for display (removed safe_ingredients)
-        matches_display = ""
-        total_ingredients = 0
-        for category, ingredients in matches.items():
-            if ingredients and category != 'all_detected':
-                matches_display += f"<div style='margin: 10px 0; padding: 10px; background: #f0f8ff; border-left: 4px solid #e91e63;'>"
-                matches_display += f"<strong style='color: #e91e63;'>{category.replace('_', ' ').title()}:</strong><br>"
-                matches_display += f"<span style='color: #333;'>{', '.join(ingredients)}</span>"
-                matches_display += f"</div>"
-                total_ingredients += len(ingredients)
-        
-        if not matches_display:
-            matches_display = "<div style='padding: 20px; background: #fff3e0; border-radius: 5px; color: #f57c00;'>❌ No ingredients detected</div>"
-        
-        # Color code the rating
-        rating_color = "#4CAF50"  # Green for safe
-        if "Danger" in rating:
-            rating_color = "#f44336"  # Red for danger
-        elif "Proceed" in rating:
-            rating_color = "#ff9800"  # Orange for caution
-        elif "TRY AGAIN" in rating:
-            rating_color = "#2196F3"  # Blue for try again
-        
-        return f"""
-        <html>
-        <head>
-            <title>OCR Debug Results</title>
-            <style>
-                body {{ font-family: 'Courier New', monospace; padding: 20px; background: #f5f5f5; line-height: 1.6; }}
-                .container {{ max-width: 900px; margin: 0 auto; }}
-                .section {{ background: white; margin: 20px 0; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                .rating {{ font-size: 24px; font-weight: bold; color: {rating_color}; text-align: center; padding: 20px; background: rgba(0,0,0,0.05); border-radius: 10px; }}
-                .stats {{ display: flex; justify-content: space-around; background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0; }}
-                .stat {{ text-align: center; }}
-                .stat-number {{ font-size: 24px; font-weight: bold; color: #2e7d32; }}
-                .stat-label {{ color: #666; font-size: 12px; }}
-                .text-box {{ border: 1px solid #ddd; padding: 15px; background: #fafafa; border-radius: 5px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 14px; }}
-                .nav-buttons {{ text-align: center; margin: 30px 0; }}
-                .nav-buttons a {{ background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 0 10px; display: inline-block; }}
-                .nav-buttons a:hover {{ background: #c2185b; }}
-                .nav-buttons a.secondary {{ background: #666; }}
-                .nav-buttons a.secondary:hover {{ background: #555; }}
-                h1 {{ color: #e91e63; text-align: center; }}
-                h3 {{ color: #333; border-bottom: 2px solid #e91e63; padding-bottom: 5px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🔍 OCR Debug Results</h1>
-                
-                <div class="section">
-                    <div class="rating">Final Rating: {rating}</div>
-                    
-                    <div class="stats">
-                        <div class="stat">
-                            <div class="stat-number">{len(text)}</div>
-                            <div class="stat-label">Characters</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{quality}</div>
-                            <div class="stat-label">Quality</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{total_ingredients}</div>
-                            <div class="stat-label">Ingredients</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{len(matches.get('all_detected', []))}</div>
-                            <div class="stat-label">Total Detected</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="section">
-                    <h3>📝 Raw Text Extracted</h3>
-                    <div class="text-box">{text or "❌ NO TEXT DETECTED - Try a clearer image with better lighting"}</div>
-                </div>
-                
-                <div class="section">
-                    <h3>🧬 Ingredient Analysis</h3>
-                    {matches_display}
-                    
-                    {'<div style="margin: 15px 0; padding: 15px; background: #fff3e0; border-radius: 5px;"><strong style="color: #f57c00;">📣 GMO Alert!</strong><br>This product contains genetically modified ingredients: ' + ', '.join(matches.get('gmo', [])) + '</div>' if matches.get('gmo') else ''}
-                </div>
-                
-                {'<div class="section"><h3>🔧 Troubleshooting Tips</h3><ul><li>Ensure good lighting when taking the photo</li><li>Hold the camera steady and close enough to read the text clearly</li><li>Make sure the ingredient list is flat and not wrinkled</li><li>Try scanning just the ingredient section, not the entire package</li><li>Clean the camera lens before taking the photo</li></ul></div>' if quality == 'very_poor' or len(text) < 10 else ''}
-                
-                <div class="nav-buttons">
-                    <a href="/debug-ocr">🔬 Test Another Image</a>
-                    <a href="/" class="secondary">← Back to Main Scanner</a>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"DEBUG OCR Error: {e}")
-        print(f"Full traceback: {error_details}")
-        
-        return f"""
-        <html>
-        <head>
-            <title>OCR Debug Error</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }}
-                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }}
-                .error {{ background: #ffebee; border: 1px solid #f44336; border-radius: 5px; padding: 20px; margin: 20px 0; }}
-                .error-details {{ background: #fafafa; border-radius: 5px; padding: 15px; font-family: monospace; overflow-x: auto; }}
-                a {{ color: #e91e63; text-decoration: none; }}
-                a:hover {{ text-decoration: underline; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>❌ OCR Debug Error</h1>
-                
-                <div class="error">
-                    <p><strong>Error:</strong> {str(e)}</p>
-                </div>
-                
-                <h3>🔧 Full Error Details:</h3>
-                <div class="error-details">
-                    <pre>{error_details}</pre>
-                </div>
-                
-                <p><strong>Common Solutions:</strong></p>
-                <ul>
-                    <li>Make sure you uploaded a valid image file</li>
-                    <li>Try a smaller image file (under 16MB)</li>
-                    <li>Check OCR.space API connectivity</li>
-                    <li>Verify image compression is working</li>
-                </ul>
-                
-                <br>
-                <a href="/debug-ocr">← Try Again</a> | 
-                <a href="/">Main Scanner</a> | 
-                <a href="/debug">System Debug</a>
-            </div>
-        </body>
-        </html>
-        """
-
-@app.route('/test-scan')
-def test_scan():
-    """Test scanning without actual image"""
-    try:
-        # Test if all imports work
-        from ingredient_scanner import scan_image_for_ingredients
-        
-        # Create a dummy result (removed safe_ingredients)
-        test_result = {
-            "rating": "✅ Yay! Safe!",
-            "matched_ingredients": {
-                "trans_fat": [],
-                "excitotoxins": [],
-                "corn": [],
-                "sugar": [],
-                "sugar_safe": [],
-                "gmo": [],
-                "all_detected": []
-            },
-            "confidence": "high",
-            "text_quality": "good",
-            "extracted_text_length": 20,
-            "gmo_alert": None
-        }
-        
-        return render_template('scanner.html',
-                             result=test_result,
-                             trial_expired=False,
-                             trial_time_left="48h 0m",
-                             stripe_publishable_key="test")
-                             
-    except Exception as e:
-        return f"Test failed: {str(e)}<br><a href='/'>Back to Scanner</a>"
-        
+# Keep all your existing routes (upgrade, stripe, debug, etc.)
 @app.route('/upgrade')
+@login_required
 def upgrade():
     """Upgrade page for premium plans"""
-    init_session()
-    
-    trial_expired = is_trial_expired()
-    trial_time_left = get_trial_time_left()
+    user_data = get_user_data(session['user_id'])
+    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
     
     return render_template('upgrade.html',
                          trial_expired=trial_expired,
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    """Create Stripe checkout session"""
-    try:
-        data = request.get_json()
-        plan = data.get('plan', 'monthly')
-        
-        # Check if Stripe is configured
-        if not stripe.api_key:
-            print("ERROR: Stripe API key not configured")
-            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
-        
-        # Define pricing based on your upgrade.html plans
-        prices = {
-            'weekly': {
-                'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'),
-                'amount': 3.99
-            },
-            'monthly': {
-                'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'),
-                'amount': 11.99
-            },
-            'yearly': {
-                'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'),
-                'amount': 95.00
-            }
-        }
-        
-        if plan not in prices:
-            print(f"ERROR: Invalid plan selected: {plan}")
-            return jsonify({'error': 'Invalid plan selected'}), 400
-        
-        price_id = prices[plan]['price_id']
-        
-        if not price_id:
-            print(f"ERROR: No price ID configured for plan: {plan}")
-            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
-        
-        # Log for debugging
-        print(f"Creating checkout session for plan: {plan}, price_id: {price_id}")
-        
-        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
-        cancel_url = f"{DOMAIN}/upgrade"
-        
-        # Create checkout session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price': price_id,
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
-                'user_id': session.get('user_id'),
-                'plan': plan
-            },
-            customer_email=data.get('email') if data.get('email') else None,
-        )
-        
-        print(f"Checkout session created successfully: {checkout_session.id}")
-        return jsonify({'checkout_url': checkout_session.url})
-        
-    except stripe.error.StripeError as e:
-        print(f"Stripe error: {str(e)}")
-        return jsonify({'error': f'Payment error: {str(e)}'}), 400
-    except Exception as e:
-        print(f"Unexpected error in create_checkout_session: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
-
-@app.route('/success')
-def success():
-    """Handle successful payment"""
-    try:
-        session_id = request.args.get('session_id')
-        plan = request.args.get('plan', 'monthly')
-        
-        if session_id:
-            # Verify the session with Stripe
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            
-            if checkout_session.payment_status == 'paid':
-                # Mark user as premium
-                session['is_premium'] = True
-                session['premium_start'] = datetime.now().isoformat()
-                session['premium_plan'] = plan
-                session['stripe_customer_id'] = checkout_session.customer
-                session['scans_used'] = 0  # Reset scan count
-                
-                # Log successful payment
-                log_payment(session.get('user_id'), plan, checkout_session.id)
-                
-                return render_template('success.html', plan=plan)
-        
-        return redirect(url_for('index'))
-        
-    except Exception as e:
-        print(f"Success page error: {e}")
-        return redirect(url_for('index'))
-
-@app.route('/create-customer-portal', methods=['POST'])
-def create_customer_portal():
-    """Create Stripe Customer Portal session for subscription management"""
-    try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
-        
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
-        
-        # Create customer portal session
-        portal_session = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=f"{DOMAIN}/account",
-        )
-        
-        return jsonify({'portal_url': portal_session.url})
-        
-    except Exception as e:
-        print(f"Customer portal error: {e}")
-        return jsonify({'error': 'Unable to create portal session'}), 500
-
-@app.route('/cancel-subscription', methods=['POST'])
-def cancel_subscription():
-    """Cancel user's subscription"""
-    try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
-        
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
-        
-        # Get customer's subscriptions
-        subscriptions = stripe.Subscription.list(customer=customer_id)
-        
-        for subscription in subscriptions.data:
-            if subscription.status == 'active':
-                # Cancel the subscription at period end (don't end immediately)
-                updated_subscription = stripe.Subscription.modify(
-                    subscription.id,
-                    cancel_at_period_end=True
-                )
-                
-                # Log cancellation event
-                log_subscription_event('cancelled', updated_subscription)
-                
-                # Send cancellation email (optional)
-                send_cancellation_email(updated_subscription)
-                
-                return jsonify({
-                    'success': True, 
-                    'message': 'Subscription will be cancelled at the end of your billing period',
-                    'period_end': updated_subscription.current_period_end
-                })
-        
-        return jsonify({'error': 'No active subscription found'}), 400
-        
-    except Exception as e:
-        print(f"Cancellation error: {e}")
-        return jsonify({'error': 'Failed to cancel subscription'}), 500
-
-@app.route('/webhook', methods=['POST'])
-def stripe_webhook():
-    """Enhanced webhook handler for subscription lifecycle"""
-    payload = request.get_data()
-    sig_header = request.headers.get('Stripe-Signature')
-    endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
-    
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        return 'Invalid payload', 400
-    except stripe.error.SignatureVerificationError:
-        return 'Invalid signature', 400
-    
-    # Handle different subscription events
-    if event['type'] == 'customer.subscription.created':
-        # New subscription created
-        handle_subscription_created(event['data']['object'])
-        
-    elif event['type'] == 'customer.subscription.updated':
-        # Subscription updated (plan change, etc.)
-        handle_subscription_updated(event['data']['object'])
-        
-    elif event['type'] == 'customer.subscription.deleted':
-        # Subscription cancelled/expired
-        handle_subscription_cancelled(event['data']['object'])
-        
-    elif event['type'] == 'invoice.payment_succeeded':
-        # Successful payment/renewal
-        handle_payment_succeeded(event['data']['object'])
-        
-    elif event['type'] == 'invoice.payment_failed':
-        # Failed payment
-        handle_payment_failed(event['data']['object'])
-        
-    return 'Success', 200
-
-def handle_subscription_created(subscription):
-    """Handle new subscription creation"""
-    print(f"New subscription created: {subscription['id']}")
-    log_subscription_event('created', subscription)
-
-def handle_subscription_updated(subscription):
-    """Handle subscription updates"""
-    print(f"Subscription updated: {subscription['id']}")
-    log_subscription_event('updated', subscription)
-
-def handle_subscription_cancelled(subscription):
-    """Handle subscription cancellation"""
-    print(f"Subscription cancelled: {subscription['id']}")
-    log_subscription_event('cancelled', subscription)
-    
-    # Send a cancellation email
-    send_cancellation_email(subscription)
-
-def handle_payment_succeeded(invoice):
-    """Handle successful payment"""
-    print(f"Payment succeeded for invoice: {invoice['id']}")
-    log_subscription_event('payment_succeeded', invoice)
-
-def handle_payment_failed(invoice):
-    """Handle failed payment"""
-    print(f"Payment failed for invoice: {invoice['id']}")
-    log_subscription_event('payment_failed', invoice)
-    
-    # Send a payment failure notification
-    send_payment_failure_notification(invoice)
-
-def log_subscription_event(event_type, data):
-    """Log subscription events for tracking"""
-    try:
-        event_log = {
-            'timestamp': datetime.now().isoformat(),
-            'event_type': event_type,
-            'subscription_id': data.get('id'),
-            'customer_id': data.get('customer'),
-            'status': data.get('status'),
-            'amount': data.get('amount_paid') if 'amount_paid' in data else data.get('amount'),
-            'period_start': data.get('current_period_start'),
-            'period_end': data.get('current_period_end'),
-            'cancel_at_period_end': data.get('cancel_at_period_end', False)
-        }
-        
-        with open('subscription_events.json', 'a') as f:
-            f.write(json.dumps(event_log) + '\n')
-            
-    except Exception as e:
-        print(f"Error logging subscription event: {e}")
-
-def send_cancellation_email(subscription):
-    """Send cancellation confirmation email"""
-    try:
-        # Get customer email from Stripe
-        customer = stripe.Customer.retrieve(subscription['customer'])
-        customer_email = customer.get('email')
-        
-        if customer_email:
-            print(f"Would send cancellation email to: {customer_email}")
-            print(f"Subscription {subscription['id']} cancelled")
-            print(f"Access continues until: {subscription.get('current_period_end')}")
-            
-            # Here you would implement your email service
-            # Example: send_email_notification(customer_email, subject, content)
-            
-    except Exception as e:
-        print(f"Error sending cancellation email: {e}")
-
-def send_payment_failure_notification(invoice):
-    """Send payment failure notification"""
-    try:
-        customer = stripe.Customer.retrieve(invoice['customer'])
-        customer_email = customer.get('email')
-        
-        if customer_email:
-            print(f"Would send payment failure notification to: {customer_email}")
-            print(f"Invoice {invoice['id']} failed")
-            
-            # Here you would implement your email service
-            
-    except Exception as e:
-        print(f"Error sending payment failure notification: {e}")
-
-@app.route('/account')
-def account():
-    """User account page with subscription management"""
-    init_session()
-    
-    trial_expired = is_trial_expired()
-    trial_time_left = get_trial_time_left()
-    
-    return render_template('account.html',
-                         trial_expired=trial_expired,
-                         trial_time_left=trial_time_left)
-
-@app.route('/reset-trial')
-def reset_trial():
-    """Reset trial for testing purposes (remove in production)"""
-    session.clear()
-    return redirect(url_for('index'))
-
+# [Keep all your existing debug routes and other functionality]
 @app.route('/debug')
 def debug():
     """Debug endpoint to check system status"""
@@ -1120,20 +680,21 @@ def debug():
     debug_info.append(f"Scanner.html exists: {os.path.exists('templates/scanner.html')}")
     debug_info.append(f"Static folder exists: {os.path.exists('static')}")
     
-    # Test OCR.space API connection
+    # Test database
     try:
-        import requests
-        api_url = 'https://api.ocr.space/parse/image'
-        response = requests.get(api_url, timeout=10)
-        debug_info.append(f"✅ OCR.space API: Reachable (status: {response.status_code})")
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users')
+        user_count = cursor.fetchone()[0]
+        debug_info.append(f"✅ Database: {user_count} users registered")
+        conn.close()
     except Exception as e:
-        debug_info.append(f"❌ OCR.space API: Unreachable - {str(e)}")
+        debug_info.append(f"❌ Database: Failed - {str(e)}")
     
     # Test Stripe configuration
     try:
         if stripe.api_key:
             debug_info.append("✅ Stripe: API key configured")
-            # Test Stripe connection
             stripe.Account.retrieve()
             debug_info.append("✅ Stripe: Connection successful")
         else:
@@ -1159,53 +720,330 @@ def debug():
     """
     return html
 
-def log_scan_result(user_id, result, scan_count, image_url=None, scan_id=None):
-    """Log scan results for analytics with image URL"""
+@app.route('/test-manual', methods=['GET', 'POST'])
+def test_manual():
+    """Manual text input for testing ingredient detection"""
+    if request.method == 'GET':
+        return '''
+        <html>
+        <head>
+            <title>Manual Ingredient Test</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #e91e63; border-radius: 5px; font-size: 16px; }
+                button { background: #e91e63; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+                button:hover { background: #c2185b; }
+                .preset { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; cursor: pointer; }
+                .preset:hover { background: #e0e0e0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🧪 Manual Ingredient Testing</h1>
+                <p>Enter ingredient text to test the detection system:</p>
+                
+                <form method="post">
+                    <textarea name="ingredients" placeholder="Enter ingredients here... e.g., corn syrup, monosodium glutamate, natural flavors"></textarea>
+                    <br><br>
+                    <button type="submit">🔬 Test Ingredients</button>
+                </form>
+                
+                <h3>Quick Test Presets:</h3>
+                <div class="preset" onclick="fillText('corn syrup, monosodium glutamate, natural flavors, salt')">
+                    🚨 High Risk Test: corn syrup, monosodium glutamate, natural flavors, salt
+                </div>
+                <div class="preset" onclick="fillText('partially hydrogenated soybean oil, sugar, salt')">
+                    🚨 Trans Fat Test: partially hydrogenated soybean oil, sugar, salt
+                </div>
+                
+                <script>
+                function fillText(text) {
+                    document.querySelector('textarea[name="ingredients"]').value = text;
+                }
+                </script>
+                
+                <p><a href="/">← Back to Main Scanner</a></p>
+            </div>
+        </body>
+        </html>
+        '''
+    
+    # Handle POST request
+    ingredients_text = request.form.get('ingredients', '').strip()
+    
+    if not ingredients_text:
+        return redirect('/test-manual')
+    
     try:
-        if not scan_id:
-            scan_id = str(uuid.uuid4())
-            
-        log_data = {
-            'scan_id': scan_id,
-            'user_id': user_id,
-            'timestamp': datetime.now().isoformat(),
-            'scan_count': scan_count,
-            'rating': result.get('rating'),
-            'confidence': result.get('confidence'),
-            'ingredients_found': len(result.get('matched_ingredients', {}).get('all_detected', [])),
-            'image_url': image_url,  # Add image URL
-            'extracted_text': result.get('extracted_text', ''),
-            'matched_ingredients': result.get('matched_ingredients', {}),
-            'text_quality': result.get('text_quality', 'unknown')
+        from ingredient_scanner import match_all_ingredients, rate_ingredients_according_to_hierarchy, assess_text_quality_enhanced
+        
+        quality = assess_text_quality_enhanced(ingredients_text)
+        matches = match_all_ingredients(ingredients_text)
+        rating = rate_ingredients_according_to_hierarchy(matches, quality)
+        
+        result = {
+            "rating": rating,
+            "matched_ingredients": matches,
+            "confidence": "high",
+            "text_quality": quality,
+            "extracted_text_length": len(ingredients_text)
         }
         
-        # Save to file or database
-        with open('scan_logs.json', 'a') as f:
-            f.write(json.dumps(log_data) + '\n')
-            
-        return scan_id
-            
+        return render_template('scanner.html',
+                             result=result,
+                             trial_expired=False,
+                             trial_time_left="Manual Test",
+                             user_name="Test User",
+                             stripe_publishable_key="test")
+                             
     except Exception as e:
-        print(f"Logging error: {e}")
-        return None
+        return f'''
+        <html>
+        <body>
+        <h1>❌ Test Error</h1>
+        <p>Error: {str(e)}</p>
+        <a href="/test-manual">← Try Again</a>
+        </body>
+        </html>
+        '''
 
-def log_payment(user_id, plan, session_id):
-    """Log successful payments"""
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history"""
     try:
-        payment_data = {
-            'user_id': user_id,
-            'timestamp': datetime.now().isoformat(),
-            'plan': plan,
-            'stripe_session_id': session_id,
-            'amount': 3.99 if plan == 'weekly' else (11.99 if plan == 'monthly' else 95.00)
-        }
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
         
-        with open('payment_logs.json', 'a') as f:
-            f.write(json.dumps(payment_data) + '\n')
-            
+        # Get user's image URLs before deleting
+        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Delete user's scan history
+        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        conn.commit()
+        conn.close()
+        
+        # Delete user's images
+        for image_url in image_urls:
+            try:
+                if image_url.startswith('/static/'):
+                    image_path = image_url[1:]  # Remove leading slash
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                        print(f"Deleted image: {image_path}")
+            except Exception as e:
+                print(f"Error deleting image {image_url}: {e}")
+        
+        return jsonify({'success': True})
+        
     except Exception as e:
-        print(f"Payment logging error: {e}")
+        print(f"Clear history error: {e}")
+        return jsonify({'error': 'Failed to clear history'}), 500
+
+@app.route('/create-customer-portal', methods=['POST'])
+@login_required
+def create_customer_portal():
+    """Create Stripe Customer Portal session for subscription management"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
+        
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
+        
+        # Create customer portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{DOMAIN}/account",
+        )
+        
+        return jsonify({'portal_url': portal_session.url})
+        
+    except Exception as e:
+        print(f"Customer portal error: {e}")
+        return jsonify({'error': 'Unable to create portal session'}), 500
+
+@app.route('/cancel-subscription', methods=['POST'])
+@login_required
+def cancel_subscription():
+    """Cancel user's subscription"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
+        
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
+        
+        # Get customer's subscriptions
+        subscriptions = stripe.Subscription.list(customer=customer_id)
+        
+        for subscription in subscriptions.data:
+            if subscription.status == 'active':
+                # Cancel the subscription at period end
+                stripe.Subscription.modify(
+                    subscription.id,
+                    cancel_at_period_end=True
+                )
+                
+                # Update database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE users 
+                    SET subscription_status = 'cancelled'
+                    WHERE id = ?
+                ''', (session['user_id'],))
+                conn.commit()
+                conn.close()
+                
+                return jsonify({
+                    'success': True, 
+                    'message': 'Subscription will be cancelled at the end of your billing period'
+                })
+        
+        return jsonify({'error': 'No active subscription found'}), 400
+        
+    except Exception as e:
+        print(f"Cancellation error: {e}")
+        return jsonify({'error': 'Failed to cancel subscription'}), 500
 
 if __name__ == '__main__':
+    create_demo_user()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False) all your existing Stripe routes: create-checkout-session, success, webhook, etc.]
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    """Create Stripe checkout session"""
+    try:
+        data = request.get_json()
+        plan = data.get('plan', 'monthly')
+        
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
+        
+        prices = {
+            'weekly': {'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'), 'amount': 3.99},
+            'monthly': {'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'), 'amount': 11.99},
+            'yearly': {'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'), 'amount': 95.00}
+        }
+        
+        if plan not in prices:
+            return jsonify({'error': 'Invalid plan selected'}), 400
+        
+        price_id = prices[plan]['price_id']
+        if not price_id:
+            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
+        
+        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
+        cancel_url = f"{DOMAIN}/upgrade"
+        
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'user_id': session.get('user_id'),
+                'plan': plan
+            },
+            customer_email=data.get('email') if data.get('email') else None,
+        )
+        
+        return jsonify({'checkout_url': checkout_session.url})
+        
+    except Exception as e:
+        print(f"Unexpected error in create_checkout_session: {str(e)}")
+        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
+
+@app.route('/success')
+@login_required
+def success():
+    """Handle successful payment"""
+    try:
+        session_id = request.args.get('session_id')
+        plan = request.args.get('plan', 'monthly')
+        
+        if session_id:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            
+            if checkout_session.payment_status == 'paid':
+                # Update user in database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                
+                next_billing = datetime.now() + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
+                
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, subscription_status = 'active', 
+                        subscription_start_date = ?, next_billing_date = ?,
+                        stripe_customer_id = ?, scans_used = 0
+                    WHERE id = ?
+                ''', (datetime.now(), next_billing, checkout_session.customer, session['user_id']))
+                
+                conn.commit()
+                conn.close()
+                
+                # Update session
+                session['is_premium'] = True
+                session['stripe_customer_id'] = checkout_session.customer
+                session['scans_used'] = 0
+                
+                return render_template('success.html', plan=plan)
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"Success page error: {e}")
+        return redirect(url_for('index'))
+
+# Create demo user function
+def create_demo_user():
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    demo_email = 'demo@foodfixr.com'
+    
+    # Check if demo user exists
+    cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
+    if cursor.fetchone():
+        conn.close()
+        return
+    
+    # Create demo user
+    password_hash = generate_password_hash('demo123')
+    trial_start = datetime.now() - timedelta(hours=2)
+    trial_end = trial_start + timedelta(hours=48)
+    
+    cursor.execute('''
+        INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
+                          scans_used, total_scans_ever, last_login)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', ('Demo User', demo_email, password_hash, trial_start, trial_end, 3, 15, datetime.now()))
+    
+    demo_user_id = cursor.lastrowid
+    
+    # Add sample scan history
+    sample_scans = [
+        ('Safe', '{"sugar": ["organic cane sugar"]}', datetime.now() - timedelta(hours=1)),
+        ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', datetime.now() - timedelta(minutes=30)),
+        ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', datetime.now() - timedelta(minutes=10))
+    ]
+    
+    for rating, ingredients, scan_date in sample_scans:
+        cursor.execute('''
+            INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (demo_user_id, rating, ingredients, scan_date, str(uuid.uuid4())))
+    
+    conn.commit()
+    conn.close()
+    print("Demo user created: demo@foodfixr.com / demo123")
+
+# [Keep
