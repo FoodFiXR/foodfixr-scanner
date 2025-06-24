@@ -184,13 +184,13 @@
             border: 1px solid rgba(233, 30, 99, 0.2);
         }
 
-        .ingredient-tag.trans-fat {
+        .ingredient-tag.trans_fat {
             background: rgba(244, 67, 54, 0.1);
             color: #f44336;
             border-color: rgba(244, 67, 54, 0.2);
         }
 
-        .ingredient-tag.excitotoxin {
+        .ingredient-tag.excitotoxins {
             background: rgba(255, 152, 0, 0.1);
             color: #ff9800;
             border-color: rgba(255, 152, 0, 0.2);
@@ -212,6 +212,18 @@
             background: rgba(121, 85, 72, 0.1);
             color: #795548;
             border-color: rgba(121, 85, 72, 0.2);
+        }
+
+        .ingredient-tag.other {
+            background: rgba(96, 125, 139, 0.1);
+            color: #607d8b;
+            border-color: rgba(96, 125, 139, 0.2);
+        }
+
+        .ingredient-tag.all_detected {
+            background: rgba(63, 81, 181, 0.1);
+            color: #3f51b5;
+            border-color: rgba(63, 81, 181, 0.2);
         }
 
         .expand-btn {
@@ -263,6 +275,18 @@
             border-radius: 8px;
             max-height: 150px;
             overflow-y: auto;
+        }
+
+        /* Debug info styles */
+        .debug-info {
+            background: rgba(255, 243, 205, 0.8);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 8px;
+            font-size: 11px;
+            font-family: monospace;
+            color: #856404;
         }
 
         /* Product Image Styles */
@@ -466,6 +490,7 @@
             <div class="nav-buttons">
                 <a href="/" class="nav-btn">📸 New Scan</a>
                 <a href="/account" class="nav-btn secondary">👤 Account</a>
+                <a href="/debug-history" class="nav-btn secondary">🔍 Debug</a>
                 {% if session.get('is_premium') %}
                     <button onclick="exportHistory()" class="nav-btn secondary">📤 Export</button>
                 {% endif %}
@@ -534,6 +559,7 @@
                     </div>
                 </div>
 
+                <!-- Enhanced ingredient summary section -->
                 {% if scan.ingredient_summary %}
                 <div class="ingredients-summary">
                     <div class="ingredient-tags">
@@ -545,13 +571,28 @@
                                     {% elif category == 'corn' %}🌽 Corn ({{ count }})
                                     {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
                                     {% elif category == 'gmo' %}👽 GMO ({{ count }})
+                                    {% elif category == 'all_detected' %}🔬 Detected ({{ count }})
+                                    {% else %}📋 {{ category.title() }} ({{ count }})
                                     {% endif %}
                                 </span>
                             {% endif %}
                         {% endfor %}
                     </div>
                 </div>
+                {% else %}
+                <!-- Show message if no ingredients found -->
+                <div class="ingredients-summary">
+                    <div style="color: #999; font-style: italic; font-size: 14px;">
+                        No specific ingredients detected in this scan
+                    </div>
+                </div>
                 {% endif %}
+
+                <!-- Debug info for troubleshooting -->
+                <div class="debug-info">
+                    Debug: Rating="{{ scan.raw_rating or 'None' }}", Summary={{ scan.ingredient_summary|length }} categories, 
+                    Detected={{ scan.detected_ingredients|length }} ingredients
+                </div>
 
                 <button class="expand-btn" onclick="toggleDetails(this)">
                     <span class="expand-text">View Details</span>
@@ -567,6 +608,13 @@
                     </div>
                     {% endif %}
 
+                    {% if scan.raw_rating %}
+                    <div class="detail-section">
+                        <div class="detail-title">📋 Original Scan Result</div>
+                        <div class="detail-content">{{ scan.raw_rating }}</div>
+                    </div>
+                    {% endif %}
+
                     {% if scan.confidence %}
                     <div class="detail-section">
                         <div class="detail-title">🎯 Scanner Confidence Level</div>
@@ -574,17 +622,21 @@
                     </div>
                     {% endif %}
 
+                    {% if scan.detected_ingredients %}
+                    <div class="detail-section">
+                        <div class="detail-title">🧬 All Detected Ingredients ({{ scan.detected_ingredients|length }})</div>
+                        <div class="detail-content">
+                            {% for ingredient in scan.detected_ingredients %}
+                                <span style="display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 6px; margin: 2px; border-radius: 4px; font-size: 11px;">{{ ingredient }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     {% if scan.extracted_text %}
                     <div class="detail-section">
                         <div class="detail-title">📝 Extracted Text ({{ scan.text_length }} characters)</div>
                         <div class="detail-content">{{ scan.extracted_text[:500] }}{% if scan.text_length > 500 %}...{% endif %}</div>
-                    </div>
-                    {% endif %}
-
-                    {% if scan.detected_ingredients %}
-                    <div class="detail-section">
-                        <div class="detail-title">🧬 All Detected Ingredients</div>
-                        <div class="detail-content">{{ scan.detected_ingredients | join(', ') }}</div>
                     </div>
                     {% endif %}
                 </div>
