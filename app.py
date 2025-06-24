@@ -773,3 +773,9 @@ def clear_history():
                         print(f"Deleted image: {image_path}")
             except Exception as e:
                 print(f"Error deleting image {image_url}: {e}")
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'error': 'Failed to clear history'}), 500
