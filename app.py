@@ -433,7 +433,36 @@ def scan():
         filepath = os.path.join(tempfile.gettempdir(), filename)
         file.save(filepath)
         
+        # Save the uploaded image for history
+        saved_image_path = None
+        try:
+            # Create uploads directory if it doesn't exist
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'history')
+            os.makedirs(uploads_dir, exist_ok=True)
+            
+            # Generate unique filename for the saved image
+            image_filename = f"scan_{session['user_id']}_{int(time.time())}_{secure_filename(file.filename)}"
+            saved_image_path = os.path.join(uploads_dir, image_filename)
+            
+            # Copy the uploaded file to permanent location
+            import shutil
+            shutil.copy2(filepath, saved_image_path)
+            
+            # Store relative URL for serving
+            image_url = f"/uploads/history/{image_filename}"
+            
+        except Exception as e:
+            print(f"Error saving image for history: {e}")
+            image_url = ""
+        
         result = scan_image_for_ingredients(filepath)
+        
+        # Extract text from image for history display
+        extracted_text = ""
+        try:
+            extracted_text = extract_text_from_image(filepath)
+        except Exception as e:
+            print(f"Error extracting text for history: {e}")
         
         # Store more detailed scan information
         conn = get_db_connection()
@@ -456,9 +485,9 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-            ''', (session['user_id'], result.get('rating', ''), ingredients_json, str(uuid.uuid4()), ''))
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url, extracted_text)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s)
+            ''', (session['user_id'], result.get('rating', ''), ingredients_json, str(uuid.uuid4()), image_url, extracted_text[:1000]))  # Limit text length
         else:
             cursor.execute('''
                 UPDATE users 
@@ -467,10 +496,10 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url, extracted_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (session['user_id'], result.get('rating', ''), ingredients_json, 
-                  format_datetime_for_db(), str(uuid.uuid4()), ''))
+                  format_datetime_for_db(), str(uuid.uuid4()), image_url, extracted_text[:1000]))  # Limit text length
         
         conn.commit()
         conn.close()
@@ -625,8 +654,8 @@ def history():
                 'has_gmo': has_gmo,
                 'confidence': 'medium',  # Default confidence level
                 'image_url': row.get('image_url', ''),  # May be empty
-                'extracted_text': '',  # Not currently stored
-                'text_length': 0,  # Not currently stored
+                'extracted_text': row.get('extracted_text', ''),  # Extracted text from image
+                'text_length': len(row.get('extracted_text', '')),  # Text length for display
             }
             
             scans.append(scan_entry)
@@ -1217,6 +1246,7 @@ def simple_login():
                 <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
                 <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
                 <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
+                <a href="/admin-cleanup-images" style="background: #9C27B0; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Cleanup Images</a>
             </div>
         </div>
     </body>
@@ -1565,6 +1595,29 @@ def check_users():
         </html>
         """
 
+@app.route('/uploads/history/<filename>')
+@login_required
+def serve_history_image(filename):
+    """Serve uploaded scan history images"""
+    try:
+        # Security check - only serve images for the current user
+        # Extract user_id from filename (format: scan_USERID_timestamp_originalname)
+        if not filename.startswith(f'scan_{session["user_id"]}_'):
+            return "Unauthorized", 403
+        
+        uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'history')
+        filepath = os.path.join(uploads_dir, filename)
+        
+        if os.path.exists(filepath):
+            from flask import send_file
+            return send_file(filepath)
+        else:
+            return "Image not found", 404
+            
+    except Exception as e:
+        print(f"Error serving history image: {e}")
+        return "Error loading image", 500
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     """Serve static files including emoji images"""
@@ -1588,6 +1641,15 @@ def serve_static(filename):
         """, 200, {'Content-Type': 'image/svg+xml'}
     
     return "File not found", 404
+
+@app.route('/admin-cleanup-images')
+def admin_cleanup_images():
+    """Manual cleanup of old images (admin function)"""
+    try:
+        cleanup_old_images()
+        return jsonify({'success': True, 'message': 'Image cleanup completed'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/debug-routes')
 def debug_routes():
