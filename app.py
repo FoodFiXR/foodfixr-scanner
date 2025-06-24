@@ -381,6 +381,52 @@ def register():
             return render_template('register.html')
     
     return render_template('register.html')
+
+# Add this route to your app.py after the register() function
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    """Reset password for users"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validation
+        if not email or not new_password or not confirm_password:
+            flash('All fields are required', 'error')
+            return render_template('reset_password.html')
+        
+        if new_password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('reset_password.html')
+        
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('reset_password.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Check if user exists
+        cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if user:
+            # Update password
+            new_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+            cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', (new_hash, email))
+            conn.commit()
+            conn.close()
+            
+            flash(f'Password updated successfully for {email}!', 'success')
+            return redirect(url_for('login'))
+        else:
+            conn.close()
+            flash('No account found with that email address', 'error')
+            return render_template('reset_password.html')
+    
+    return render_template('reset_password.html')
     
 @app.route('/logout')
 def logout():
