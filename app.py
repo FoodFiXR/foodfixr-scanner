@@ -249,83 +249,7 @@ def format_datetime_for_db(dt=None):
         dt = datetime.now()
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-def hash_password_consistent(password):
-    """Consistent password hashing method"""
-    return generate_password_hash(password, method='pbkdf2:sha256', salt_length=16)
-
-def verify_password_robust(stored_hash, password):
-    """Robust password verification that handles multiple hash formats"""
-    try:
-        # Standard check
-        if check_password_hash(stored_hash, password):
-            return True
-        
-        # If standard check fails, try rehashing with the same password to see if formats match
-        # This handles cases where hash format might have changed
-        test_hash = hash_password_consistent(password)
-        if stored_hash == test_hash:
-            return True
-            
-        return False
-    except Exception as e:
-        print(f"Password verification error: {e}")
-        return False
-
-# AUTHENTICATION ROUTES
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        
-        print(f"DEBUG: Login attempt for email: {email}")
-        
-        if not email or not password:
-            flash('Please enter both email and password', 'error')
-            return render_template('login.html')
-        
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-        user = cursor.fetchone()
-        
-        if user:
-            print(f"DEBUG: User found: {user['name']}")
-            
-            # Use robust password verification
-            is_valid = verify_password_robust(user['password_hash'], password)
-            print(f"DEBUG: Password verification result: {is_valid}")
-            
-            if is_valid:
-                # Update last login
-                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                             (format_datetime_for_db(), user['id']))
-                conn.commit()
-                
-                # Set session
-                session.permanent = True
-                session['user_id'] = user['id']
-                session['user_email'] = user['email']
-                session['user_name'] = user['name']
-                session['is_premium'] = bool(user['is_premium'])
-                session['scans_used'] = user['scans_used']
-                session['stripe_customer_id'] = user['stripe_customer_id']
-                
-                flash(f'Welcome back, {user["name"]}!', 'success')
-                conn.close()
-                return redirect(url_for('index'))
-            else:
-                flash('Invalid email or password', 'error')
-                conn.close()
-        else:
-            print(f"DEBUG: No user found with email: {email}")
-            flash('Invalid email or password', 'error')
-            conn.close()
-    
-    return render_template('login.html')
-
+# AUTHENTICATION ROUTES - FIXED VERSION
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -363,9 +287,9 @@ def register():
             conn.close()
             return render_template('register.html')
         
-        # Create new user with consistent hashing
-        password_hash = hash_password_consistent(password)
-        print(f"DEBUG: Generated consistent hash")
+        # EXACT SAME METHOD AS LOGIN EXPECTS
+        password_hash = generate_password_hash(password)  # Use default method
+        print(f"DEBUG: Generated hash method: {password_hash.split('$')[0] if '$' in password_hash else 'pbkdf2' if 'pbkdf2' in password_hash else 'unknown'}")
         
         now = datetime.now()
         trial_start = format_datetime_for_db(now)
@@ -383,9 +307,17 @@ def register():
             
             print(f"DEBUG: User created successfully with ID: {user_id}")
             
-            # Test password immediately after creation
-            test_verify = verify_password_robust(password_hash, password)
-            print(f"DEBUG: Immediate password test: {test_verify}")
+            # IMMEDIATE TEST - This is the key fix
+            test_verify = check_password_hash(password_hash, password)
+            print(f"DEBUG: Immediate verification test: {test_verify}")
+            
+            if not test_verify:
+                print("ERROR: Password verification failed immediately after hashing!")
+                flash('Registration failed - password verification error. Please try again.', 'error')
+                cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                conn.commit()
+                conn.close()
+                return render_template('register.html')
             
             # Auto-login after registration
             session.permanent = True
@@ -407,6 +339,63 @@ def register():
             return render_template('register.html')
     
     return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        print(f"DEBUG: Login attempt for email: {email}")
+        print(f"DEBUG: Password provided: {'Yes' if password else 'No'}")
+        
+        if not email or not password:
+            flash('Please enter both email and password', 'error')
+            return render_template('login.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if user:
+            print(f"DEBUG: User found: {user['name']}")
+            print(f"DEBUG: Stored hash starts with: {user['password_hash'][:30]}...")
+            
+            # EXACT SAME METHOD AS REGISTRATION USES
+            is_valid = check_password_hash(user['password_hash'], password)
+            print(f"DEBUG: Password verification result: {is_valid}")
+            
+            if is_valid:
+                # Update last login
+                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                             (format_datetime_for_db(), user['id']))
+                conn.commit()
+                
+                # Set session
+                session.permanent = True
+                session['user_id'] = user['id']
+                session['user_email'] = user['email']
+                session['user_name'] = user['name']
+                session['is_premium'] = bool(user['is_premium'])
+                session['scans_used'] = user['scans_used']
+                session['stripe_customer_id'] = user['stripe_customer_id']
+                
+                flash(f'Welcome back, {user["name"]}!', 'success')
+                conn.close()
+                return redirect(url_for('index'))
+            else:
+                print(f"DEBUG: Password verification failed for hash: {user['password_hash'][:50]}...")
+                flash('Invalid email or password', 'error')
+                conn.close()
+        else:
+            print(f"DEBUG: No user found with email: {email}")
+            flash('Invalid email or password', 'error')
+            conn.close()
+    
+    return render_template('login.html')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
@@ -437,8 +426,8 @@ def reset_password():
         user = cursor.fetchone()
         
         if user:
-            # Update password with consistent hashing
-            new_hash = hash_password_consistent(new_password)
+            # Update password with same method as registration
+            new_hash = generate_password_hash(new_password)
             cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', (new_hash, email))
             conn.commit()
             conn.close()
@@ -451,140 +440,6 @@ def reset_password():
             return render_template('reset_password.html')
     
     return render_template('reset_password.html')
-
-# UTILITY ROUTES FOR DEBUGGING AND MAINTENANCE
-@app.route('/debug-users')
-def debug_users():
-    """Debug route to check users in database"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, password_hash, created_at FROM users ORDER BY created_at DESC LIMIT 10')
-        users = cursor.fetchall()
-        
-        conn.close()
-        
-        html = """
-        <html>
-        <head><title>Debug Users</title></head>
-        <body style="font-family: monospace; padding: 20px;">
-        <h1>🔍 Users in Database</h1>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 8px;">ID</th>
-            <th style="padding: 8px;">Name</th>
-            <th style="padding: 8px;">Email</th>
-            <th style="padding: 8px;">Hash Method</th>
-            <th style="padding: 8px;">Created At</th>
-        </tr>
-        """
-        
-        for user in users:
-            hash_method = "pbkdf2" if "pbkdf2" in user['password_hash'] else "other"
-            html += f"""
-            <tr>
-                <td style="padding: 8px;">{user['id']}</td>
-                <td style="padding: 8px;">{user['name']}</td>
-                <td style="padding: 8px;">{user['email']}</td>
-                <td style="padding: 8px;">{hash_method}</td>
-                <td style="padding: 8px;">{user['created_at']}</td>
-            </tr>
-            """
-        
-        html += """
-        </table>
-        <br>
-        <a href="/fix-all-passwords" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔧 Fix All Passwords</a>
-        <a href="/create-test-user" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👤 Create Test User</a>
-        <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back</a>
-        </body>
-        </html>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"Database error: {str(e)}"
-
-@app.route('/fix-all-passwords')
-def fix_all_passwords():
-    """Fix all password hashes to use consistent format"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Set all users to have a default password with consistent hashing
-        default_password = 'foodfixr123'
-        consistent_hash = hash_password_consistent(default_password)
-        
-        cursor.execute('UPDATE users SET password_hash = ?', (consistent_hash,))
-        updated_count = cursor.rowcount
-        
-        conn.commit()
-        conn.close()
-        
-        return f"""
-        <html>
-        <head><title>Password Fix Complete</title></head>
-        <body style="font-family: Arial; padding: 20px;">
-        <h1>✅ Password Fix Complete</h1>
-        <p><strong>{updated_count} users updated</strong></p>
-        <p>All users can now login with password: <code>foodfixr123</code></p>
-        <br>
-        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-        <a href="/debug-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Check Users</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-@app.route('/create-test-user')
-def create_test_user():
-    """Create a test user with known credentials"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        test_email = 'test@foodfixr.com'
-        test_password = 'test123'
-        
-        # Delete existing test user
-        cursor.execute('DELETE FROM users WHERE email = ?', (test_email,))
-        
-        # Create new test user with consistent hashing
-        password_hash = hash_password_consistent(test_password)
-        now = datetime.now()
-        trial_start = format_datetime_for_db(now)
-        trial_end = format_datetime_for_db(now + timedelta(hours=48))
-        
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', ('Test User', test_email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
-        
-        conn.commit()
-        conn.close()
-        
-        return f"""
-        <html>
-        <head><title>Test User Created</title></head>
-        <body style="font-family: Arial; padding: 20px;">
-        <h1>✅ Test User Created Successfully</h1>
-        <div style="background: #f0f8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <p><strong>Email:</strong> test@foodfixr.com</p>
-        <p><strong>Password:</strong> test123</p>
-        </div>
-        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 @app.route('/logout')
 def logout():
@@ -1125,59 +980,297 @@ def export_history():
         flash('Failed to export history', 'error')
         return redirect(url_for('history'))
 
-# DEMO AND SETUP FUNCTIONS
-def create_demo_user():
-    """Create demo user for testing"""
+# DEBUG AND TESTING ROUTES
+@app.route('/test-password-flow')
+def test_password_flow():
+    """Test the complete registration and login flow"""
+    try:
+        # Test password hashing and verification
+        test_password = "testpass123"
+        
+        # Test 1: Hash with your registration method
+        reg_hash = generate_password_hash(test_password)
+        
+        # Test 2: Verify with your login method  
+        login_verify = check_password_hash(reg_hash, test_password)
+        
+        # Test 3: Database round trip
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Create a test entry
+        test_email = f"test_{int(time.time())}@example.com"
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', ('Test User', test_email, reg_hash, format_datetime_for_db(), 
+              format_datetime_for_db(datetime.now() + timedelta(hours=48)), format_datetime_for_db()))
+        
+        # Retrieve and test
+        cursor.execute('SELECT password_hash FROM users WHERE email = ?', (test_email,))
+        db_hash = cursor.fetchone()[0]
+        db_verify = check_password_hash(db_hash, test_password)
+        
+        # Clean up
+        cursor.execute('DELETE FROM users WHERE email = ?', (test_email,))
+        conn.commit()
+        conn.close()
+        
+        # Test 4: Check if werkzeug version changed
+        from werkzeug import __version__ as werkzeug_version
+        
+        results = f"""
+        <html>
+        <head><title>Password Flow Test</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>🔐 Password Flow Test Results</h1>
+        
+        <div style="background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px;">
+        <strong>Werkzeug Version:</strong> {werkzeug_version}<br>
+        <strong>Test Password:</strong> {test_password}<br>
+        <strong>Generated Hash:</strong> {reg_hash[:50]}...<br>
+        <strong>Hash Method:</strong> {'pbkdf2' if 'pbkdf2' in reg_hash else 'scrypt' if 'scrypt' in reg_hash else 'other'}<br>
+        </div>
+        
+        <div style="background: {'#e8f5e8' if login_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
+        <strong>Direct Verification:</strong> {'✅ PASS' if login_verify else '❌ FAIL'}<br>
+        </div>
+        
+        <div style="background: {'#e8f5e8' if db_verify else '#ffe8e8'}; padding: 15px; margin: 10px 0; border-radius: 5px;">
+        <strong>Database Round Trip:</strong> {'✅ PASS' if db_verify else '❌ FAIL'}<br>
+        <strong>DB Hash Matches:</strong> {'✅ YES' if reg_hash == db_hash else '❌ NO'}<br>
+        </div>
+        
+        <div style="margin: 20px 0;">
+        <a href="/register" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Register</a>
+        <a href="/login" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Try Login</a>
+        </div>
+        </body>
+        </html>
+        """
+        return results
+        
+    except Exception as e:
+        return f"<html><body><h1>Test Failed</h1><p>Error: {str(e)}</p></body></html>"
+
+@app.route('/diagnose-user/<email>')
+def diagnose_user(email):
+    """Diagnose a specific user's password hash"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email.lower(),))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return f"<html><body><h1>User not found: {email}</h1></body></html>"
+        
+        hash_info = user['password_hash']
+        hash_method = "unknown"
+        
+        if hash_info.startswith('pbkdf2:'):
+            hash_method = "pbkdf2"
+        elif hash_info.startswith('scrypt:'):
+            hash_method = "scrypt"
+        elif '
+         in hash_info:
+            hash_method = hash_info.split('
+        )[0]
+        
+        return f"""
+        <html>
+        <head><title>User Diagnosis: {email}</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>🔍 User Diagnosis: {email}</h1>
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+        <strong>Name:</strong> {user['name']}<br>
+        <strong>Email:</strong> {user['email']}<br>
+        <strong>Created:</strong> {user['created_at']}<br>
+        <strong>Hash Method:</strong> {hash_method}<br>
+        <strong>Hash Preview:</strong> {hash_info[:50]}...<br>
+        <strong>Full Hash:</strong> {hash_info}<br>
+        </div>
+        <br>
+        <a href="/fix-user-password/{email}" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Fix This User's Password</a>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>"
+
+@app.route('/fix-user-password/<email>')
+def fix_user_password(email):
+    """Fix a specific user's password to a known value"""
     try:
         conn = sqlite3.connect('foodfixr.db')
         cursor = conn.cursor()
         
-        demo_email = 'demo@foodfixr.com'
-        demo_password = 'demo123'
+        # Set password to 'reset123'
+        new_password = 'reset123'
+        new_hash = generate_password_hash(new_password)
         
-        # Check if demo user exists
-        cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
-        if cursor.fetchone():
-            print("Demo user already exists")
-            conn.close()
-            return
+        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', (new_hash, email.lower()))
+        updated = cursor.rowcount
+        conn.commit()
+        conn.close()
         
-        # Create demo user with consistent hashing
-        password_hash = hash_password_consistent(demo_password)
-        now = datetime.now()
-        trial_start = now - timedelta(hours=2)
-        trial_end = trial_start + timedelta(hours=48)
+        if updated:
+            return f"""
+            <html>
+            <head><title>Password Fixed</title></head>
+            <body style="font-family: Arial; padding: 20px;">
+            <h1>✅ Password Fixed for {email}</h1>
+            <p><strong>New Password:</strong> reset123</p>
+            <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+            </body>
+            </html>
+            """
+        else:
+            return f"<html><body><h1>User not found: {email}</h1></body></html>"
+            
+    except Exception as e:
+        return f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>"
+
+@app.route('/debug-users')
+def debug_users():
+    """Debug route to check users in database"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
         
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
-                              scans_used, total_scans_ever, last_login)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', ('Demo User', demo_email, password_hash, format_datetime_for_db(trial_start), 
-              format_datetime_for_db(trial_end), 3, 15, format_datetime_for_db(now)))
+        cursor.execute('SELECT id, name, email, password_hash, created_at FROM users ORDER BY created_at DESC LIMIT 10')
+        users = cursor.fetchall()
         
-        demo_user_id = cursor.lastrowid
+        conn.close()
         
-        # Add sample scan history
-        sample_scans = [
-            ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
-            ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
-            ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', now - timedelta(minutes=10))
-        ]
+        html = """
+        <html>
+        <head><title>Debug Users</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>🔍 Users in Database</h1>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 8px;">ID</th>
+            <th style="padding: 8px;">Name</th>
+            <th style="padding: 8px;">Email</th>
+            <th style="padding: 8px;">Hash Method</th>
+            <th style="padding: 8px;">Created At</th>
+            <th style="padding: 8px;">Actions</th>
+        </tr>
+        """
         
-        for rating, ingredients, scan_date in sample_scans:
-            cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (demo_user_id, rating, ingredients, format_datetime_for_db(scan_date), str(uuid.uuid4())))
+        for user in users:
+            hash_method = "pbkdf2" if "pbkdf2" in user['password_hash'] else "scrypt" if "scrypt" in user['password_hash'] else "other"
+            html += f"""
+            <tr>
+                <td style="padding: 8px;">{user['id']}</td>
+                <td style="padding: 8px;">{user['name']}</td>
+                <td style="padding: 8px;">{user['email']}</td>
+                <td style="padding: 8px;">{hash_method}</td>
+                <td style="padding: 8px;">{user['created_at']}</td>
+                <td style="padding: 8px;"><a href="/diagnose-user/{user['email']}">Diagnose</a></td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <br>
+        <a href="/fix-all-passwords" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔧 Fix All Passwords</a>
+        <a href="/create-test-user" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👤 Create Test User</a>
+        <a href="/test-password-flow" style="background: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔐 Test Password Flow</a>
+        <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back</a>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"Database error: {str(e)}"
+
+@app.route('/fix-all-passwords')
+def fix_all_passwords():
+    """Fix all password hashes to use consistent format"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Set all users to have a default password with consistent hashing
+        default_password = 'foodfixr123'
+        consistent_hash = generate_password_hash(default_password)
+        
+        cursor.execute('UPDATE users SET password_hash = ?', (consistent_hash,))
+        updated_count = cursor.rowcount
         
         conn.commit()
         conn.close()
-        print("✅ Demo user created: demo@foodfixr.com / demo123")
+        
+        return f"""
+        <html>
+        <head><title>Password Fix Complete</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>✅ Password Fix Complete</h1>
+        <p><strong>{updated_count} users updated</strong></p>
+        <p>All users can now login with password: <code>foodfixr123</code></p>
+        <br>
+        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+        <a href="/debug-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Check Users</a>
+        </body>
+        </html>
+        """
         
     except Exception as e:
-        print(f"Error creating demo user: {e}")
+        return f"Error: {str(e)}"
 
-# DEBUG AND TESTING ROUTES
+@app.route('/create-test-user')
+def create_test_user():
+    """Create a test user with known credentials"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        test_email = 'test@foodfixr.com'
+        test_password = 'test123'
+        
+        # Delete existing test user
+        cursor.execute('DELETE FROM users WHERE email = ?', (test_email,))
+        
+        # Create new test user with consistent hashing
+        password_hash = generate_password_hash(test_password)
+        now = datetime.now()
+        trial_start = format_datetime_for_db(now)
+        trial_end = format_datetime_for_db(now + timedelta(hours=48))
+        
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', ('Test User', test_email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
+        
+        conn.commit()
+        conn.close()
+        
+        return f"""
+        <html>
+        <head><title>Test User Created</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>✅ Test User Created Successfully</h1>
+        <div style="background: #f0f8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p><strong>Email:</strong> test@foodfixr.com</p>
+        <p><strong>Password:</strong> test123</p>
+        </div>
+        <a href="/login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/debug')
 def debug():
     """Debug endpoint to check system status"""
@@ -1248,11 +1341,18 @@ def debug():
     # Test password hashing
     try:
         test_pass = "test123"
-        test_hash = hash_password_consistent(test_pass)
-        test_verify = verify_password_robust(test_hash, test_pass)
+        test_hash = generate_password_hash(test_pass)
+        test_verify = check_password_hash(test_hash, test_pass)
         debug_info.append(f"✅ Password hashing: Hash={test_hash[:20]}... Verify={test_verify}")
     except Exception as e:
         debug_info.append(f"❌ Password hashing: Failed - {str(e)}")
+    
+    # Test Werkzeug version
+    try:
+        from werkzeug import __version__ as werkzeug_version
+        debug_info.append(f"✅ Werkzeug version: {werkzeug_version}")
+    except Exception as e:
+        debug_info.append(f"❌ Werkzeug version: Failed - {str(e)}")
     
     html = f"""
     <html>
@@ -1266,12 +1366,65 @@ def debug():
     <a href="/debug-users" style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👥 Debug Users</a>
     <a href="/create-test-user" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">👤 Create Test User</a>
     <a href="/fix-all-passwords" style="background: #ff9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔧 Fix Passwords</a>
+    <a href="/test-password-flow" style="background: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔐 Test Password Flow</a>
     <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to App</a>
     </div>
     </body>
     </html>
     """
     return html
+
+# DEMO AND SETUP FUNCTIONS
+def create_demo_user():
+    """Create demo user for testing"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        demo_email = 'demo@foodfixr.com'
+        demo_password = 'demo123'
+        
+        # Check if demo user exists
+        cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
+        if cursor.fetchone():
+            print("Demo user already exists")
+            conn.close()
+            return
+        
+        # Create demo user with consistent hashing
+        password_hash = generate_password_hash(demo_password)
+        now = datetime.now()
+        trial_start = now - timedelta(hours=2)
+        trial_end = trial_start + timedelta(hours=48)
+        
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
+                              scans_used, total_scans_ever, last_login)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ('Demo User', demo_email, password_hash, format_datetime_for_db(trial_start), 
+              format_datetime_for_db(trial_end), 3, 15, format_datetime_for_db(now)))
+        
+        demo_user_id = cursor.lastrowid
+        
+        # Add sample scan history
+        sample_scans = [
+            ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
+            ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
+            ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', now - timedelta(minutes=10))
+        ]
+        
+        for rating, ingredients, scan_date in sample_scans:
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (demo_user_id, rating, ingredients, format_datetime_for_db(scan_date), str(uuid.uuid4())))
+        
+        conn.commit()
+        conn.close()
+        print("✅ Demo user created: demo@foodfixr.com / demo123")
+        
+    except Exception as e:
+        print(f"Error creating demo user: {e}")
 
 if __name__ == '__main__':
     # Create demo user on startup
