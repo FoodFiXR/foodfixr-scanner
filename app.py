@@ -583,7 +583,125 @@ def check_users():
         
         html += "</table><br><p>All users can login with password: <strong>test123</strong></p><a href='/simple-login' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Try Login</a></body></html>"
         
-        return html
+    @app.route('/working-login', methods=['GET', 'POST'])
+def working_login():
+    """Completely self-contained login that doesn't use templates"""
+    error_msg = None
+    
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        print(f"DEBUG: Working login attempt for: {email}")
+        
+        if not email or not password:
+            error_msg = "Please enter both email and password"
+        else:
+            try:
+                conn = sqlite3.connect('foodfixr.db')
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                user = cursor.fetchone()
+                
+                if user:
+                    print(f"DEBUG: User found: {user['name']}")
+                    if check_password_hash(user['password_hash'], password):
+                        print("DEBUG: Password correct!")
+                        
+                        # Update last login
+                        cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                                     (format_datetime_for_db(), user['id']))
+                        conn.commit()
+                        conn.close()
+                        
+                        # Set session
+                        session.clear()
+                        session.permanent = True
+                        session['user_id'] = user['id']
+                        session['user_email'] = user['email']
+                        session['user_name'] = user['name']
+                        session['is_premium'] = bool(user['is_premium'])
+                        session['scans_used'] = user['scans_used']
+                        session['stripe_customer_id'] = user['stripe_customer_id']
+                        
+                        print("DEBUG: Session set, redirecting...")
+                        return redirect('/')
+                    else:
+                        error_msg = "Invalid password"
+                        print("DEBUG: Invalid password")
+                else:
+                    error_msg = "No account found with that email"
+                    print("DEBUG: User not found")
+                    
+                conn.close()
+            except Exception as e:
+                error_msg = f"Login error: {str(e)}"
+                print(f"DEBUG: Exception: {e}")
+    
+    # Return HTML form
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FoodFixr Login</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }}
+            .container {{ max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .header h1 {{ color: #e91e63; margin: 0; font-size: 28px; }}
+            .header p {{ color: #666; margin: 10px 0 0 0; }}
+            .error {{ background: #ffebee; color: #c62828; padding: 12px; border-radius: 5px; margin-bottom: 20px; text-align: center; border: 1px solid #ffcdd2; }}
+            .form-group {{ margin-bottom: 20px; }}
+            .form-group label {{ display: block; margin-bottom: 5px; font-weight: bold; color: #333; }}
+            .form-group input {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }}
+            .form-group input:focus {{ border-color: #e91e63; outline: none; }}
+            .login-btn {{ width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }}
+            .login-btn:hover {{ background: #c2185b; }}
+            .help-section {{ text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; }}
+            .help-btn {{ display: inline-block; background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; font-size: 14px; }}
+            .help-btn.orange {{ background: #ff9800; }}
+            .footer {{ text-align: center; margin-top: 20px; color: #999; font-size: 14px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🍎 FoodFixr</h1>
+                <p>Smart Ingredient Scanner</p>
+            </div>
+            
+            {f'<div class="error">{error_msg}</div>' if error_msg else ''}
+            
+            <form method="POST" action="/working-login">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <button type="submit" class="login-btn">🔑 Login to FoodFixr</button>
+            </form>
+            
+            <div class="help-section">
+                <p style="color: #666; margin-bottom: 15px;">Having trouble logging in?</p>
+                <a href="/reset-all-passwords" class="help-btn orange">🔧 Reset All Passwords</a>
+                <a href="/check-users" class="help-btn">👥 View Users</a>
+            </div>
+            
+            <div class="footer">
+                <p>Don't have an account? <a href="/register" style="color: #e91e63;">Sign up here</a></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
         
     except Exception as e:
         return f"Database error: {str(e)}"
