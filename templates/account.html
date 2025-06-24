@@ -1,718 +1,457 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta charset="UTF-8" />
-    <title>My Account - FoodFixr</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+# Complete Flask App with Account Creation and Management
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
+from datetime import datetime, timedelta
+import os
+from functools import wraps
+import secrets
 
-        body {
-            background: #e50ce8;
-            font-family: 'Comfortaa', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            overflow-x: hidden;
-            text-align: center;
-            min-height: 100vh;
-            position: relative;
-            padding: 20px 15px;
-        }
+app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this-in-production'
+app.permanent_session_lifetime = timedelta(days=30)
 
-        /* Main Container */
-        .account-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 32px 24px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 
-                0 20px 60px rgba(229, 12, 232, 0.15),
-                0 8px 32px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 1;
-            margin-bottom: 20px;
-        }
+# Database initialization
+def init_db():
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    # Enhanced users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_premium BOOLEAN DEFAULT 0,
+            stripe_customer_id TEXT,
+            subscription_status TEXT DEFAULT 'trial',
+            subscription_start_date TIMESTAMP,
+            next_billing_date TIMESTAMP,
+            trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            trial_end_date TIMESTAMP,
+            scans_used INTEGER DEFAULT 0,
+            total_scans_ever INTEGER DEFAULT 0,
+            last_login TIMESTAMP
+        )
+    ''')
+    
+    # Scan history table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scan_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            result_rating TEXT,
+            ingredients_found TEXT,
+            image_name TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
 
-        /* Header */
-        .account-header {
-            margin-bottom: 32px;
-            text-align: center;
-        }
+# Initialize database
+init_db()
 
-        .account-title {
-            font-size: 36px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #e91e63, #9c27b0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-        }
+# Helper functions
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-        .account-subtitle {
-            font-size: 16px;
-            color: #666;
-            font-weight: 500;
-        }
+def get_user_data(user_id):
+    conn = sqlite3.connect('foodfixr.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    
+    conn.close()
+    return dict(user) if user else None
 
-        /* Back Button */
-        .back-button {
-            position: absolute;
-            top: 24px;
-            left: 24px;
-            background: rgba(229, 12, 232, 0.1);
-            color: #e50ce8;
-            padding: 10px 16px;
-            border: 2px solid rgba(229, 12, 232, 0.3);
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+def calculate_trial_time_left(trial_start_date):
+    if isinstance(trial_start_date, str):
+        trial_start = datetime.strptime(trial_start_date, '%Y-%m-%d %H:%M:%S')
+    else:
+        trial_start = trial_start_date
+    
+    trial_end = trial_start + timedelta(hours=48)
+    now = datetime.now()
+    
+    if now >= trial_end:
+        return "0h 0m", True, 0, 0
+    
+    time_left = trial_end - now
+    hours = int(time_left.total_seconds() // 3600)
+    minutes = int((time_left.total_seconds() % 3600) // 60)
+    
+    return f"{hours}h {minutes}m", False, hours, minutes
 
-        .back-button:hover {
-            background: #e50ce8;
-            color: white;
-            transform: translateY(-2px);
-        }
+def calculate_renewal_days(next_billing_date):
+    if not next_billing_date:
+        return None
+    
+    if isinstance(next_billing_date, str):
+        billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d %H:%M:%S')
+    else:
+        billing_date = next_billing_date
+    
+    now = datetime.now()
+    days_left = (billing_date - now).days
+    
+    return max(0, days_left)
 
-        /* User Profile Section */
-        .user-profile {
-            background: linear-gradient(135deg, #f8f9ff, #e8f4fd);
-            border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 24px;
-            border: 2px solid rgba(229, 12, 232, 0.1);
-            text-align: left;
-        }
-
-        .profile-header {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .user-avatar {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #e50ce8, #c209c5);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: white;
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-
-        .user-info {
-            flex: 1;
-        }
-
-        .user-name {
-            font-size: 20px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .user-email {
-            font-size: 14px;
-            color: #666;
-            font-weight: 500;
-        }
-
-        .profile-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-top: 20px;
-        }
-
-        .detail-item {
-            background: rgba(255, 255, 255, 0.7);
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(229, 12, 232, 0.1);
-        }
-
-        .detail-label {
-            font-size: 12px;
-            color: #666;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        .detail-value {
-            font-size: 14px;
-            color: #333;
-            font-weight: 600;
-        }
-
-        /* Subscription Status */
-        .subscription-status {
-            border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 24px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .subscription-status.premium {
-            background: linear-gradient(135deg, #4CAF50, rgba(76, 175, 80, 0.8));
-            border: 2px solid #388E3C;
-        }
-
-        .subscription-status.trial {
-            background: linear-gradient(135deg, #77ecfe, rgba(119, 236, 254, 0.8));
-            border: 2px solid #0e4b9e;
-        }
-
-        .subscription-status.expired {
-            background: linear-gradient(135deg, #ffcdd2, rgba(255, 205, 210, 0.8));
-            border: 2px solid #f44336;
-        }
-
-        .status-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .status-title {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 8px;
-            color: white;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .status-subtitle {
-            font-size: 16px;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-
-        /* Plan Details */
-        .plan-details {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 24px;
-            text-align: left;
-        }
-
-        .plan-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .plan-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-
-        .plan-item:last-child {
-            border-bottom: none;
-        }
-
-        .plan-label {
-            font-size: 14px;
-            color: #666;
-            font-weight: 500;
-        }
-
-        .plan-value {
-            font-size: 14px;
-            color: #333;
-            font-weight: 600;
-        }
-
-        .plan-value.highlight {
-            color: #e50ce8;
-            font-weight: 700;
-        }
-
-        /* Usage Statistics */
-        .usage-stats {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 24px;
-            border: 2px solid rgba(255, 152, 0, 0.2);
-        }
-
-        .stats-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #e65100;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        .stat-item {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 16px;
-            border-radius: 12px;
-            text-align: center;
-            border: 1px solid rgba(255, 152, 0, 0.1);
-        }
-
-        .stat-number {
-            font-size: 24px;
-            font-weight: 800;
-            color: #e65100;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Progress Bar */
-        .progress-container {
-            margin-top: 16px;
-        }
-
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #666;
-            font-weight: 600;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #e50ce8, #c209c5);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        /* Action Buttons */
-        .action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .btn {
-            padding: 16px 24px;
-            border: none;
-            border-radius: 16px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #e50ce8, #c209c5);
-            color: white;
-            box-shadow: 0 8px 24px rgba(229, 12, 232, 0.4);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 32px rgba(229, 12, 232, 0.5);
-        }
-
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-            border: 2px solid rgba(229, 12, 232, 0.3);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(229, 12, 232, 0.1);
-            border-color: #e50ce8;
-            transform: translateY(-2px);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #d32f2f);
-            color: white;
-            box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
-        }
-
-        /* Cancel Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: white;
-            margin: 15% auto;
-            padding: 32px;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-
-        .modal-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 16px;
-        }
-
-        .modal-text {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
-        /* Mobile Responsiveness */
-        @media (max-width: 480px) {
-            body {
-                padding: 12px 8px;
-            }
+# AUTHENTICATION ROUTES
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            flash('Please enter both email and password', 'error')
+            return render_template('login.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if user and check_password_hash(user['password_hash'], password):
+            # Update last login
+            cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                         (datetime.now(), user['id']))
+            conn.commit()
             
-            .account-container {
-                padding: 24px 20px;
-                margin: 0 3px 12px 3px;
-            }
-
-            .back-button {
-                position: static;
-                margin-bottom: 20px;
-                align-self: flex-start;
-            }
-
-            .account-title {
-                font-size: 28px;
-            }
-
-            .profile-details {
-                grid-template-columns: 1fr;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .modal-content {
-                width: 95%;
-                padding: 24px;
-                margin: 20% auto;
-            }
-
-            .modal-buttons {
-                flex-direction: column;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="account-container">
-        <!-- Back Button -->
-        <a href="/" class="back-button">
-            ← Back to Scanner
-        </a>
-
-        <!-- Header -->
-        <div class="account-header">
-            <h1 class="account-title">My Account</h1>
-            <p class="account-subtitle">Manage your FoodFixr subscription</p>
-        </div>
-
-        <!-- User Profile Section -->
-        <div class="user-profile">
-            <div class="profile-header">
-                <div class="user-avatar">
-                    {{ user_name[0].upper() if user_name else session.get('user_email', 'U')[0].upper() }}
-                </div>
-                <div class="user-info">
-                    <div class="user-name">
-                        {{ user_name or 'FoodFixr User' }}
-                    </div>
-                    <div class="user-email">
-                        {{ session.get('user_email', 'user@example.com') }}
-                    </div>
-                </div>
-            </div>
+            # Set session
+            session.permanent = True
+            session['user_id'] = user['id']
+            session['user_email'] = user['email']
+            session['user_name'] = user['name']
+            session['is_premium'] = bool(user['is_premium'])
+            session['scans_used'] = user['scans_used']
+            session['stripe_customer_id'] = user['stripe_customer_id']
             
-            <div class="profile-details">
-                <div class="detail-item">
-                    <div class="detail-label">Member Since</div>
-                    <div class="detail-value">
-                        {{ user_created_date or 'Recently Joined' }}
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Customer ID</div>
-                    <div class="detail-value">
-                        {{ session.get('stripe_customer_id', 'N/A')[:8] }}...
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Account Status</div>
-                    <div class="detail-value">
-                        {% if session.get('is_premium') %}
-                            Active Premium
-                        {% else %}
-                            Free Trial
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Total Scans</div>
-                    <div class="detail-value">
-                        {{ total_scans_ever or session.get('scans_used', 0) }}
-                    </div>
-                </div>
-            </div>
-        </div>
+            flash('Welcome back to FoodFixr!', 'success')
+            conn.close()
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password', 'error')
+            conn.close()
+    
+    return render_template('login.html')
 
-        <!-- Subscription Status -->
-        {% if session.get('is_premium') %}
-        <div class="subscription-status premium">
-            <div class="status-icon">💎</div>
-            <div class="status-title">Premium Active</div>
-            <div class="status-subtitle">Unlimited scanning power!</div>
-        </div>
-        {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
-        <div class="subscription-status expired">
-            <div class="status-icon">🔒</div>
-            <div class="status-title">Trial Expired</div>
-            <div class="status-subtitle">Upgrade to continue scanning</div>
-        </div>
-        {% else %}
-        <div class="subscription-status trial">
-            <div class="status-icon">🎉</div>
-            <div class="status-title">Free Trial Active</div>
-            <div class="status-subtitle">
-                {{ 10 - session.get('scans_used', 0) }} scans remaining
-            </div>
-        </div>
-        {% endif %}
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validation
+        if not all([name, email, password, confirm_password]):
+            flash('All fields are required', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('register.html')
+        
+        if len(name) < 2:
+            flash('Name must be at least 2 characters long', 'error')
+            return render_template('register.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Check if email already exists
+        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            flash('An account with this email already exists', 'error')
+            conn.close()
+            return render_template('register.html')
+        
+        # Create new user with trial period
+        password_hash = generate_password_hash(password)
+        trial_start = datetime.now()
+        trial_end = trial_start + timedelta(hours=48)
+        
+        cursor.execute('''
+            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, email, password_hash, trial_start, trial_end, trial_start))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Auto-login after registration
+        session.permanent = True
+        session['user_id'] = user_id
+        session['user_email'] = email
+        session['user_name'] = name
+        session['is_premium'] = False
+        session['scans_used'] = 0
+        session['stripe_customer_id'] = None
+        
+        flash(f'Welcome to FoodFixr, {name}! Your free trial has started.', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('register.html')
 
-        <!-- Plan Details -->
-        <div class="plan-details">
-            <div class="plan-title">
-                📋 Subscription Details
-            </div>
-            
-            {% if session.get('is_premium') %}
-            <div class="plan-item">
-                <span class="plan-label">Current Plan</span>
-                <span class="plan-value highlight">Premium Monthly</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Monthly Price</span>
-                <span class="plan-value">$9.99/month</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Started</span>
-                <span class="plan-value">{{ subscription_start_date or 'Recently' }}</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Next Billing</span>
-                <span class="plan-value">{{ next_billing_date or 'Soon' }}</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Status</span>
-                <span class="plan-value highlight">{{ subscription_status or 'Active' }}</span>
-            </div>
-            {% else %}
-            <div class="plan-item">
-                <span class="plan-label">Current Plan</span>
-                <span class="plan-value">Free Trial</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Trial Started</span>
-                <span class="plan-value">{{ trial_start_date or 'Recently' }}</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Time Remaining</span>
-                <span class="plan-value highlight">{{ trial_time_left or '48h 0m' }}</span>
-            </div>
-            <div class="plan-item">
-                <span class="plan-label">Scans Used</span>
-                <span class="plan-value">{{ session.get('scans_used', 0) }}/10</span>
-            </div>
-            {% endif %}
-        </div>
+@app.route('/logout')
+def logout():
+    user_name = session.get('user_name', 'User')
+    session.clear()
+    flash(f'Goodbye {user_name}! You have been logged out.', 'info')
+    return redirect(url_for('login'))
 
-        <!-- Usage Statistics -->
-        {% if not session.get('is_premium') %}
-        <div class="usage-stats">
-            <div class="stats-title">
-                📊 Trial Usage
-            </div>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">{{ session.get('scans_used', 0) }}</div>
-                    <div class="stat-label">Scans Used</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">{{ 10 - session.get('scans_used', 0) }}</div>
-                    <div class="stat-label">Remaining</div>
-                </div>
-            </div>
-            
-            <div class="progress-container">
-                <div class="progress-label">
-                    <span>Trial Progress</span>
-                    <span>{{ session.get('scans_used', 0) }}/10</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: {{ (session.get('scans_used', 0) / 10 * 100) }}%"></div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+# MAIN ROUTES
+@app.route('/')
+@login_required
+def index():
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
+    
+    # Calculate trial status
+    trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    # Update session with latest data
+    session['scans_used'] = user_data['scans_used']
+    session['is_premium'] = bool(user_data['is_premium'])
+    
+    return render_template('scanner.html', 
+                         trial_time_left=trial_time_left,
+                         trial_expired=trial_expired,
+                         user_name=user_data['name'])
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            {% if session.get('is_premium') %}
-                <a href="{{ billing_portal_url }}" class="btn btn-primary">
-                    💳 Manage Billing
-                </a>
-                <button onclick="openCancelModal()" class="btn btn-danger">
-                    ❌ Cancel Subscription
-                </button>
-            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
-                <a href="/upgrade" class="btn btn-primary">
-                    🚀 Upgrade to Premium
-                </a>
-            {% else %}
-                <a href="/upgrade" class="btn btn-primary">
-                    🚀 Upgrade to Premium
-                </a>
-                <a href="/" class="btn btn-secondary">
-                    📸 Continue Scanning
-                </a>
-            {% endif %}
-        </div>
-    </div>
+@app.route('/account')
+@login_required
+def account():
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
+    
+    # Calculate trial time left
+    trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    # Calculate renewal days for premium users
+    days_until_renewal = None
+    if user_data['is_premium'] and user_data['next_billing_date']:
+        days_until_renewal = calculate_renewal_days(user_data['next_billing_date'])
+    
+    # Format dates
+    created_date = datetime.strptime(user_data['created_at'], '%Y-%m-%d %H:%M:%S')
+    formatted_created_date = created_date.strftime('%B %d, %Y')
+    
+    trial_start = datetime.strptime(user_data['trial_start_date'], '%Y-%m-%d %H:%M:%S')
+    formatted_trial_start = trial_start.strftime('%B %d, %Y')
+    
+    # Format subscription dates for premium users
+    subscription_start_formatted = None
+    next_billing_formatted = None
+    
+    if user_data['is_premium']:
+        if user_data['subscription_start_date']:
+            sub_start = datetime.strptime(user_data['subscription_start_date'], '%Y-%m-%d %H:%M:%S')
+            subscription_start_formatted = sub_start.strftime('%B %d, %Y')
+        
+        if user_data['next_billing_date']:
+            next_billing = datetime.strptime(user_data['next_billing_date'], '%Y-%m-%d %H:%M:%S')
+            next_billing_formatted = next_billing.strftime('%B %d, %Y')
+    
+    return render_template('account.html',
+                         user_name=user_data['name'],
+                         user_created_date=formatted_created_date,
+                         total_scans_ever=user_data['total_scans_ever'],
+                         trial_start_date=formatted_trial_start,
+                         trial_time_left=trial_time_left,
+                         trial_expired=trial_expired,
+                         trial_hours_left=trial_hours,
+                         trial_minutes_left=trial_minutes,
+                         subscription_status=user_data['subscription_status'],
+                         subscription_start_date=subscription_start_formatted,
+                         next_billing_date=next_billing_formatted,
+                         days_until_renewal=days_until_renewal,
+                         billing_portal_url='/billing-portal')
 
-    <!-- Cancel Subscription Modal -->
-    <div id="cancelModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-title">Cancel Subscription?</div>
-            <div class="modal-text">
-                Are you sure you want to cancel your Premium subscription? You'll lose access to unlimited scanning.
-            </div>
-            <div class="modal-buttons">
-                <button onclick="closeCancelModal()" class="btn btn-secondary">
-                    Keep Premium
-                </button>
-                <button onclick="confirmCancel()" class="btn btn-danger">
-                    Yes, Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function openCancelModal() {
-            document.getElementById('cancelModal').style.display = 'block';
+# SCAN PROCESSING ROUTE (Updated)
+@app.route('/', methods=['POST'])
+@login_required
+def process_scan():
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
+    
+    # Check if user can scan
+    if not user_data['is_premium'] and user_data['scans_used'] >= 10:
+        flash('You have used all your free scans. Please upgrade to continue.', 'error')
+        return redirect(url_for('upgrade'))
+    
+    # Check if trial expired
+    _, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+    if not user_data['is_premium'] and trial_expired:
+        flash('Your free trial has expired. Please upgrade to continue scanning.', 'error')
+        return redirect(url_for('upgrade'))
+    
+    # Process the scan (your existing scan processing logic here)
+    # For now, I'll create a mock result
+    result = {
+        'rating': 'Safe',
+        'matched_ingredients': {
+            'sugar': ['organic cane sugar'],
+            'gmo': [],
+            'trans_fat': [],
+            'excitotoxins': [],
+            'corn': []
         }
+    }
+    
+    # Update scan count in database
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
+    new_total_scans = user_data['total_scans_ever'] + 1
+    
+    cursor.execute('''
+        UPDATE users 
+        SET scans_used = ?, total_scans_ever = ?
+        WHERE id = ?
+    ''', (new_scans_used, new_total_scans, session['user_id']))
+    
+    # Save scan to history
+    cursor.execute('''
+        INSERT INTO scan_history (user_id, result_rating, ingredients_found)
+        VALUES (?, ?, ?)
+    ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {}))))
+    
+    conn.commit()
+    conn.close()
+    
+    # Update session
+    session['scans_used'] = new_scans_used
+    
+    # Calculate updated trial status
+    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    return render_template('scanner.html', 
+                         result=result,
+                         trial_time_left=trial_time_left,
+                         trial_expired=trial_expired,
+                         user_name=user_data['name'])
 
-        function closeCancelModal() {
-            document.getElementById('cancelModal').style.display = 'none';
-        }
+# ADDITIONAL ROUTES
+@app.route('/upgrade')
+@login_required
+def upgrade():
+    return render_template('upgrade.html')
 
-        function confirmCancel() {
-            // You can redirect to a cancellation endpoint or handle via AJAX
-            window.location.href = '/cancel-subscription';
-        }
+@app.route('/history')
+@login_required
+def history():
+    conn = sqlite3.connect('foodfixr.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT * FROM scan_history 
+        WHERE user_id = ? 
+        ORDER BY scan_date DESC 
+        LIMIT 50
+    ''', (session['user_id'],))
+    
+    scans = cursor.fetchall()
+    conn.close()
+    
+    return render_template('history.html', scans=scans)
 
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('cancelModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        }
+@app.route('/billing-portal')
+@login_required
+def billing_portal():
+    # This would redirect to Stripe Customer Portal
+    # For now, just show a placeholder
+    flash('Billing portal integration coming soon!', 'info')
+    return redirect(url_for('account'))
 
-        // Auto-update progress bar animation
-        document.addEventListener('DOMContentLoaded', function() {
-            const progressFill = document.querySelector('.progress-fill');
-            if (progressFill) {
-                setTimeout(() => {
-                    progressFill.style.width = progressFill.style.width;
-                }, 500);
-            }
-        });
-    </script>
-</body>
-</html>
+@app.route('/cancel-subscription')
+@login_required
+def cancel_subscription():
+    # Handle subscription cancellation
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE users 
+        SET subscription_status = 'cancelled', is_premium = 0
+        WHERE id = ?
+    ''', (session['user_id'],))
+    
+    conn.commit()
+    conn.close()
+    
+    session['is_premium'] = False
+    flash('Your subscription has been cancelled. You can continue using your free trial.', 'info')
+    return redirect(url_for('account'))
+
+# DEMO USER SETUP
+def create_demo_user():
+    conn = sqlite3.connect('foodfixr.db')
+    cursor = conn.cursor()
+    
+    demo_email = 'demo@foodfixr.com'
+    
+    # Check if demo user exists
+    cursor.execute('SELECT id FROM users WHERE email = ?', (demo_email,))
+    if cursor.fetchone():
+        conn.close()
+        return
+    
+    # Create demo user
+    password_hash = generate_password_hash('demo123')
+    trial_start = datetime.now() - timedelta(hours=2)  # Started 2 hours ago
+    trial_end = trial_start + timedelta(hours=48)
+    
+    cursor.execute('''
+        INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
+                          scans_used, total_scans_ever, last_login)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', ('Demo User', demo_email, password_hash, trial_start, trial_end, 3, 15, datetime.now()))
+    
+    demo_user_id = cursor.lastrowid
+    
+    # Add sample scan history
+    sample_scans = [
+        ('Safe', '{"sugar": ["organic cane sugar"]}', datetime.now() - timedelta(hours=1)),
+        ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', datetime.now() - timedelta(minutes=30)),
+        ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', datetime.now() - timedelta(minutes=10))
+    ]
+    
+    for rating, ingredients, scan_date in sample_scans:
+        cursor.execute('''
+            INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date)
+            VALUES (?, ?, ?, ?)
+        ''', (demo_user_id, rating, ingredients, scan_date))
+    
+    conn.commit()
+    conn.close()
+    print("Demo user created: demo@foodfixr.com / demo123")
+
+if __name__ == '__main__':
+    create_demo_user()
+    app.run(debug=True)
