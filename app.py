@@ -655,6 +655,108 @@ def account():
                          days_until_renewal=days_until_renewal,
                          billing_portal_url='/create-customer-portal')
 
+# Add this debug route to your app.py file (you can add it anywhere after your other routes)
+
+@app.route('/debug-billing')
+@login_required
+def debug_billing():
+    """Debug billing portal issues"""
+    try:
+        user_data = get_user_data(session['user_id'])
+        
+        debug_info = {
+            'user_id': session.get('user_id'),
+            'is_premium': session.get('is_premium'),
+            'stripe_customer_id_session': session.get('stripe_customer_id'),
+            'stripe_customer_id_db': user_data.get('stripe_customer_id') if user_data else None,
+            'subscription_status': user_data.get('subscription_status') if user_data else None,
+            'stripe_api_key_configured': bool(stripe.api_key),
+            'domain': DOMAIN
+        }
+        
+        # Test Stripe connection
+        stripe_test = "Not tested"
+        customer_valid = "Not tested"
+        
+        if stripe.api_key:
+            try:
+                # Test Stripe connection
+                stripe.Account.retrieve()
+                stripe_test = "✅ Connected"
+                
+                # Test customer retrieval if we have an ID
+                customer_id = user_data.get('stripe_customer_id') if user_data else None
+                if customer_id:
+                    try:
+                        customer = stripe.Customer.retrieve(customer_id)
+                        customer_valid = f"✅ Valid customer: {customer.email}"
+                    except Exception as e:
+                        customer_valid = f"❌ Invalid customer: {str(e)}"
+                
+            except Exception as e:
+                stripe_test = f"❌ Failed: {str(e)}"
+        
+        debug_info['stripe_connection'] = stripe_test
+        debug_info['customer_validation'] = customer_valid
+        
+        return f"""
+        <html>
+        <head><title>Billing Debug</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>💳 Billing Portal Debug</h1>
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3>User Information:</h3>
+        <strong>User ID:</strong> {debug_info['user_id']}<br>
+        <strong>Is Premium:</strong> {debug_info['is_premium']}<br>
+        <strong>Customer ID (Session):</strong> {debug_info['stripe_customer_id_session']}<br>
+        <strong>Customer ID (DB):</strong> {debug_info['stripe_customer_id_db']}<br>
+        <strong>Subscription Status:</strong> {debug_info['subscription_status']}<br>
+        <br>
+        <h3>System Configuration:</h3>
+        <strong>Stripe API Key:</strong> {debug_info['stripe_api_key_configured']}<br>
+        <strong>Domain:</strong> {debug_info['domain']}<br>
+        <strong>Stripe Connection:</strong> {debug_info['stripe_connection']}<br>
+        <strong>Customer Validation:</strong> {debug_info['customer_validation']}<br>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <h3>💡 Troubleshooting Tips:</h3>
+        <ul>
+        <li>If "Is Premium" is False, user needs to upgrade first</li>
+        <li>If "Customer ID" is None, user didn't complete Stripe checkout properly</li>
+        <li>If "Stripe Connection" shows error, check your STRIPE_SECRET_KEY environment variable</li>
+        <li>If "Customer Validation" shows error, the customer might be deleted from Stripe</li>
+        </ul>
+        </div>
+        
+        <div style="margin: 20px 0;">
+        <a href="/account" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px;">← Back to Account</a>
+        <a href="/upgrade" style="background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px;">💎 Upgrade</a>
+        <a href="/debug" style="background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">🔍 Full Debug</a>
+        </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return f"""
+        <html>
+        <head><title>Debug Error</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f5f5f5;">
+        <h1>❌ Debug Error</h1>
+        <div style="background: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3>Error Details:</h3>
+        <pre>{str(e)}</pre>
+        <h3>Full Traceback:</h3>
+        <pre>{error_details}</pre>
+        </div>
+        <a href="/account" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">← Back to Account</a>
+        </body>
+        </html>
+        """
+        
 @app.route('/history')
 @login_required
 def history():
