@@ -134,13 +134,6 @@ def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def init_session():
-    """Initialize session - now checks for authenticated users"""
-    if 'user_id' not in session:
-        # For non-authenticated users, redirect to login
-        return False
-    return True
-
 def is_trial_expired():
     """Check if 48-hour trial has expired"""
     if 'user_id' not in session:
@@ -621,7 +614,6 @@ def history():
         print(f"History error: {e}")
         return render_template('history.html', scans=[], stats=None)
 
-# Keep all your existing routes (upgrade, stripe, debug, etc.)
 @app.route('/upgrade')
 @login_required
 def upgrade():
@@ -634,7 +626,197 @@ def upgrade():
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
-# [Keep all your existing debug routes and other functionality]
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    """Create Stripe checkout session"""
+    try:
+        data = request.get_json()
+        plan = data.get('plan', 'monthly')
+        
+        if not stripe.api_key:
+            print("ERROR: Stripe API key not configured")
+            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
+        
+        prices = {
+            'weekly': {'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'), 'amount': 3.99},
+            'monthly': {'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'), 'amount': 11.99},
+            'yearly': {'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'), 'amount': 95.00}
+        }
+        
+        if plan not in prices:
+            return jsonify({'error': 'Invalid plan selected'}), 400
+        
+        price_id = prices[plan]['price_id']
+        if not price_id:
+            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
+        
+        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
+        cancel_url = f"{DOMAIN}/upgrade"
+        
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'user_id': session.get('user_id'),
+                'plan': plan
+            },
+            customer_email=data.get('email') if data.get('email') else None,
+        )
+        
+        return jsonify({'checkout_url': checkout_session.url})
+        
+    except Exception as e:
+        print(f"Unexpected error in create_checkout_session: {str(e)}")
+        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
+
+@app.route('/success')
+@login_required
+def success():
+    """Handle successful payment"""
+    try:
+        session_id = request.args.get('session_id')
+        plan = request.args.get('plan', 'monthly')
+        
+        if session_id:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            
+            if checkout_session.payment_status == 'paid':
+                # Update user in database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                
+                next_billing = datetime.now() + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
+                
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, subscription_status = 'active', 
+                        subscription_start_date = ?, next_billing_date = ?,
+                        stripe_customer_id = ?, scans_used = 0
+                    WHERE id = ?
+                ''', (datetime.now(), next_billing, checkout_session.customer, session['user_id']))
+                
+                conn.commit()
+                conn.close()
+                
+                # Update session
+                session['is_premium'] = True
+                session['stripe_customer_id'] = checkout_session.customer
+                session['scans_used'] = 0
+                
+                return render_template('success.html', plan=plan)
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"Success page error: {e}")
+        return redirect(url_for('index'))
+
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Get user's image URLs before deleting
+        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Delete user's scan history
+        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        conn.commit()
+        conn.close()
+        
+        # Delete user's images
+        for image_url in image_urls:
+            try:
+                if image_url.startswith('/static/'):
+                    image_path = image_url[1:]  # Remove leading slash
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                        print(f"Deleted image: {image_path}")
+            except Exception as e:
+                print(f"Error deleting image {image_url}: {e}")
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'error': 'Failed to clear history'}), 500
+
+@app.route('/create-customer-portal', methods=['POST'])
+@login_required
+def create_customer_portal():
+    """Create Stripe Customer Portal session for subscription management"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
+        
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
+        
+        # Create customer portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{DOMAIN}/account",
+        )
+        
+        return jsonify({'portal_url': portal_session.url})
+        
+    except Exception as e:
+        print(f"Customer portal error: {e}")
+        return jsonify({'error': 'Unable to create portal session'}), 500
+
+@app.route('/cancel-subscription', methods=['POST'])
+@login_required
+def cancel_subscription():
+    """Cancel user's subscription"""
+    try:
+        if not session.get('is_premium'):
+            return jsonify({'error': 'No active subscription'}), 400
+        
+        customer_id = session.get('stripe_customer_id')
+        if not customer_id:
+            return jsonify({'error': 'No customer ID found'}), 400
+        
+        # Get customer's subscriptions
+        subscriptions = stripe.Subscription.list(customer=customer_id)
+        
+        for subscription in subscriptions.data:
+            if subscription.status == 'active':
+                # Cancel the subscription at period end
+                stripe.Subscription.modify(
+                    subscription.id,
+                    cancel_at_period_end=True
+                )
+                
+                # Update database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE users 
+                    SET subscription_status = 'cancelled'
+                    WHERE id = ?
+                ''', (session['user_id'],))
+                conn.commit()
+                conn.close()
+                
+                return jsonify({
+                    'success': True, 
+                    'message': 'Subscription will be cancelled at the end of your billing period'
+                })
+        
+        return jsonify({'error': 'No active subscription found'}), 400
+        
+    except Exception as e:
+        print(f"Cancellation error: {e}")
+        return jsonify({'error': 'Failed to cancel subscription'}), 500
+
 @app.route('/debug')
 def debug():
     """Debug endpoint to check system status"""
@@ -808,203 +990,8 @@ def test_manual():
         </html>
         '''
 
-@app.route('/clear-history', methods=['POST'])
-@login_required
-def clear_history():
-    """Clear user's scan history"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Get user's image URLs before deleting
-        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
-        
-        # Delete user's scan history
-        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        conn.commit()
-        conn.close()
-        
-        # Delete user's images
-        for image_url in image_urls:
-            try:
-                if image_url.startswith('/static/'):
-                    image_path = image_url[1:]  # Remove leading slash
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                        print(f"Deleted image: {image_path}")
-            except Exception as e:
-                print(f"Error deleting image {image_url}: {e}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        print(f"Clear history error: {e}")
-        return jsonify({'error': 'Failed to clear history'}), 500
-
-@app.route('/create-customer-portal', methods=['POST'])
-@login_required
-def create_customer_portal():
-    """Create Stripe Customer Portal session for subscription management"""
-    try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
-        
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
-        
-        # Create customer portal session
-        portal_session = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=f"{DOMAIN}/account",
-        )
-        
-        return jsonify({'portal_url': portal_session.url})
-        
-    except Exception as e:
-        print(f"Customer portal error: {e}")
-        return jsonify({'error': 'Unable to create portal session'}), 500
-
-@app.route('/cancel-subscription', methods=['POST'])
-@login_required
-def cancel_subscription():
-    """Cancel user's subscription"""
-    try:
-        if not session.get('is_premium'):
-            return jsonify({'error': 'No active subscription'}), 400
-        
-        customer_id = session.get('stripe_customer_id')
-        if not customer_id:
-            return jsonify({'error': 'No customer ID found'}), 400
-        
-        # Get customer's subscriptions
-        subscriptions = stripe.Subscription.list(customer=customer_id)
-        
-        for subscription in subscriptions.data:
-            if subscription.status == 'active':
-                # Cancel the subscription at period end
-                stripe.Subscription.modify(
-                    subscription.id,
-                    cancel_at_period_end=True
-                )
-                
-                # Update database
-                conn = sqlite3.connect('foodfixr.db')
-                cursor = conn.cursor()
-                cursor.execute('''
-                    UPDATE users 
-                    SET subscription_status = 'cancelled'
-                    WHERE id = ?
-                ''', (session['user_id'],))
-                conn.commit()
-                conn.close()
-                
-                return jsonify({
-                    'success': True, 
-                    'message': 'Subscription will be cancelled at the end of your billing period'
-                })
-        
-        return jsonify({'error': 'No active subscription found'}), 400
-        
-    except Exception as e:
-        print(f"Cancellation error: {e}")
-        return jsonify({'error': 'Failed to cancel subscription'}), 500
-
-if __name__ == '__main__':
-    create_demo_user()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False) all your existing Stripe routes: create-checkout-session, success, webhook, etc.]
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    """Create Stripe checkout session"""
-    try:
-        data = request.get_json()
-        plan = data.get('plan', 'monthly')
-        
-        if not stripe.api_key:
-            print("ERROR: Stripe API key not configured")
-            return jsonify({'error': 'Payment system not configured. Please contact support.'}), 500
-        
-        prices = {
-            'weekly': {'price_id': os.getenv('STRIPE_WEEKLY_PRICE_ID'), 'amount': 3.99},
-            'monthly': {'price_id': os.getenv('STRIPE_MONTHLY_PRICE_ID'), 'amount': 11.99},
-            'yearly': {'price_id': os.getenv('STRIPE_YEARLY_PRICE_ID'), 'amount': 95.00}
-        }
-        
-        if plan not in prices:
-            return jsonify({'error': 'Invalid plan selected'}), 400
-        
-        price_id = prices[plan]['price_id']
-        if not price_id:
-            return jsonify({'error': f'Price not configured for {plan} plan. Please contact support.'}), 500
-        
-        success_url = f"{DOMAIN}/success?session_id={{CHECKOUT_SESSION_ID}}&plan={plan}"
-        cancel_url = f"{DOMAIN}/upgrade"
-        
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{'price': price_id, 'quantity': 1}],
-            mode='subscription',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
-                'user_id': session.get('user_id'),
-                'plan': plan
-            },
-            customer_email=data.get('email') if data.get('email') else None,
-        )
-        
-        return jsonify({'checkout_url': checkout_session.url})
-        
-    except Exception as e:
-        print(f"Unexpected error in create_checkout_session: {str(e)}")
-        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
-
-@app.route('/success')
-@login_required
-def success():
-    """Handle successful payment"""
-    try:
-        session_id = request.args.get('session_id')
-        plan = request.args.get('plan', 'monthly')
-        
-        if session_id:
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            
-            if checkout_session.payment_status == 'paid':
-                # Update user in database
-                conn = sqlite3.connect('foodfixr.db')
-                cursor = conn.cursor()
-                
-                next_billing = datetime.now() + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
-                
-                cursor.execute('''
-                    UPDATE users 
-                    SET is_premium = 1, subscription_status = 'active', 
-                        subscription_start_date = ?, next_billing_date = ?,
-                        stripe_customer_id = ?, scans_used = 0
-                    WHERE id = ?
-                ''', (datetime.now(), next_billing, checkout_session.customer, session['user_id']))
-                
-                conn.commit()
-                conn.close()
-                
-                # Update session
-                session['is_premium'] = True
-                session['stripe_customer_id'] = checkout_session.customer
-                session['scans_used'] = 0
-                
-                return render_template('success.html', plan=plan)
-        
-        return redirect(url_for('index'))
-        
-    except Exception as e:
-        print(f"Success page error: {e}")
-        return redirect(url_for('index'))
-
-# Create demo user function
 def create_demo_user():
+    """Create demo user for testing"""
     conn = sqlite3.connect('foodfixr.db')
     cursor = conn.cursor()
     
@@ -1046,4 +1033,7 @@ def create_demo_user():
     conn.close()
     print("Demo user created: demo@foodfixr.com / demo123")
 
-# [Keep
+if __name__ == '__main__':
+    create_demo_user()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
