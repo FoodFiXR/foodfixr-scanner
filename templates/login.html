@@ -15,13 +15,13 @@
         }
 
         body {
+            background: #e50ce8;
             font-family: 'Comfortaa', sans-serif;
-            background: linear-gradient(135deg, #e50ce8, #c209c5);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 20px 15px;
         }
 
         .login-container {
@@ -29,30 +29,33 @@
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 40px;
-            max-width: 400px;
+            max-width: 420px;
             width: 100%;
             box-shadow: 
                 0 20px 60px rgba(229, 12, 232, 0.15),
                 0 8px 32px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
         }
 
-        .logo {
+        .header {
             text-align: center;
             margin-bottom: 32px;
         }
 
-        .logo-title {
-            font-size: 32px;
+        .logo-text {
+            font-size: 48px;
             font-weight: 800;
             background: linear-gradient(135deg, #e91e63, #9c27b0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            letter-spacing: -2px;
             margin-bottom: 8px;
         }
 
-        .logo-subtitle {
+        .login-subtitle {
             font-size: 16px;
             color: #666;
             font-weight: 500;
@@ -74,24 +77,25 @@
             width: 100%;
             padding: 16px;
             border: 2px solid rgba(229, 12, 232, 0.2);
-            border-radius: 12px;
+            border-radius: 16px;
             font-size: 16px;
             font-family: 'Comfortaa', sans-serif;
             font-weight: 500;
             transition: all 0.3s ease;
             background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
         }
 
         .form-input:focus {
             outline: none;
             border-color: #e50ce8;
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
             box-shadow: 0 0 0 4px rgba(229, 12, 232, 0.1);
         }
 
         .btn-primary {
             width: 100%;
-            padding: 16px;
+            padding: 18px;
             background: linear-gradient(135deg, #e50ce8, #c209c5);
             color: white;
             border: none;
@@ -102,6 +106,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 8px 24px rgba(229, 12, 232, 0.4);
+            margin: 24px 0;
         }
 
         .btn-primary:hover {
@@ -135,40 +140,89 @@
         }
 
         .alert-error {
-            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-            color: #721c24;
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: #c62828;
             border: 2px solid #f44336;
         }
 
         .alert-success {
-            background: linear-gradient(135deg, #d4edda, #c3e6cb);
-            color: #155724;
+            background: linear-gradient(135deg, #e8f5e8, #c3e6cb);
+            color: #2e7d32;
             border: 2px solid #4CAF50;
         }
 
         .alert-info {
-            background: linear-gradient(135deg, #d1ecf1, #bee5eb);
-            color: #0c5460;
-            border: 2px solid #17a2b8;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: #1565c0;
+            border: 2px solid #2196F3;
+        }
+
+        /* Welcome Message */
+        .welcome-message {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 2px solid rgba(76, 175, 80, 0.2);
+            text-align: center;
+        }
+
+        .welcome-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 8px;
+        }
+
+        .welcome-text {
+            font-size: 14px;
+            color: #4caf50;
+            line-height: 1.4;
         }
 
         @media (max-width: 480px) {
-            .login-container {
-                padding: 24px;
-                margin: 0 10px;
+            body {
+                padding: 12px 8px;
             }
             
-            .logo-title {
-                font-size: 28px;
+            .login-container {
+                padding: 32px 24px;
+                margin: 0 3px;
+                max-width: 390px;
+            }
+            
+            .logo-text {
+                font-size: 42px;
+            }
+
+            .form-input {
+                padding: 14px;
+            }
+
+            .btn-primary {
+                padding: 16px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .login-container {
+                max-width: 350px;
+                padding: 28px 20px;
             }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="logo">
-            <h1 class="logo-title">🍎 FoodFixr</h1>
-            <p class="logo-subtitle">Welcome back! Please sign in.</p>
+        <div class="header">
+            <div class="logo-text">FOOD FIXR</div>
+            <p class="login-subtitle">Welcome back! Please sign in.</p>
+        </div>
+
+        <!-- Welcome Message -->
+        <div class="welcome-message">
+            <div class="welcome-title">🍎 Smart Ingredient Scanner</div>
+            <div class="welcome-text">Sign in to continue your healthy eating journey</div>
         </div>
 
         <!-- Flash Messages -->
@@ -208,7 +262,7 @@
             </div>
 
             <button type="submit" class="btn-primary">
-                Sign In
+                🚀 Sign In & Start Scanning
             </button>
         </form>
 
