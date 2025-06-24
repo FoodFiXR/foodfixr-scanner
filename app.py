@@ -928,7 +928,202 @@ def test_upgrade_user():
             h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
             .form-group {{ margin-bottom: 20px; }}
             label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🧪 Test User Upgrade</h1>
+            
+            <div class="info">
+                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
+                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
+                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
+            </div>
+            
+            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="plan">Select Plan:</label>
+                    <select id="plan" name="plan" required>
+                        <option value="weekly">Weekly ($3.99/week)</option>
+                        <option value="monthly" selected>Monthly ($11.99/month)</option>
+                        <option value="yearly">Yearly ($95.00/year)</option>
+                    </select>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🚀 Test Upgrade to Premium</button>
+                    <a href="/upgrade" class="btn btn-secondary">💳 Real Stripe Upgrade</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to Scanner</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/simple-login', methods=['GET', 'POST'])
+def simple_login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            error_msg = "Please enter both email and password"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Use appropriate placeholder for database type
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    session.clear()
+                    session.permanent = True
+                    session['user_id'] = user['id']
+                    session['user_email'] = user['email']
+                    session['user_name'] = user['name']
+                    session['is_premium'] = bool(user['is_premium'])
+                    session['scans_used'] = user['scans_used']
+                    session['stripe_customer_id'] = user['stripe_customer_id']
+                    
+                    conn.close()
+                    return redirect('/')
+                else:
+                    error_msg = "Invalid email or password"
+                    
+                conn.close()
+            except Exception as e:
+                error_msg = f"Login error: {str(e)}"
+    else:
+        error_msg = None
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FoodFixr Login</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0;">
+        <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
+            
+            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
+            
+            <form method="POST" action="/simple-login">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
+                    <input type="email" name="email" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
+                    <input type="password" name="password" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <button type="submit" style="width: 100%%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                    Login
+                </button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 25px;">
+                <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
+                <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/admin-password-reset', methods=['GET', 'POST'])
+def admin_password_reset():
+    """Admin route to reset individual user passwords"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        new_password = request.form.get('new_password', '')
+        
+        if not email or not new_password:
+            error_msg = "Both email and password are required"
+        elif len(new_password) < 6:
+            error_msg = "Password must be at least 6 characters long"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Check if user exists
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
+                
+                user = cursor.fetchone()
+                
+                if not user:
+                    error_msg = f"No user found with email: {email}"
+                else:
+                    # Update password
+                    password_hash = generate_password_hash(new_password)
+                    
+                    if database_url:
+                        cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
+                                     (password_hash, email))
+                    else:
+                        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
+                                     (password_hash, email))
+                    
+                    conn.commit()
+                    success_msg = f"Password updated for {user['name']} ({email})"
+                
+                conn.close()
+                
+            except Exception as e:
+                error_msg = f"Database error: {str(e)}"
+    else:
+        error_msg = None
+        success_msg = None
+    
+    # Get all users for the dropdown
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT email, name FROM users ORDER BY name')
+        users = cursor.fetchall()
+        conn.close()
+    except:
+        users = []
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Password Reset</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input, select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
             input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
             .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
             .btn-primary {{ background: #e91e63; color: white; }}
@@ -1021,7 +1216,7 @@ def check_users():
                 body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
                 .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
                 h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                table {{ width: 100%%; border-collapse: collapse; margin: 20px 0; }}
                 th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
                 th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
                 tr:hover {{ background-color: #f5f5f5; }}
@@ -1146,200 +1341,4 @@ def internal_error(e):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False): #333; }}
-            select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-primary {{ background: #e91e63; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🧪 Test User Upgrade</h1>
-            
-            <div class="info">
-                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
-                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
-                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
-            </div>
-            
-            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label for="plan">Select Plan:</label>
-                    <select id="plan" name="plan" required>
-                        <option value="weekly">Weekly ($3.99/week)</option>
-                        <option value="monthly" selected>Monthly ($11.99/month)</option>
-                        <option value="yearly">Yearly ($95.00/year)</option>
-                    </select>
-                </div>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                    <button type="submit" class="btn btn-primary">🚀 Test Upgrade to Premium</button>
-                    <a href="/upgrade" class="btn btn-secondary">💳 Real Stripe Upgrade</a>
-                    <a href="/" class="btn btn-secondary">🏠 Back to Scanner</a>
-                </div>
-            </form>
-        </div>
-    </body>
-    </html>
-    """
-
-@app.route('/simple-login', methods=['GET', 'POST'])
-def simple_login():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        
-        if not email or not password:
-            error_msg = "Please enter both email and password"
-        else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                # Use appropriate placeholder for database type
-                database_url = os.getenv('DATABASE_URL')
-                if database_url:
-                    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
-                else:
-                    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-                
-                user = cursor.fetchone()
-                
-                if user and check_password_hash(user['password_hash'], password):
-                    session.clear()
-                    session.permanent = True
-                    session['user_id'] = user['id']
-                    session['user_email'] = user['email']
-                    session['user_name'] = user['name']
-                    session['is_premium'] = bool(user['is_premium'])
-                    session['scans_used'] = user['scans_used']
-                    session['stripe_customer_id'] = user['stripe_customer_id']
-                    
-                    conn.close()
-                    return redirect('/')
-                else:
-                    error_msg = "Invalid email or password"
-                    
-                conn.close()
-            except Exception as e:
-                error_msg = f"Login error: {str(e)}"
-    else:
-        error_msg = None
-    
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>FoodFixr Login</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
-    <body style="font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0;">
-        <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
-            
-            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
-            
-            <form method="POST" action="/simple-login">
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
-                    <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
-                </div>
-                
-                <div style="margin-bottom: 25px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
-                    <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
-                </div>
-                
-                <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
-                    Login
-                </button>
-            </form>
-            
-            <div style="text-align: center; margin-top: 25px;">
-                <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
-                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
-                <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-# Additional admin routes for password management...
-@app.route('/admin-password-reset', methods=['GET', 'POST'])
-def admin_password_reset():
-    """Admin route to reset individual user passwords"""
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        new_password = request.form.get('new_password', '')
-        
-        if not email or not new_password:
-            error_msg = "Both email and password are required"
-        elif len(new_password) < 6:
-            error_msg = "Password must be at least 6 characters long"
-        else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                # Check if user exists
-                database_url = os.getenv('DATABASE_URL')
-                if database_url:
-                    cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
-                else:
-                    cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
-                
-                user = cursor.fetchone()
-                
-                if not user:
-                    error_msg = f"No user found with email: {email}"
-                else:
-                    # Update password
-                    password_hash = generate_password_hash(new_password)
-                    
-                    if database_url:
-                        cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
-                                     (password_hash, email))
-                    else:
-                        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
-                                     (password_hash, email))
-                    
-                    conn.commit()
-                    success_msg = f"Password updated for {user['name']} ({email})"
-                
-                conn.close()
-                
-            except Exception as e:
-                error_msg = f"Database error: {str(e)}"
-    else:
-        error_msg = None
-        success_msg = None
-    
-    # Get all users for the dropdown
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT email, name FROM users ORDER BY name')
-        users = cursor.fetchall()
-        conn.close()
-    except:
-        users = []
-    
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Admin Password Reset</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-            .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color
+    app.run(host="0.0.0.0", port=port, debug=False)
