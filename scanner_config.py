@@ -245,7 +245,6 @@ gmo_keywords = [
     "fermentation-derived dairy proteins",
     "synbio vanillin",
     "vegetable oil",
-    "starch",
     "modified starch", 
     "lecithin",
     "flavoring",
