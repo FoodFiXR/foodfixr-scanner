@@ -1571,7 +1571,6 @@ def check_users():
                     <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
                     <a href="/bulk-password-reset" class="btn btn-secondary">⚠️ Bulk Password Reset</a>
                     <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
-                    <a href="/admin-cleanup-images" class="btn btn-secondary">🗑️ Cleanup Images</a>
                 </div>
                 
                 <table>
@@ -1661,7 +1660,7 @@ def serve_history_image(filename):
         return "Error loading image", 500
 
 @app.route('/static/<path:filename>')
-def serve_static(filename):
+def serve_static_files(filename):
     """Serve static files including emoji images"""
     # For now, we'll redirect to a generic emoji or return a placeholder
     # In production, you'd want to add actual image files
@@ -2327,6 +2326,10 @@ def debug_routes():
     
     return html
 
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
+
 @app.route('/test-login-form')
 def test_login_form():
     """Simple test login form that posts to /login"""
@@ -2357,9 +2360,9 @@ def test_login_form():
     </html>
     """
 
-@app.route('/admin-cleanup-images')
-def admin_cleanup_images():
-    """Manual cleanup of old images (admin function)"""
+@app.route('/admin-cleanup-scan-images')
+def admin_cleanup_scan_images():
+    """Manual cleanup of old scan images (admin function)"""
     try:
         cleanup_old_images()
         return """
