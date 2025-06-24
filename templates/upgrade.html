@@ -317,83 +317,12 @@
             border: 2px solid #4CAF50;
             border-radius: 12px;
             padding: 16px;
-            margin-bottom: 24px;
             text-align: center;
         }
 
         .guarantee-text {
             font-size: 14px;
             color: #2e7d32;
-            font-weight: 600;
-        }
-
-        /* Comparison Table */
-        .comparison-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .comparison-title {
-            font-size: 22px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .comparison-table {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 1px;
-            background: rgba(229, 12, 232, 0.1);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .comparison-header {
-            background: rgba(229, 12, 232, 0.1);
-            padding: 12px;
-            font-weight: 700;
-            text-align: center;
-            color: #333;
-        }
-
-        .comparison-cell {
-            background: white;
-            padding: 12px;
-            text-align: center;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .comparison-feature {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .check-mark {
-            color: #4CAF50;
-            font-size: 18px;
-        }
-
-        .x-mark {
-            color: #f44336;
-            font-size: 18px;
-        }
-
-        .limited-mark {
-            color: #ff9800;
-            font-size: 12px;
             font-weight: 600;
         }
 
@@ -424,16 +353,6 @@
 
             .nav-buttons {
                 flex-direction: column;
-            }
-
-            .comparison-table {
-                grid-template-columns: 2fr 80px 80px;
-                font-size: 12px;
-            }
-
-            .comparison-cell,
-            .comparison-feature {
-                padding: 8px;
             }
         }
     </style>
@@ -530,44 +449,6 @@
                 <div class="guarantee-text">
                     ✅ 30-day money-back guarantee • Cancel anytime • Secure payment by Stripe
                 </div>
-            </div>
-        </div>
-
-        <!-- Comparison Table -->
-        <div class="comparison-section">
-            <div class="comparison-title">📋 Free vs Premium Comparison</div>
-            <div class="comparison-table">
-                <div class="comparison-header">Feature</div>
-                <div class="comparison-header">Free Trial</div>
-                <div class="comparison-header">Premium</div>
-                
-                <div class="comparison-feature">Ingredient Scans</div>
-                <div class="comparison-cell"><span class="limited-mark">10 scans</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span> Unlimited</div>
-                
-                <div class="comparison-feature">Trial Time</div>
-                <div class="comparison-cell"><span class="limited-mark">48 hours</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span> Forever</div>
-                
-                <div class="comparison-feature">Scan History</div>
-                <div class="comparison-cell"><span class="check-mark">✓</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span> Advanced</div>
-                
-                <div class="comparison-feature">Priority Processing</div>
-                <div class="comparison-cell"><span class="x-mark">✗</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span></div>
-                
-                <div class="comparison-feature">Ad-Free Experience</div>
-                <div class="comparison-cell"><span class="x-mark">✗</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span></div>
-                
-                <div class="comparison-feature">Premium Support</div>
-                <div class="comparison-cell"><span class="x-mark">✗</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span></div>
-                
-                <div class="comparison-feature">Export Data</div>
-                <div class="comparison-cell"><span class="x-mark">✗</span></div>
-                <div class="comparison-cell"><span class="check-mark">✓</span></div>
             </div>
         </div>
     </div>
