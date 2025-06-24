@@ -640,6 +640,66 @@ def reset_all_passwords():
     except Exception as e:
         return f"Error: {str(e)}"
 
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not all([email, new_password, confirm_password]):
+            flash('All fields are required', 'error')
+            return render_template('reset_password.html')
+        
+        if new_password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('reset_password.html')
+        
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('reset_password.html')
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Check if user exists
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('SELECT id FROM users WHERE email = %s', (email,))
+            else:
+                cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+            
+            user = cursor.fetchone()
+            
+            if not user:
+                flash('No account found with this email address', 'error')
+                conn.close()
+                return render_template('reset_password.html')
+            
+            # Update password
+            password_hash = generate_password_hash(new_password)
+            
+            if database_url:
+                cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
+                             (password_hash, email))
+            else:
+                cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
+                             (password_hash, email))
+            
+            conn.commit()
+            conn.close()
+            
+            flash('Password successfully reset! You can now login with your new password.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            flash('Password reset failed. Please try again.', 'error')
+            return render_template('reset_password.html')
+    
+    return render_template('reset_password.html')
+    
 @app.route('/check-users')
 def check_users():
     try:
