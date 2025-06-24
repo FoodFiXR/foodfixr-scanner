@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from ingredient_scanner import scan_image_for_ingredients
+from ingredient_scanner import scan_image_for_ingredients, before_scan_cleanup
 import json
 from datetime import datetime, timedelta
 import uuid
@@ -14,6 +14,7 @@ import sqlite3
 from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import gc  # Add for memory management
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -23,14 +24,42 @@ stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 
-# Configuration
+# Configuration - Reduced limits for memory-constrained environments
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # Reduced from 16MB to 8MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.permanent_session_lifetime = timedelta(days=30)
+
+# Add memory management hooks
+@app.before_request
+def before_request():
+    """Run memory cleanup before each request"""
+    try:
+        # Force garbage collection
+        gc.collect()
+        
+        # Set conservative PIL limits
+        from PIL import Image
+        Image.MAX_IMAGE_PIXELS = 40000000  # Conservative limit
+        
+        print("DEBUG: Pre-request cleanup completed")
+    except Exception as e:
+        print(f"DEBUG: Pre-request cleanup error: {e}")
+
+@app.after_request
+def after_request(response):
+    """Run cleanup after each request"""
+    try:
+        # Force garbage collection after request
+        gc.collect()
+        print("DEBUG: Post-request cleanup completed")
+    except Exception as e:
+        print(f"DEBUG: Post-request cleanup error: {e}")
+    
+    return response
 
 # Database connection function
 def get_db_connection():
@@ -168,6 +197,15 @@ def format_datetime_for_db(dt=None):
     if dt is None:
         dt = datetime.now()
     return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+def cleanup_uploaded_file(filepath):
+    """Safely clean up uploaded files"""
+    try:
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"DEBUG: Cleaned up uploaded file: {filepath}")
+    except Exception as e:
+        print(f"DEBUG: Error cleaning up file {filepath}: {e}")
 
 # AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
@@ -401,6 +439,10 @@ def index():
 @app.route('/', methods=['POST'])
 @login_required
 def scan():
+    # CRITICAL: Memory cleanup before processing
+    print("DEBUG: Starting scan with memory cleanup")
+    before_scan_cleanup()
+    
     user_data = get_user_data(session['user_id'])
     if not user_data:
         return redirect(url_for('logout'))
@@ -426,15 +468,35 @@ def scan():
                              user_name=user_data['name'],
                              error="Invalid file. Please upload an image.")
     
+    filepath = None
     try:
+        # Save uploaded file with memory-conscious handling
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{filename}"
         filepath = os.path.join(tempfile.gettempdir(), filename)
+        
+        print(f"DEBUG: Saving uploaded file to: {filepath}")
         file.save(filepath)
         
+        # Check file size before processing
+        file_size_kb = os.path.getsize(filepath) / 1024
+        print(f"DEBUG: Uploaded file size: {file_size_kb:.1f} KB")
+        
+        # If file is too large, reject it early
+        if file_size_kb > 2048:  # 2MB limit
+            cleanup_uploaded_file(filepath)
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Image too large. Please upload a smaller image (max 2MB).")
+        
+        # Process the image with memory management
+        print("DEBUG: Starting image processing...")
         result = scan_image_for_ingredients(filepath)
         
+        # Update user scan counts
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -472,11 +534,10 @@ def scan():
         
         session['scans_used'] = new_scans_used
         
-        try:
-            os.remove(filepath)
-        except:
-            pass
+        # Clean up uploaded file
+        cleanup_uploaded_file(filepath)
         
+        print("DEBUG: Scan completed successfully")
         return render_template('scanner.html',
                              result=result,
                              trial_expired=trial_expired,
@@ -484,11 +545,26 @@ def scan():
                              user_name=user_data['name'])
         
     except Exception as e:
+        print(f"DEBUG: Scan error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Clean up uploaded file on error
+        cleanup_uploaded_file(filepath)
+        
+        # Force memory cleanup on error
+        gc.collect()
+        
         return render_template('scanner.html',
                              trial_expired=trial_expired,
                              trial_time_left=trial_time_left,
                              user_name=user_data['name'],
-                             error=f"Scanning failed: {str(e)}. Please try again.")
+                             error=f"Scanning failed: {str(e)}. Please try again with a smaller image.")
+    
+    finally:
+        # Always ensure cleanup
+        cleanup_uploaded_file(filepath)
+        gc.collect()
 
 @app.route('/account')
 @login_required
@@ -797,6 +873,7 @@ def stripe_webhook():
     
     return '', 200
 
+# ADMIN/DEBUG ROUTES
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
 @login_required
 def test_upgrade_user():
@@ -851,6 +928,225 @@ def test_upgrade_user():
             h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
             .form-group {{ margin-bottom: 20px; }}
             label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
+            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
+            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Admin Password Reset</h1>
+            
+            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
+            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Select User Email:</label>
+                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
+                        <option value="">-- Select a user --</option>
+                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
+                    </select>
+                    <div class="quick-fill">
+                        Or type manually: 
+                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                    <div class="quick-fill">
+                        Quick passwords: 
+                        <button type="button" onclick="setPassword('password123')">password123</button>
+                        <button type="button" onclick="setPassword('admin123')">admin123</button>
+                        <button type="button" onclick="setPassword('test123')">test123</button>
+                        <button type="button" onclick="setPassword('user123')">user123</button>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
+                </div>
+            </form>
+            
+            <div class="user-list">
+                <h3>📋 Registered Users ({len(users)} total):</h3>
+                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
+            </div>
+        </div>
+        
+        <script>
+            function fillEmail(email) {{
+                document.getElementById('manual_email').value = email;
+            }}
+            
+            function setPassword(password) {{
+                document.getElementById('new_password').value = password;
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/check-users')
+def check_users():
+    """Enhanced user management interface"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        conn.close()
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>User Management</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
+                tr:hover {{ background-color: #f5f5f5; }}
+                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
+                .btn-primary {{ background: #e91e63; color: white; }}
+                .btn-secondary {{ background: #666; color: white; }}
+                .btn-success {{ background: #28a745; color: white; }}
+                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
+                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
+                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
+                .premium {{ color: #28a745; font-weight: bold; }}
+                .trial {{ color: #ffc107; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>👥 User Management Dashboard</h1>
+                
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-number">{len(users)}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
+                        <div>Premium Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
+                        <div>Total Scans</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
+                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Scans Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join([f'''
+                        <tr>
+                            <td>{user[0]}</td>
+                            <td>{user[1]}</td>
+                            <td>{user[2]}</td>
+                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
+                            <td>{user[5] or 0}</td>
+                            <td>{user[3]}</td>
+                        </tr>
+                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>❌ Database Error</h1>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
+        </body>
+        </html>
+        """
+
+# Health check endpoint for monitoring
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint"""
+    try:
+        # Check database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        conn.close()
+        
+        # Check memory usage
+        import psutil
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        return jsonify({
+            'status': 'healthy',
+            'memory_mb': round(memory_mb, 1),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+# Error handlers
+@app.errorhandler(413)
+def too_large(e):
+    return render_template('error.html', 
+                         error_title="File Too Large", 
+                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
+
+@app.errorhandler(500)
+def internal_error(e):
+    # Force cleanup on 500 errors
+    gc.collect()
+    return render_template('error.html', 
+                         error_title="Internal Server Error", 
+                         error_message="Something went wrong. Please try again."), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False): #333; }}
             select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
             .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
             .btn-primary {{ background: #e91e63; color: white; }}
@@ -893,7 +1189,6 @@ def test_upgrade_user():
     </html>
     """
 
-# SIMPLE LOGIN PAGE
 @app.route('/simple-login', methods=['GET', 'POST'])
 def simple_login():
     if request.method == 'POST':
@@ -976,7 +1271,7 @@ def simple_login():
     </html>
     """
 
-# IMPROVED PASSWORD MANAGEMENT ROUTES
+# Additional admin routes for password management...
 @app.route('/admin-password-reset', methods=['GET', 'POST'])
 def admin_password_reset():
     """Admin route to reset individual user passwords"""
@@ -1047,328 +1342,4 @@ def admin_password_reset():
             .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
             h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
             .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-primary {{ background: #e91e63; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
-            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
-            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
-            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔐 Admin Password Reset</h1>
-            
-            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
-            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label for="email">Select User Email:</label>
-                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
-                        <option value="">-- Select a user --</option>
-                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
-                    </select>
-                    <div class="quick-fill">
-                        Or type manually: 
-                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password">New Password:</label>
-                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
-                    <div class="quick-fill">
-                        Quick passwords: 
-                        <button type="button" onclick="setPassword('password123')">password123</button>
-                        <button type="button" onclick="setPassword('admin123')">admin123</button>
-                        <button type="button" onclick="setPassword('test123')">test123</button>
-                        <button type="button" onclick="setPassword('user123')">user123</button>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
-                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
-                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
-                </div>
-            </form>
-            
-            <div class="user-list">
-                <h3>📋 Registered Users ({len(users)} total):</h3>
-                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
-            </div>
-        </div>
-        
-        <script>
-            function fillEmail(email) {{
-                document.getElementById('manual_email').value = email;
-            }}
-            
-            function setPassword(password) {{
-                document.getElementById('new_password').value = password;
-            }}
-        </script>
-    </body>
-    </html>
-    """
-
-@app.route('/bulk-password-reset', methods=['GET', 'POST'])
-def bulk_password_reset():
-    """Reset all users to the same password (use with caution)"""
-    if request.method == 'POST':
-        new_password = request.form.get('new_password', '')
-        confirm_password = request.form.get('confirm_password', '')
-        
-        if not new_password or not confirm_password:
-            error_msg = "Both password fields are required"
-        elif new_password != confirm_password:
-            error_msg = "Passwords do not match"
-        elif len(new_password) < 6:
-            error_msg = "Password must be at least 6 characters long"
-        else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                new_hash = generate_password_hash(new_password)
-                
-                database_url = os.getenv('DATABASE_URL')
-                if database_url:
-                    cursor.execute('UPDATE users SET password_hash = %s', (new_hash,))
-                else:
-                    cursor.execute('UPDATE users SET password_hash = ?', (new_hash,))
-                
-                updated = cursor.rowcount
-                conn.commit()
-                conn.close()
-                
-                success_msg = f"Password updated for {updated} users. All users can now login with: {new_password}"
-                
-            except Exception as e:
-                error_msg = f"Error: {str(e)}"
-    else:
-        error_msg = None
-        success_msg = None
-    
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Bulk Password Reset</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-            .warning {{ background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px solid #ffc107; }}
-            .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            input {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            input:focus {{ border-color: #e91e63; outline: none; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-danger {{ background: #dc3545; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>⚠️ Bulk Password Reset</h1>
-            
-            <div class="warning">
-                <strong>⚠️ WARNING:</strong> This will change the password for ALL users in the database. Use with caution!
-            </div>
-            
-            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
-            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label for="new_password">New Password for All Users:</label>
-                    <input type="password" id="new_password" name="new_password" placeholder="Enter password (min 6 chars)" required minlength="6">
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password:</label>
-                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm password" required minlength="6">
-                </div>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to reset ALL user passwords?')">
-                        ⚠️ Reset All Passwords
-                    </button>
-                    <a href="/admin-password-reset" class="btn btn-secondary">👤 Individual Reset</a>
-                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
-                </div>
-            </form>
-        </div>
-    </body>
-    </html>
-    """
-
-@app.route('/check-users')
-def check_users():
-    """Enhanced user management interface"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
-        users = cursor.fetchall()
-        conn.close()
-        
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>User Management</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
-                tr:hover {{ background-color: #f5f5f5; }}
-                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
-                .btn-primary {{ background: #e91e63; color: white; }}
-                .btn-secondary {{ background: #666; color: white; }}
-                .btn-success {{ background: #28a745; color: white; }}
-                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
-                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
-                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
-                .premium {{ color: #28a745; font-weight: bold; }}
-                .trial {{ color: #ffc107; font-weight: bold; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>👥 User Management Dashboard</h1>
-                
-                <div class="stats">
-                    <div class="stat-box">
-                        <div class="stat-number">{len(users)}</div>
-                        <div>Total Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
-                        <div>Premium Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
-                        <div>Total Scans</div>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin: 20px 0;">
-                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
-                    <a href="/bulk-password-reset" class="btn btn-secondary">⚠️ Bulk Password Reset</a>
-                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
-                </div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Scans Used</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {''.join([f'''
-                        <tr>
-                            <td>{user[0]}</td>
-                            <td>{user[1]}</td>
-                            <td>{user[2]}</td>
-                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
-                            <td>{user[5] or 0}</td>
-                            <td>{user[3]}</td>
-                        </tr>
-                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"""
-        <html>
-        <body style="font-family: Arial; padding: 20px;">
-            <h1>❌ Database Error</h1>
-            <p><strong>Error:</strong> {str(e)}</p>
-            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
-        </body>
-        </html>
-        """
-
-@app.route('/debug-routes')
-def debug_routes():
-    """Show all available routes"""
-    routes = []
-    for rule in app.url_map.iter_rules():
-        routes.append({
-            'endpoint': rule.endpoint,
-            'methods': list(rule.methods),
-            'path': rule.rule
-        })
-    
-    html = "<html><body style='font-family: Arial; padding: 20px;'><h1>Available Routes</h1><table border='1' style='border-collapse: collapse;'>"
-    html += "<tr><th style='padding: 8px;'>Path</th><th style='padding: 8px;'>Methods</th><th style='padding: 8px;'>Function</th></tr>"
-    
-    for route in routes:
-        html += f"<tr><td style='padding: 8px;'>{route['path']}</td><td style='padding: 8px;'>{', '.join(route['methods'])}</td><td style='padding: 8px;'>{route['endpoint']}</td></tr>"
-    
-    html += "</table><br><a href='/simple-login' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Try Simple Login</a></body></html>"
-    
-    return html
-
-@app.route('/test-login-form')
-def test_login_form():
-    """Simple test login form that posts to /login"""
-    return f"""
-    <html>
-    <head><title>Test Login Form</title></head>
-    <body style="font-family: Arial; padding: 20px;">
-    <h1>Test Login Form</h1>
-    <p>This form posts directly to /login route</p>
-    
-    <form method="POST" action="/login" style="max-width: 300px;">
-        <div style="margin-bottom: 15px;">
-            <label>Email:</label><br>
-            <input type="email" name="email" required style="width: 100%; padding: 8px;">
-        </div>
-        <div style="margin-bottom: 15px;">
-            <label>Password:</label><br>
-            <input type="password" name="password" required style="width: 100%; padding: 8px;">
-        </div>
-        <button type="submit" style="padding: 10px 20px; background: #4CAF50; color: white; border: none;">Login</button>
-    </form>
-    
-    <br><br>
-    <a href="/admin-password-reset">Reset Individual Passwords</a><br>
-    <a href="/check-users">Check Users</a><br>
-    <a href="/simple-login">Simple Login</a>
-    </body>
-    </html>
-    """
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color
