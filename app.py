@@ -44,17 +44,17 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
             is_premium BOOLEAN DEFAULT 0,
             stripe_customer_id TEXT,
             subscription_status TEXT DEFAULT 'trial',
-            subscription_start_date TIMESTAMP,
-            next_billing_date TIMESTAMP,
-            trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            trial_end_date TIMESTAMP,
+            subscription_start_date TEXT,
+            next_billing_date TEXT,
+            trial_start_date TEXT DEFAULT (datetime('now', 'localtime')),
+            trial_end_date TEXT,
             scans_used INTEGER DEFAULT 0,
             total_scans_ever INTEGER DEFAULT 0,
-            last_login TIMESTAMP
+            last_login TEXT
         )
     ''')
     
@@ -63,7 +63,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS scan_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            scan_date TEXT DEFAULT (datetime('now', 'localtime')),
             result_rating TEXT,
             ingredients_found TEXT,
             image_url TEXT,
@@ -98,12 +98,41 @@ def get_user_data(user_id):
     conn.close()
     return dict(user) if user else None
 
-def calculate_trial_time_left(trial_start_date):
-    if isinstance(trial_start_date, str):
-        trial_start = datetime.strptime(trial_start_date, '%Y-%m-%d %H:%M:%S')
-    else:
-        trial_start = trial_start_date
+def safe_datetime_parse(date_string):
+    """Safely parse datetime strings with various formats"""
+    if not date_string:
+        return datetime.now()
     
+    if isinstance(date_string, datetime):
+        return date_string
+    
+    # Try multiple datetime formats to handle microseconds and variations
+    formats = [
+        '%Y-%m-%d %H:%M:%S.%f',      # With microseconds
+        '%Y-%m-%d %H:%M:%S',         # Standard format
+        '%Y-%m-%d %H:%M',            # Without seconds
+        '%Y-%m-%d',                  # Date only
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_string, fmt)
+        except ValueError:
+            continue
+    
+    # If all formats fail, try to clean the string
+    try:
+        # Remove microseconds if present
+        clean_date = date_string.split('.')[0]
+        return datetime.strptime(clean_date, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        # Last resort: return current time
+        print(f"Warning: Could not parse date '{date_string}', using current time")
+        return datetime.now()
+
+def calculate_trial_time_left(trial_start_date):
+    """Calculate remaining trial time, handling various datetime formats"""
+    trial_start = safe_datetime_parse(trial_start_date)
     trial_end = trial_start + timedelta(hours=48)
     now = datetime.now()
     
@@ -120,11 +149,7 @@ def calculate_renewal_days(next_billing_date):
     if not next_billing_date:
         return None
     
-    if isinstance(next_billing_date, str):
-        billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d %H:%M:%S')
-    else:
-        billing_date = next_billing_date
-    
+    billing_date = safe_datetime_parse(next_billing_date)
     now = datetime.now()
     days_left = (billing_date - now).days
     
@@ -146,7 +171,7 @@ def is_trial_expired():
     if user_data['is_premium']:
         return False
         
-    trial_start = datetime.strptime(user_data['trial_start_date'], '%Y-%m-%d %H:%M:%S')
+    trial_start = safe_datetime_parse(user_data['trial_start_date'])
     trial_end = trial_start + timedelta(hours=48)
     return datetime.now() > trial_end
 
@@ -216,6 +241,12 @@ def save_scan_image(image_path, user_id, scan_id=None):
         print(f"Error saving scan image: {e}")
         return None
 
+def format_datetime_for_db(dt=None):
+    """Format datetime for consistent database storage"""
+    if dt is None:
+        dt = datetime.now()
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
+
 # AUTHENTICATION ROUTES
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -237,7 +268,7 @@ def login():
         if user and check_password_hash(user['password_hash'], password):
             # Update last login
             cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                         (datetime.now(), user['id']))
+                         (format_datetime_for_db(), user['id']))
             conn.commit()
             
             # Set session
@@ -295,13 +326,15 @@ def register():
         
         # Create new user with trial period
         password_hash = generate_password_hash(password)
-        trial_start = datetime.now()
-        trial_end = trial_start + timedelta(hours=48)
+        now = datetime.now()
+        trial_start = format_datetime_for_db(now)
+        trial_end = format_datetime_for_db(now + timedelta(hours=48))
+        last_login = format_datetime_for_db(now)
         
         cursor.execute('''
             INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, email, password_hash, trial_start, trial_end, trial_start))
+        ''', (name, email, password_hash, trial_start, trial_end, last_login))
         
         user_id = cursor.lastrowid
         conn.commit()
@@ -431,9 +464,10 @@ def scan():
             
             # Save scan to history
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, image_url, scan_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), image_url, scan_id))
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, image_url, scan_id, scan_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), 
+                  image_url, scan_id, format_datetime_for_db()))
             
             conn.commit()
             conn.close()
@@ -502,11 +536,11 @@ def account():
     if user_data['is_premium'] and user_data['next_billing_date']:
         days_until_renewal = calculate_renewal_days(user_data['next_billing_date'])
     
-    # Format dates
-    created_date = datetime.strptime(user_data['created_at'], '%Y-%m-%d %H:%M:%S')
+    # Format dates safely
+    created_date = safe_datetime_parse(user_data['created_at'])
     formatted_created_date = created_date.strftime('%B %d, %Y')
     
-    trial_start = datetime.strptime(user_data['trial_start_date'], '%Y-%m-%d %H:%M:%S')
+    trial_start = safe_datetime_parse(user_data['trial_start_date'])
     formatted_trial_start = trial_start.strftime('%B %d, %Y')
     
     # Format subscription dates for premium users
@@ -515,11 +549,11 @@ def account():
     
     if user_data['is_premium']:
         if user_data['subscription_start_date']:
-            sub_start = datetime.strptime(user_data['subscription_start_date'], '%Y-%m-%d %H:%M:%S')
+            sub_start = safe_datetime_parse(user_data['subscription_start_date'])
             subscription_start_formatted = sub_start.strftime('%B %d, %Y')
         
         if user_data['next_billing_date']:
-            next_billing = datetime.strptime(user_data['next_billing_date'], '%Y-%m-%d %H:%M:%S')
+            next_billing = safe_datetime_parse(user_data['next_billing_date'])
             next_billing_formatted = next_billing.strftime('%B %d, %Y')
     
     return render_template('account.html',
@@ -562,8 +596,8 @@ def history():
         }
         
         for row in cursor.fetchall():
-            # Parse timestamp
-            scan_date = datetime.strptime(row['scan_date'], '%Y-%m-%d %H:%M:%S')
+            # Parse timestamp safely
+            scan_date = safe_datetime_parse(row['scan_date'])
             
             # Determine rating type
             rating = row['result_rating'] or ''
@@ -670,82 +704,6 @@ def create_checkout_session():
         
     except Exception as e:
         print(f"Unexpected error in create_checkout_session: {str(e)}")
-        return jsonify({'error': 'Failed to create checkout session. Please try again.'}), 500
-
-@app.route('/success')
-@login_required
-def success():
-    """Handle successful payment"""
-    try:
-        session_id = request.args.get('session_id')
-        plan = request.args.get('plan', 'monthly')
-        
-        if session_id:
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            
-            if checkout_session.payment_status == 'paid':
-                # Update user in database
-                conn = sqlite3.connect('foodfixr.db')
-                cursor = conn.cursor()
-                
-                next_billing = datetime.now() + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
-                
-                cursor.execute('''
-                    UPDATE users 
-                    SET is_premium = 1, subscription_status = 'active', 
-                        subscription_start_date = ?, next_billing_date = ?,
-                        stripe_customer_id = ?, scans_used = 0
-                    WHERE id = ?
-                ''', (datetime.now(), next_billing, checkout_session.customer, session['user_id']))
-                
-                conn.commit()
-                conn.close()
-                
-                # Update session
-                session['is_premium'] = True
-                session['stripe_customer_id'] = checkout_session.customer
-                session['scans_used'] = 0
-                
-                return render_template('success.html', plan=plan)
-        
-        return redirect(url_for('index'))
-        
-    except Exception as e:
-        print(f"Success page error: {e}")
-        return redirect(url_for('index'))
-
-@app.route('/clear-history', methods=['POST'])
-@login_required
-def clear_history():
-    """Clear user's scan history"""
-    try:
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        # Get user's image URLs before deleting
-        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
-        
-        # Delete user's scan history
-        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        conn.commit()
-        conn.close()
-        
-        # Delete user's images
-        for image_url in image_urls:
-            try:
-                if image_url.startswith('/static/'):
-                    image_path = image_url[1:]  # Remove leading slash
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                        print(f"Deleted image: {image_path}")
-            except Exception as e:
-                print(f"Error deleting image {image_url}: {e}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        print(f"Clear history error: {e}")
         return jsonify({'error': 'Failed to clear history'}), 500
 
 @app.route('/create-customer-portal', methods=['POST'])
@@ -1005,29 +963,31 @@ def create_demo_user():
     
     # Create demo user
     password_hash = generate_password_hash('demo123')
-    trial_start = datetime.now() - timedelta(hours=2)
+    now = datetime.now()
+    trial_start = now - timedelta(hours=2)
     trial_end = trial_start + timedelta(hours=48)
     
     cursor.execute('''
         INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, 
                           scans_used, total_scans_ever, last_login)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', ('Demo User', demo_email, password_hash, trial_start, trial_end, 3, 15, datetime.now()))
+    ''', ('Demo User', demo_email, password_hash, format_datetime_for_db(trial_start), 
+          format_datetime_for_db(trial_end), 3, 15, format_datetime_for_db(now)))
     
     demo_user_id = cursor.lastrowid
     
     # Add sample scan history
     sample_scans = [
-        ('Safe', '{"sugar": ["organic cane sugar"]}', datetime.now() - timedelta(hours=1)),
-        ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', datetime.now() - timedelta(minutes=30)),
-        ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', datetime.now() - timedelta(minutes=10))
+        ('Safe', '{"sugar": ["organic cane sugar"]}', now - timedelta(hours=1)),
+        ('Proceed carefully', '{"corn": ["high fructose corn syrup"]}', now - timedelta(minutes=30)),
+        ('Danger', '{"trans_fat": ["partially hydrogenated oil"]}', now - timedelta(minutes=10))
     ]
     
     for rating, ingredients, scan_date in sample_scans:
         cursor.execute('''
             INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
             VALUES (?, ?, ?, ?, ?)
-        ''', (demo_user_id, rating, ingredients, scan_date, str(uuid.uuid4())))
+        ''', (demo_user_id, rating, ingredients, format_datetime_for_db(scan_date), str(uuid.uuid4())))
     
     conn.commit()
     conn.close()
@@ -1036,4 +996,82 @@ def create_demo_user():
 if __name__ == '__main__':
     create_demo_user()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False) create checkout session. Please try again.'}), 500
+
+@app.route('/success')
+@login_required
+def success():
+    """Handle successful payment"""
+    try:
+        session_id = request.args.get('session_id')
+        plan = request.args.get('plan', 'monthly')
+        
+        if session_id:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            
+            if checkout_session.payment_status == 'paid':
+                # Update user in database
+                conn = sqlite3.connect('foodfixr.db')
+                cursor = conn.cursor()
+                
+                now = datetime.now()
+                next_billing = now + timedelta(days=7 if plan == 'weekly' else (30 if plan == 'monthly' else 365))
+                
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, subscription_status = 'active', 
+                        subscription_start_date = ?, next_billing_date = ?,
+                        stripe_customer_id = ?, scans_used = 0
+                    WHERE id = ?
+                ''', (format_datetime_for_db(now), format_datetime_for_db(next_billing), 
+                      checkout_session.customer, session['user_id']))
+                
+                conn.commit()
+                conn.close()
+                
+                # Update session
+                session['is_premium'] = True
+                session['stripe_customer_id'] = checkout_session.customer
+                session['scans_used'] = 0
+                
+                return render_template('success.html', plan=plan)
+        
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"Success page error: {e}")
+        return redirect(url_for('index'))
+
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        # Get user's image URLs before deleting
+        cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        image_urls = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Delete user's scan history
+        cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        conn.commit()
+        conn.close()
+        
+        # Delete user's images
+        for image_url in image_urls:
+            try:
+                if image_url.startswith('/static/'):
+                    image_path = image_url[1:]  # Remove leading slash
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                        print(f"Deleted image: {image_path}")
+            except Exception as e:
+                print(f"Error deleting image {image_url}: {e}")
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'error': 'Failed to
