@@ -248,11 +248,14 @@ def format_datetime_for_db(dt=None):
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 # AUTHENTICATION ROUTES
+# AUTHENTICATION ROUTES
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
+        
+        print(f"DEBUG: Login attempt for email: {email}")  # Debug line
         
         if not email or not password:
             flash('Please enter both email and password', 'error')
@@ -265,25 +268,37 @@ def login():
         cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
         user = cursor.fetchone()
         
-        if user and check_password_hash(user['password_hash'], password):
-            # Update last login
-            cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                         (format_datetime_for_db(), user['id']))
-            conn.commit()
+        if user:
+            print(f"DEBUG: User found: {user['name']}")  # Debug line
+            print(f"DEBUG: Stored hash: {user['password_hash'][:20]}...")  # Debug line
             
-            # Set session
-            session.permanent = True
-            session['user_id'] = user['id']
-            session['user_email'] = user['email']
-            session['user_name'] = user['name']
-            session['is_premium'] = bool(user['is_premium'])
-            session['scans_used'] = user['scans_used']
-            session['stripe_customer_id'] = user['stripe_customer_id']
+            # Check password
+            is_valid = check_password_hash(user['password_hash'], password)
+            print(f"DEBUG: Password check result: {is_valid}")  # Debug line
             
-            flash(f'Welcome back, {user["name"]}!', 'success')
-            conn.close()
-            return redirect(url_for('index'))
+            if is_valid:
+                # Update last login
+                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                             (format_datetime_for_db(), user['id']))
+                conn.commit()
+                
+                # Set session
+                session.permanent = True
+                session['user_id'] = user['id']
+                session['user_email'] = user['email']
+                session['user_name'] = user['name']
+                session['is_premium'] = bool(user['is_premium'])
+                session['scans_used'] = user['scans_used']
+                session['stripe_customer_id'] = user['stripe_customer_id']
+                
+                flash(f'Welcome back, {user["name"]}!', 'success')
+                conn.close()
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid email or password', 'error')
+                conn.close()
         else:
+            print(f"DEBUG: No user found with email: {email}")  # Debug line
             flash('Invalid email or password', 'error')
             conn.close()
     
@@ -296,6 +311,8 @@ def register():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
+        
+        print(f"DEBUG: Registration attempt for email: {email}")  # Debug line
         
         # Validation
         if not all([name, email, password, confirm_password]):
@@ -325,35 +342,46 @@ def register():
             return render_template('register.html')
         
         # Create new user with trial period
-        password_hash = generate_password_hash(password)
+        password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+        print(f"DEBUG: Generated hash: {password_hash[:20]}...")  # Debug line
+        
         now = datetime.now()
         trial_start = format_datetime_for_db(now)
         trial_end = format_datetime_for_db(now + timedelta(hours=48))
         last_login = format_datetime_for_db(now)
         
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, email, password_hash, trial_start, trial_end, last_login))
-        
-        user_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        # Auto-login after registration
-        session.permanent = True
-        session['user_id'] = user_id
-        session['user_email'] = email
-        session['user_name'] = name
-        session['is_premium'] = False
-        session['scans_used'] = 0
-        session['stripe_customer_id'] = None
-        
-        flash(f'Welcome to FoodFixr, {name}! Your free trial has started.', 'success')
-        return redirect(url_for('index'))
+        try:
+            cursor.execute('''
+                INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, email, password_hash, trial_start, trial_end, last_login))
+            
+            user_id = cursor.lastrowid
+            conn.commit()
+            
+            print(f"DEBUG: User created successfully with ID: {user_id}")  # Debug line
+            
+            # Auto-login after registration
+            session.permanent = True
+            session['user_id'] = user_id
+            session['user_email'] = email
+            session['user_name'] = name
+            session['is_premium'] = False
+            session['scans_used'] = 0
+            session['stripe_customer_id'] = None
+            
+            flash(f'Welcome to FoodFixr, {name}! Your free trial has started.', 'success')
+            conn.close()
+            return redirect(url_for('index'))
+            
+        except Exception as e:
+            print(f"DEBUG: Database error during registration: {e}")
+            flash('Registration failed. Please try again.', 'error')
+            conn.close()
+            return render_template('register.html')
     
     return render_template('register.html')
-
+    
 @app.route('/logout')
 def logout():
     user_name = session.get('user_name', 'User')
@@ -656,6 +684,58 @@ def upgrade():
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
+@app.route('/debug-users')
+def debug_users():
+    """Debug route to check users in database"""
+    try:
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, password_hash, created_at FROM users ORDER BY created_at DESC LIMIT 10')
+        users = cursor.fetchall()
+        
+        conn.close()
+        
+        html = """
+        <html>
+        <head><title>Debug Users</title></head>
+        <body style="font-family: monospace; padding: 20px;">
+        <h1>🔍 Users in Database</h1>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 8px;">ID</th>
+            <th style="padding: 8px;">Name</th>
+            <th style="padding: 8px;">Email</th>
+            <th style="padding: 8px;">Password Hash (first 20 chars)</th>
+            <th style="padding: 8px;">Created At</th>
+        </tr>
+        """
+        
+        for user in users:
+            html += f"""
+            <tr>
+                <td style="padding: 8px;">{user['id']}</td>
+                <td style="padding: 8px;">{user['name']}</td>
+                <td style="padding: 8px;">{user['email']}</td>
+                <td style="padding: 8px;">{user['password_hash'][:20]}...</td>
+                <td style="padding: 8px;">{user['created_at']}</td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <br>
+        <a href="/" style="background: #e91e63; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">← Back to Scanner</a>
+        </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"Database error: {str(e)}"
+        
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     """Create Stripe checkout session"""
