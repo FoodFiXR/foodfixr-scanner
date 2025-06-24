@@ -10,6 +10,7 @@ import uuid
 import stripe
 from PIL import Image
 import time
+import shutil
 import sqlite3
 from functools import wraps
 import psycopg2
@@ -77,10 +78,22 @@ def init_db():
             scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             result_rating TEXT,
             ingredients_found TEXT,
-            image_url TEXT,
+            image_url TEXT DEFAULT '',
+            extracted_text TEXT DEFAULT '',
             scan_id VARCHAR(255)
         )
     ''')
+    
+    # Add missing columns if they don't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE scan_history ADD COLUMN image_url TEXT DEFAULT \'\'')
+    except:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute('ALTER TABLE scan_history ADD COLUMN extracted_text TEXT DEFAULT \'\'')
+    except:
+        pass  # Column already exists
     
     conn.commit()
     conn.close()
@@ -433,7 +446,36 @@ def scan():
         filepath = os.path.join(tempfile.gettempdir(), filename)
         file.save(filepath)
         
+        # Save the uploaded image for history
+        saved_image_path = None
+        try:
+            # Create uploads directory if it doesn't exist
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'history')
+            os.makedirs(uploads_dir, exist_ok=True)
+            
+            # Generate unique filename for the saved image
+            image_filename = f"scan_{session['user_id']}_{int(time.time())}_{secure_filename(file.filename)}"
+            saved_image_path = os.path.join(uploads_dir, image_filename)
+            
+            # Copy the uploaded file to permanent location
+            import shutil
+            shutil.copy2(filepath, saved_image_path)
+            
+            # Store relative URL for serving
+            image_url = f"/uploads/history/{image_filename}"
+            
+        except Exception as e:
+            print(f"Error saving image for history: {e}")
+            image_url = ""
+        
         result = scan_image_for_ingredients(filepath)
+        
+        # Extract text from image for history display
+        extracted_text = ""
+        try:
+            extracted_text = extract_text_from_image(filepath)
+        except Exception as e:
+            print(f"Error extracting text for history: {e}")
         
         # Store more detailed scan information
         conn = get_db_connection()
@@ -456,9 +498,9 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-            ''', (session['user_id'], result.get('rating', ''), ingredients_json, str(uuid.uuid4()), ''))
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url, extracted_text)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s)
+            ''', (session['user_id'], result.get('rating', ''), ingredients_json, str(uuid.uuid4()), image_url, extracted_text[:1000]))  # Limit text length
         else:
             cursor.execute('''
                 UPDATE users 
@@ -467,10 +509,10 @@ def scan():
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id, image_url, extracted_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (session['user_id'], result.get('rating', ''), ingredients_json, 
-                  format_datetime_for_db(), str(uuid.uuid4()), ''))
+                  format_datetime_for_db(), str(uuid.uuid4()), image_url, extracted_text[:1000]))  # Limit text length
         
         conn.commit()
         conn.close()
@@ -625,8 +667,8 @@ def history():
                 'has_gmo': has_gmo,
                 'confidence': 'medium',  # Default confidence level
                 'image_url': row.get('image_url', ''),  # May be empty
-                'extracted_text': '',  # Not currently stored
-                'text_length': 0,  # Not currently stored
+                'extracted_text': row.get('extracted_text', ''),  # Extracted text from image
+                'text_length': len(row.get('extracted_text', '')),  # Text length for display
             }
             
             scans.append(scan_entry)
@@ -1217,6 +1259,12 @@ def simple_login():
                 <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
                 <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
                 <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
+                <a href="/migrate-database" style="background: #E91E63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">🔧 Migrate DB</a>
+                <a href="/emergency-premium-fix" style="background: #F44336; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">🚨 Emergency Fix</a>
+                <a href="/sync-stripe-subscriptions" style="background: #FF5722; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Sync Stripe</a>
+                <a href="/fix-user-subscription" style="background: #673AB7; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Fix User Sub</a>
+                <a href="/test-webhook" style="background: #795548; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Webhook</a>
+                <a href="/admin-cleanup-images" style="background: #9C27B0; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Cleanup Images</a>
             </div>
         </div>
     </body>
@@ -1523,6 +1571,7 @@ def check_users():
                     <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
                     <a href="/bulk-password-reset" class="btn btn-secondary">⚠️ Bulk Password Reset</a>
                     <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                    <a href="/admin-cleanup-images" class="btn btn-secondary">🗑️ Cleanup Images</a>
                 </div>
                 
                 <table>
@@ -1565,6 +1614,52 @@ def check_users():
         </html>
         """
 
+@app.route('/uploads/history/<filename>')
+@login_required
+def serve_history_image(filename):
+    """Serve uploaded scan history images"""
+    try:
+        # Security check - only serve images for the current user
+        # Extract user_id from filename (format: scan_USERID_timestamp_originalname)
+        if not filename.startswith(f'scan_{session["user_id"]}_'):
+            return "Unauthorized", 403
+        
+        uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'history')
+        filepath = os.path.join(uploads_dir, filename)
+        
+        if os.path.exists(filepath):
+            from flask import send_file
+            return send_file(filepath)
+        else:
+            return "Image not found", 404
+            
+    except Exception as e:
+        print(f"Error serving history image: {e}")
+        return "Error loading image", 500
+
+@app.route('/uploads/history/<filename>')
+@login_required
+def serve_history_image(filename):
+    """Serve uploaded scan history images"""
+    try:
+        # Security check - only serve images for the current user
+        # Extract user_id from filename (format: scan_USERID_timestamp_originalname)
+        if not filename.startswith(f'scan_{session["user_id"]}_'):
+            return "Unauthorized", 403
+        
+        uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'history')
+        filepath = os.path.join(uploads_dir, filename)
+        
+        if os.path.exists(filepath):
+            from flask import send_file
+            return send_file(filepath)
+        else:
+            return "Image not found", 404
+            
+    except Exception as e:
+        print(f"Error serving history image: {e}")
+        return "Error loading image", 500
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     """Serve static files including emoji images"""
@@ -1588,6 +1683,628 @@ def serve_static(filename):
         """, 200, {'Content-Type': 'image/svg+xml'}
     
     return "File not found", 404
+
+@app.route('/emergency-premium-fix', methods=['GET', 'POST'])
+def emergency_premium_fix():
+    """Emergency route to set user as premium without column dependencies"""
+    if request.method == 'POST':
+        user_email = request.form.get('email', '').strip()
+        
+        if not user_email:
+            return "Email is required", 400
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            
+            # Simple update - just set is_premium to true
+            if database_url:
+                cursor.execute('UPDATE users SET is_premium = TRUE WHERE email = %s', (user_email,))
+                cursor.execute('SELECT is_premium FROM users WHERE email = %s', (user_email,))
+            else:
+                cursor.execute('UPDATE users SET is_premium = 1 WHERE email = ?', (user_email,))
+                cursor.execute('SELECT is_premium FROM users WHERE email = ?', (user_email,))
+            
+            result = cursor.fetchone()
+            
+            if cursor.rowcount > 0:
+                conn.commit()
+                conn.close()
+                return f"""
+                <div style="padding: 20px; background: #d4edda; color: #155724; border-radius: 8px; margin: 20px;">
+                    <h3>✅ Emergency Fix Applied!</h3>
+                    <p><strong>User:</strong> {user_email}</p>
+                    <p><strong>Status:</strong> Premium Activated (Emergency Mode)</p>
+                    <p><strong>Note:</strong> This is a basic fix. Run database migration and proper sync later.</p>
+                    <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin-top: 10px; display: inline-block;">Check Users</a>
+                    <a href="/migrate-database" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin-top: 10px; display: inline-block;">Migrate Database</a>
+                </div>
+                """
+            else:
+                conn.close()
+                return f"User {user_email} not found", 404
+                
+        except Exception as e:
+            return f"Error: {str(e)}", 500
+    
+    # GET request - show form
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Emergency Premium Fix - FoodFixr</title>
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; }}
+            h1 {{ color: #e91e63; text-align: center; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; }}
+            input {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }}
+            .btn {{ padding: 12px 24px; background: #e91e63; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; }}
+            .btn:hover {{ background: #c2185b; }}
+            .warning {{ background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeaa7; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚨 Emergency Premium Fix</h1>
+            
+            <div class="warning">
+                <strong>⚠️ Emergency Mode:</strong> This tool sets users to premium without column dependencies. Use when database migration fails.
+            </div>
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">User Email:</label>
+                    <input type="email" id="email" name="email" required placeholder="user@example.com">
+                </div>
+                
+                <button type="submit" class="btn">🚨 Emergency Fix</button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/migrate-database" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Migrate Database</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Check Users</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/migrate-database')
+def migrate_database():
+    """Manually migrate database to add missing columns"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        
+        # List of columns to add
+        columns_to_add = [
+            ('stripe_customer_id', 'VARCHAR(255)' if database_url else 'TEXT'),
+            ('subscription_status', 'VARCHAR(50) DEFAULT \'trial\'' if database_url else 'TEXT DEFAULT \'trial\''),
+            ('subscription_start_date', 'TIMESTAMP' if database_url else 'TEXT'),
+            ('stripe_subscription_id', 'VARCHAR(255)' if database_url else 'TEXT'),
+            ('image_url', 'TEXT DEFAULT \'\'' if database_url else 'TEXT DEFAULT \'\''),
+            ('extracted_text', 'TEXT DEFAULT \'\'' if database_url else 'TEXT DEFAULT \'\'')
+        ]
+        
+        results = []
+        
+        # Add columns to users table
+        for column_name, column_type in columns_to_add[:4]:  # First 4 are for users table
+            try:
+                if database_url:
+                    cursor.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type}')
+                else:
+                    cursor.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type}')
+                results.append(f"✅ Added {column_name} to users table")
+            except Exception as e:
+                if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+                    results.append(f"ℹ️ Column {column_name} already exists in users table")
+                else:
+                    results.append(f"❌ Error adding {column_name} to users: {str(e)}")
+        
+        # Add columns to scan_history table
+        for column_name, column_type in columns_to_add[4:]:  # Last 2 are for scan_history table
+            try:
+                if database_url:
+                    cursor.execute(f'ALTER TABLE scan_history ADD COLUMN {column_name} {column_type}')
+                else:
+                    cursor.execute(f'ALTER TABLE scan_history ADD COLUMN {column_name} {column_type}')
+                results.append(f"✅ Added {column_name} to scan_history table")
+            except Exception as e:
+                if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+                    results.append(f"ℹ️ Column {column_name} already exists in scan_history table")
+                else:
+                    results.append(f"❌ Error adding {column_name} to scan_history: {str(e)}")
+        
+        # Commit changes
+        conn.commit()
+        
+        # Test the changes by checking table structure
+        try:
+            if database_url:
+                cursor.execute("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'users' 
+                    ORDER BY ordinal_position
+                """)
+            else:
+                cursor.execute("PRAGMA table_info(users)")
+            
+            columns_info = cursor.fetchall()
+            results.append("📊 Current users table structure:")
+            for col in columns_info:
+                if database_url:
+                    results.append(f"   • {col['column_name']}: {col['data_type']}")
+                else:
+                    results.append(f"   • {col[1]}: {col[2]}")  # SQLite format
+                    
+        except Exception as e:
+            results.append(f"❌ Error checking table structure: {str(e)}")
+        
+        conn.close()
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Database Migration - FoodFixr</title>
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }}
+                h1 {{ color: #e91e63; text-align: center; }}
+                .result {{ padding: 10px; margin: 5px 0; border-radius: 5px; }}
+                .success {{ background: #d4edda; color: #155724; }}
+                .info {{ background: #d1ecf1; color: #0c5460; }}
+                .error {{ background: #f8d7da; color: #721c24; }}
+                .btn {{ padding: 10px 20px; background: #e91e63; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; display: inline-block; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔧 Database Migration Results</h1>
+                
+                {''.join([f'<div class="result {("success" if "✅" in r else "info" if "ℹ️" in r or "📊" in r else "error")}">{r}</div>' for r in results])}
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="/fix-user-subscription" class="btn">🔧 Fix User Subscription</a>
+                    <a href="/sync-stripe-subscriptions" class="btn">🔄 Sync Stripe</a>
+                    <a href="/check-users" class="btn">👥 Check Users</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 8px; margin: 20px;">
+            <h3>❌ Migration Failed</h3>
+            <p>Error: {str(e)}</p>
+            <a href="/simple-login" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Back to Home</a>
+        </div>
+        """
+
+@app.route('/sync-stripe-subscriptions')
+def sync_stripe_subscriptions():
+    """Sync all active Stripe subscriptions with database"""
+    try:
+        synced_count = 0
+        errors = []
+        
+        # Get all users from database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('SELECT id, email, stripe_customer_id FROM users')
+        else:
+            cursor.execute('SELECT id, email, stripe_customer_id FROM users')
+        
+        users = cursor.fetchall()
+        
+        for user in users:
+            try:
+                user_id = user['id']
+                email = user['email']
+                stripe_customer_id = user['stripe_customer_id']
+                
+                # Skip if no Stripe customer ID
+                if not stripe_customer_id:
+                    continue
+                
+                # Get active subscriptions for this customer
+                subscriptions = stripe.Subscription.list(
+                    customer=stripe_customer_id,
+                    status='active',
+                    limit=10
+                )
+                
+                if subscriptions.data:
+                    # User has active subscription - update database
+                    subscription = subscriptions.data[0]  # Get first active subscription
+                    
+                    # Try the full update first, fall back to basic update if columns don't exist
+                    try:
+                        if database_url:
+                            cursor.execute('''
+                                UPDATE users 
+                                SET is_premium = TRUE,
+                                    subscription_status = %s,
+                                    subscription_start_date = %s,
+                                    stripe_subscription_id = %s
+                                WHERE id = %s
+                            ''', ('active', 
+                                  datetime.fromtimestamp(subscription.created).strftime('%Y-%m-%d %H:%M:%S'),
+                                  subscription.id,
+                                  user_id))
+                        else:
+                            cursor.execute('''
+                                UPDATE users 
+                                SET is_premium = 1,
+                                    subscription_status = ?,
+                                    subscription_start_date = ?,
+                                    stripe_subscription_id = ?
+                                WHERE id = ?
+                            ''', ('active', 
+                                  datetime.fromtimestamp(subscription.created).strftime('%Y-%m-%d %H:%M:%S'),
+                                  subscription.id,
+                                  user_id))
+                    except Exception as col_error:
+                        # If subscription columns don't exist, just update is_premium
+                        print(f"⚠️ Column error, falling back to basic update: {col_error}")
+                        if database_url:
+                            cursor.execute('UPDATE users SET is_premium = TRUE WHERE id = %s', (user_id,))
+                        else:
+                            cursor.execute('UPDATE users SET is_premium = 1 WHERE id = ?', (user_id,))
+                    
+                    synced_count += 1
+                    print(f"✅ Synced subscription for user {email}")
+                
+            except Exception as e:
+                error_msg = f"Error syncing user {email}: {str(e)}"
+                errors.append(error_msg)
+                print(f"❌ {error_msg}")
+        
+        conn.commit()
+        conn.close()
+        
+        result = {
+            'success': True,
+            'synced_count': synced_count,
+            'total_users': len(users),
+            'errors': errors
+        }
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Stripe Sync Results</title>
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; }}
+                .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }}
+                .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 10px 0; }}
+                .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 10px 0; }}
+                .btn {{ padding: 10px 20px; background: #e91e63; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; display: inline-block; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔄 Stripe Subscription Sync Results</h1>
+                
+                <div class="success">
+                    <strong>✅ Sync Complete!</strong><br>
+                    Synced {synced_count} active subscriptions out of {len(users)} total users.
+                </div>
+                
+                {''.join([f'<div class="error">❌ {error}</div>' for error in errors]) if errors else ''}
+                
+                <div style="margin-top: 30px;">
+                    <a href="/check-users" class="btn">👥 Check Users</a>
+                    <a href="/simple-login" class="btn">🔐 Login</a>
+                    <a href="/" class="btn">🏠 Home</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 8px; margin: 20px;">
+            <h3>❌ Sync Failed</h3>
+            <p>Error: {str(e)}</p>
+            <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Back to Users</a>
+        </div>
+        """
+
+@app.route('/fix-user-subscription', methods=['GET', 'POST'])
+def fix_user_subscription():
+    """Fix subscription for a specific user"""
+    if request.method == 'POST':
+        user_email = request.form.get('email', '').strip()
+        
+        if not user_email:
+            return "Email is required", 400
+        
+        try:
+            # Find user in database
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('SELECT * FROM users WHERE email = %s', (user_email,))
+            else:
+                cursor.execute('SELECT * FROM users WHERE email = ?', (user_email,))
+            
+            user = cursor.fetchone()
+            
+            if not user:
+                conn.close()
+                return f"User with email {user_email} not found in database", 404
+            
+            # Check if user has Stripe customer ID
+            if not user['stripe_customer_id']:
+                # Find customer by email in Stripe
+                customers = stripe.Customer.list(email=user_email, limit=1)
+                if customers.data:
+                    stripe_customer_id = customers.data[0].id
+                    # Update database with customer ID
+                    if database_url:
+                        cursor.execute('UPDATE users SET stripe_customer_id = %s WHERE id = %s', 
+                                     (stripe_customer_id, user['id']))
+                    else:
+                        cursor.execute('UPDATE users SET stripe_customer_id = ? WHERE id = ?', 
+                                     (stripe_customer_id, user['id']))
+                    conn.commit()
+                else:
+                    conn.close()
+                    return f"No Stripe customer found for {user_email}", 404
+            else:
+                stripe_customer_id = user['stripe_customer_id']
+            
+            # Get active subscriptions
+            subscriptions = stripe.Subscription.list(
+                customer=stripe_customer_id,
+                status='active',
+                limit=5
+            )
+            
+            if subscriptions.data:
+                # Update user to premium
+                subscription = subscriptions.data[0]
+                
+                # Try the full update first, fall back to basic update if columns don't exist
+                try:
+                    if database_url:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = TRUE,
+                                subscription_status = %s,
+                                subscription_start_date = %s,
+                                stripe_subscription_id = %s
+                            WHERE id = %s
+                        ''', ('active', 
+                              datetime.fromtimestamp(subscription.created).strftime('%Y-%m-%d %H:%M:%S'),
+                              subscription.id,
+                              user['id']))
+                    else:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = 1,
+                                subscription_status = ?,
+                                subscription_start_date = ?,
+                                stripe_subscription_id = ?
+                            WHERE id = ?
+                        ''', ('active', 
+                              datetime.fromtimestamp(subscription.created).strftime('%Y-%m-%d %H:%M:%S'),
+                              subscription.id,
+                              user['id']))
+                except Exception as col_error:
+                    # If subscription columns don't exist, just update is_premium
+                    print(f"⚠️ Column error, falling back to basic update: {col_error}")
+                    if database_url:
+                        cursor.execute('UPDATE users SET is_premium = TRUE WHERE id = %s', (user['id'],))
+                    else:
+                        cursor.execute('UPDATE users SET is_premium = 1 WHERE id = ?', (user['id'],))
+                
+                conn.commit()
+                conn.close()
+                
+                return f"""
+                <div style="padding: 20px; background: #d4edda; color: #155724; border-radius: 8px; margin: 20px;">
+                    <h3>✅ Subscription Fixed!</h3>
+                    <p><strong>User:</strong> {user_email}</p>
+                    <p><strong>Status:</strong> Premium Active</p>
+                    <p><strong>Subscription ID:</strong> {subscription.id}</p>
+                    <p><strong>Start Date:</strong> {datetime.fromtimestamp(subscription.created).strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    <p><strong>Note:</strong> If you see column errors above, run <a href="/migrate-database" style="color: #155724; text-decoration: underline;">Database Migration</a> first.</p>
+                    <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin-top: 10px; display: inline-block;">Back to Users</a>
+                </div>
+                """
+            else:
+                conn.close()
+                return f"No active subscriptions found for {user_email} in Stripe", 404
+                
+        except Exception as e:
+            return f"Error fixing subscription: {str(e)}", 500
+    
+    # GET request - show form
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Fix User Subscription</title>
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; }}
+            h1 {{ color: #e91e63; text-align: center; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; }}
+            input {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }}
+            .btn {{ padding: 12px 24px; background: #e91e63; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; }}
+            .btn:hover {{ background: #c2185b; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔧 Fix User Subscription</h1>
+            
+            <div class="info">
+                <strong>ℹ️ This tool:</strong> Finds active Stripe subscriptions and syncs them with the database for a specific user.
+            </div>
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">User Email:</label>
+                    <input type="email" id="email" name="email" required placeholder="user@example.com">
+                </div>
+                
+                <button type="submit" class="btn">🔄 Fix Subscription</button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/sync-stripe-subscriptions" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Sync All Users</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Check Users</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/test-webhook', methods=['GET', 'POST'])
+def test_webhook():
+    """Test webhook functionality"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+        user_email = request.form.get('email')
+        
+        if not user_email:
+            return "Email required", 400
+        
+        try:
+            # Find user
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('SELECT * FROM users WHERE email = %s', (user_email,))
+            else:
+                cursor.execute('SELECT * FROM users WHERE email = ?', (user_email,))
+            
+            user = cursor.fetchone()
+            conn.close()
+            
+            if not user:
+                return f"User {user_email} not found", 404
+            
+            # Simulate webhook actions
+            if action == 'activate':
+                # Simulate subscription.created webhook
+                fake_subscription = {
+                    'id': f'sub_test_{int(time.time())}',
+                    'customer': user.get('stripe_customer_id', 'cus_test'),
+                    'status': 'active',
+                    'created': int(time.time())
+                }
+                handle_subscription_created(fake_subscription)
+                message = f"✅ Activated premium for {user_email}"
+                
+            elif action == 'cancel':
+                # Simulate subscription.deleted webhook
+                fake_subscription = {
+                    'id': user.get('stripe_subscription_id', 'sub_test'),
+                }
+                handle_subscription_deleted(fake_subscription)
+                message = f"❌ Canceled premium for {user_email}"
+                
+            else:
+                return "Invalid action", 400
+            
+            return f"""
+            <div style="padding: 20px; background: #d4edda; color: #155724; border-radius: 8px; margin: 20px;">
+                <h3>🔄 Webhook Test Result</h3>
+                <p>{message}</p>
+                <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Check Users</a>
+                <a href="/test-webhook" style="background: #6c757d; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Test Again</a>
+            </div>
+            """
+            
+        except Exception as e:
+            return f"Error: {str(e)}", 500
+    
+    # GET request - show form
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Test Webhook - FoodFixr</title>
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; }}
+            h1 {{ color: #e91e63; text-align: center; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; }}
+            input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }}
+            .btn {{ padding: 12px 24px; background: #e91e63; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; }}
+            .btn:hover {{ background: #c2185b; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔄 Test Webhook</h1>
+            
+            <div class="info">
+                <strong>ℹ️ This tool:</strong> Simulates Stripe webhook events to test subscription activation/cancellation without actual Stripe calls.
+            </div>
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">User Email:</label>
+                    <input type="email" id="email" name="email" required placeholder="user@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="action">Action:</label>
+                    <select id="action" name="action" required>
+                        <option value="">Select Action</option>
+                        <option value="activate">Activate Premium (subscription.created)</option>
+                        <option value="cancel">Cancel Premium (subscription.deleted)</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn">🧪 Test Webhook</button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/sync-stripe-subscriptions" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Sync Stripe</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px;">Check Users</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/admin-cleanup-images')
+def admin_cleanup_images():
+    """Manual cleanup of old images (admin function)"""
+    try:
+        cleanup_old_images()
+        return jsonify({'success': True, 'message': 'Image cleanup completed'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/debug-routes')
 def debug_routes():
@@ -1639,6 +2356,27 @@ def test_login_form():
     </body>
     </html>
     """
+
+@app.route('/admin-cleanup-images')
+def admin_cleanup_images():
+    """Manual cleanup of old images (admin function)"""
+    try:
+        cleanup_old_images()
+        return """
+        <div style="padding: 20px; background: #d4edda; color: #155724; border-radius: 8px; margin: 20px;">
+            <h3>✅ Image Cleanup Complete!</h3>
+            <p>Old scan images (30+ days) have been removed to free up storage space.</p>
+            <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Back to Admin</a>
+        </div>
+        """
+    except Exception as e:
+        return f"""
+        <div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 8px; margin: 20px;">
+            <h3>❌ Cleanup Failed</h3>
+            <p>Error: {str(e)}</p>
+            <a href="/check-users" style="background: #e91e63; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Back to Admin</a>
+        </div>
+        """
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
