@@ -3,7 +3,9 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8" />
-    <title>FoodFixr - Account</title>
+    <title>My Account - FoodFixr</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -15,179 +17,385 @@
         body {
             background: #e50ce8;
             font-family: 'Comfortaa', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: hidden;
+            text-align: center;
             min-height: 100vh;
+            position: relative;
             padding: 20px 15px;
         }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .header {
+        /* Main Container */
+        .account-container {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 24px;
-            padding: 24px;
-            margin-bottom: 24px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(229, 12, 232, 0.15);
+            padding: 32px 24px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 
+                0 20px 60px rgba(229, 12, 232, 0.15),
+                0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            margin-bottom: 20px;
         }
 
-        .logo-text {
+        /* Header */
+        .account-header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .account-title {
             font-size: 36px;
             font-weight: 800;
             background: linear-gradient(135deg, #e91e63, #9c27b0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            letter-spacing: -1px;
             margin-bottom: 8px;
         }
 
-        .page-title {
-            font-size: 24px;
-            color: #333;
-            font-weight: 600;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .subscription-status {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .status-indicator {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .status-indicator.active {
-            background: #4CAF50;
-            box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2);
-        }
-
-        .status-indicator.trial {
-            background: #FF9800;
-            box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.2);
-        }
-
-        .status-indicator.expired {
-            background: #F44336;
-            box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.2);
-        }
-
-        .status-text {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .status-text.active { color: #4CAF50; }
-        .status-text.trial { color: #FF9800; }
-        .status-text.expired { color: #F44336; }
-
-        .subscription-details {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
-        }
-
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
-        .detail-label {
+        .account-subtitle {
+            font-size: 16px;
             color: #666;
             font-weight: 500;
         }
 
+        /* Back Button */
+        .back-button {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            background: rgba(229, 12, 232, 0.1);
+            color: #e50ce8;
+            padding: 10px 16px;
+            border: 2px solid rgba(229, 12, 232, 0.3);
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .back-button:hover {
+            background: #e50ce8;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* User Profile Section */
+        .user-profile {
+            background: linear-gradient(135deg, #f8f9ff, #e8f4fd);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 2px solid rgba(229, 12, 232, 0.1);
+            text-align: left;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .user-avatar {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .user-email {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .profile-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            background: rgba(255, 255, 255, 0.7);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(229, 12, 232, 0.1);
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
         .detail-value {
+            font-size: 14px;
             color: #333;
             font-weight: 600;
         }
 
+        /* Subscription Status */
+        .subscription-status {
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .subscription-status.premium {
+            background: linear-gradient(135deg, #4CAF50, rgba(76, 175, 80, 0.8));
+            border: 2px solid #388E3C;
+        }
+
+        .subscription-status.trial {
+            background: linear-gradient(135deg, #77ecfe, rgba(119, 236, 254, 0.8));
+            border: 2px solid #0e4b9e;
+        }
+
+        .subscription-status.expired {
+            background: linear-gradient(135deg, #ffcdd2, rgba(255, 205, 210, 0.8));
+            border: 2px solid #f44336;
+        }
+
+        .status-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .status-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .status-subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* Plan Details */
+        .plan-details {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .plan-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .plan-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .plan-item:last-child {
+            border-bottom: none;
+        }
+
+        .plan-label {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .plan-value {
+            font-size: 14px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .plan-value.highlight {
+            color: #e50ce8;
+            font-weight: 700;
+        }
+
+        /* Usage Statistics */
+        .usage-stats {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 2px solid rgba(255, 152, 0, 0.2);
+        }
+
+        .stats-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #e65100;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 152, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 800;
+            color: #e65100;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 16px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* Action Buttons */
         .action-buttons {
             display: flex;
+            flex-direction: column;
             gap: 12px;
-            margin-top: 24px;
-            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 12px 24px;
-            border-radius: 12px;
+            padding: 16px 24px;
             border: none;
-            font-weight: 600;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
             transition: all 0.3s ease;
-            font-size: 14px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .btn-primary {
             background: linear-gradient(135deg, #e50ce8, #c209c5);
             color: white;
+            box-shadow: 0 8px 24px rgba(229, 12, 232, 0.4);
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(229, 12, 232, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(229, 12, 232, 0.5);
         }
 
         .btn-secondary {
-            background: #f8f9fa;
-            color: #666;
-            border: 2px solid #ddd;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 2px solid rgba(229, 12, 232, 0.3);
         }
 
         .btn-secondary:hover {
-            background: #e9ecef;
-            border-color: #adb5bd;
+            background: rgba(229, 12, 232, 0.1);
+            border-color: #e50ce8;
+            transform: translateY(-2px);
         }
 
         .btn-danger {
-            background: #f8f9fa;
-            color: #dc3545;
-            border: 2px solid #dc3545;
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
         }
 
         .btn-danger:hover {
-            background: #dc3545;
-            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
         }
 
-        .warning-box {
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-            border: 2px solid #ffc107;
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
-            color: #856404;
-        }
-
-        .warning-title {
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
+        /* Cancel Modal */
         .modal {
             display: none;
             position: fixed;
@@ -197,21 +405,18 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            backdrop-filter: blur(5px);
         }
 
         .modal-content {
             background: white;
-            border-radius: 20px;
+            margin: 15% auto;
             padding: 32px;
-            max-width: 500px;
+            border-radius: 20px;
             width: 90%;
+            max-width: 400px;
             text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
 
         .modal-title {
@@ -222,9 +427,10 @@
         }
 
         .modal-text {
+            font-size: 16px;
             color: #666;
-            line-height: 1.6;
             margin-bottom: 24px;
+            line-height: 1.5;
         }
 
         .modal-buttons {
@@ -233,249 +439,278 @@
             justify-content: center;
         }
 
-        @media (max-width: 600px) {
-            .detail-row {
-                flex-direction: column;
-                gap: 4px;
+        /* Mobile Responsiveness */
+        @media (max-width: 480px) {
+            body {
+                padding: 12px 8px;
             }
             
-            .action-buttons {
-                flex-direction: column;
+            .account-container {
+                padding: 24px 20px;
+                margin: 0 3px 12px 3px;
             }
-            
-            .btn {
-                width: 100%;
+
+            .back-button {
+                position: static;
+                margin-bottom: 20px;
+                align-self: flex-start;
+            }
+
+            .account-title {
+                font-size: 28px;
+            }
+
+            .profile-details {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 24px;
+                margin: 20% auto;
+            }
+
+            .modal-buttons {
+                flex-direction: column;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Cancel Confirmation Modal -->
-    <div class="modal" id="cancelModal">
-        <div class="modal-content">
-            <div class="modal-title">⚠️ Cancel Subscription?</div>
-            <div class="modal-text">
-                Are you sure you want to cancel your premium subscription? You'll lose access to:
-                <br><br>
-                • Unlimited ingredient scans<br>
-                • Advanced health insights<br>
-                • Priority support<br>
-                • Export scan history<br>
-                <br>
-                Your subscription will remain active until the end of your current billing period.
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeModal()">Keep Subscription</button>
-                <button class="btn btn-danger" onclick="confirmCancel()">Yes, Cancel</button>
-            </div>
-        </div>
-    </div>
+    <div class="account-container">
+        <!-- Back Button -->
+        <a href="/" class="back-button">
+            ← Back to Scanner
+        </a>
 
-    <div class="container">
         <!-- Header -->
-        <div class="header">
-            <div class="logo-text">FOOD FIXR</div>
-            <div class="page-title">👤 Account</div>
+        <div class="account-header">
+            <h1 class="account-title">My Account</h1>
+            <p class="account-subtitle">Manage your FoodFixr subscription</p>
+        </div>
+
+        <!-- User Profile Section -->
+        <div class="user-profile">
+            <div class="profile-header">
+                <div class="user-avatar">
+                    {{ user_name[0].upper() if user_name else session.get('user_email', 'U')[0].upper() }}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">
+                        {{ user_name or 'FoodFixr User' }}
+                    </div>
+                    <div class="user-email">
+                        {{ session.get('user_email', 'user@example.com') }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-details">
+                <div class="detail-item">
+                    <div class="detail-label">Member Since</div>
+                    <div class="detail-value">
+                        {{ user_created_date or 'Recently Joined' }}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Customer ID</div>
+                    <div class="detail-value">
+                        {{ session.get('stripe_customer_id', 'N/A')[:8] }}...
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Account Status</div>
+                    <div class="detail-value">
+                        {% if session.get('is_premium') %}
+                            Active Premium
+                        {% else %}
+                            Free Trial
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Total Scans</div>
+                    <div class="detail-value">
+                        {{ total_scans_ever or session.get('scans_used', 0) }}
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Subscription Status -->
-        <div class="card">
-            <h3 style="margin-bottom: 20px; color: #333;">Subscription Status</h3>
+        {% if session.get('is_premium') %}
+        <div class="subscription-status premium">
+            <div class="status-icon">💎</div>
+            <div class="status-title">Premium Active</div>
+            <div class="status-subtitle">Unlimited scanning power!</div>
+        </div>
+        {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+        <div class="subscription-status expired">
+            <div class="status-icon">🔒</div>
+            <div class="status-title">Trial Expired</div>
+            <div class="status-subtitle">Upgrade to continue scanning</div>
+        </div>
+        {% else %}
+        <div class="subscription-status trial">
+            <div class="status-icon">🎉</div>
+            <div class="status-title">Free Trial Active</div>
+            <div class="status-subtitle">
+                {{ 10 - session.get('scans_used', 0) }} scans remaining
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Plan Details -->
+        <div class="plan-details">
+            <div class="plan-title">
+                📋 Subscription Details
+            </div>
             
             {% if session.get('is_premium') %}
-            <div class="subscription-status">
-                <div class="status-indicator active"></div>
-                <div class="status-text active">Premium Active</div>
+            <div class="plan-item">
+                <span class="plan-label">Current Plan</span>
+                <span class="plan-value highlight">Premium Monthly</span>
             </div>
-            
-            <div class="subscription-details">
-                <div class="detail-row">
-                    <span class="detail-label">Plan:</span>
-                    <span class="detail-value">{{ session.get('premium_plan', 'Monthly').title() }} Plan</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Started:</span>
-                    <span class="detail-value">
-                        {% if session.get('premium_start') %}
-                            {{ session.get('premium_start')[:10] }}
-                        {% else %}
-                            Recently
-                        {% endif %}
-                    </span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Status:</span>
-                    <span class="detail-value">Active & Billing</span>
-                </div>
+            <div class="plan-item">
+                <span class="plan-label">Monthly Price</span>
+                <span class="plan-value">$9.99/month</span>
             </div>
-
-            <div class="warning-box">
-                <div class="warning-title">📋 Manage Your Subscription</div>
-                <div>
-                    To modify your subscription, update payment methods, or view billing history, 
-                    you can manage your subscription directly through Stripe's customer portal.
-                </div>
+            <div class="plan-item">
+                <span class="plan-label">Started</span>
+                <span class="plan-value">{{ subscription_start_date or 'Recently' }}</span>
             </div>
-
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="openCustomerPortal()">
-                    💳 Manage Billing
-                </button>
-                <button class="btn btn-danger" onclick="showCancelModal()">
-                    ❌ Cancel Subscription
-                </button>
+            <div class="plan-item">
+                <span class="plan-label">Next Billing</span>
+                <span class="plan-value">{{ next_billing_date or 'Soon' }}</span>
             </div>
-
-            {% elif trial_expired %}
-            <div class="subscription-status">
-                <div class="status-indicator expired"></div>
-                <div class="status-text expired">Trial Expired</div>
+            <div class="plan-item">
+                <span class="plan-label">Status</span>
+                <span class="plan-value highlight">{{ subscription_status or 'Active' }}</span>
             </div>
-            
-            <div class="subscription-details">
-                <div class="detail-row">
-                    <span class="detail-label">Scans Used:</span>
-                    <span class="detail-value">{{ session.get('scans_used', 0) }}/10</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Trial Time:</span>
-                    <span class="detail-value">Expired</span>
-                </div>
-            </div>
-
-            <div class="action-buttons">
-                <a href="/upgrade" class="btn btn-primary">
-                    🚀 Upgrade to Premium
-                </a>
-            </div>
-
             {% else %}
-            <div class="subscription-status">
-                <div class="status-indicator trial"></div>
-                <div class="status-text trial">Free Trial</div>
+            <div class="plan-item">
+                <span class="plan-label">Current Plan</span>
+                <span class="plan-value">Free Trial</span>
             </div>
-            
-            <div class="subscription-details">
-                <div class="detail-row">
-                    <span class="detail-label">Scans Used:</span>
-                    <span class="detail-value">{{ session.get('scans_used', 0) }}/10</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Time Left:</span>
-                    <span class="detail-value">{{ trial_time_left }}</span>
-                </div>
+            <div class="plan-item">
+                <span class="plan-label">Trial Started</span>
+                <span class="plan-value">{{ trial_start_date or 'Recently' }}</span>
             </div>
-
-            <div class="action-buttons">
-                <a href="/upgrade" class="btn btn-primary">
-                    🚀 Upgrade to Premium
-                </a>
+            <div class="plan-item">
+                <span class="plan-label">Time Remaining</span>
+                <span class="plan-value highlight">{{ trial_time_left or '48h 0m' }}</span>
+            </div>
+            <div class="plan-item">
+                <span class="plan-label">Scans Used</span>
+                <span class="plan-value">{{ session.get('scans_used', 0) }}/10</span>
             </div>
             {% endif %}
         </div>
 
-        <!-- Account Actions -->
-        <div class="card">
-            <h3 style="margin-bottom: 20px; color: #333;">Account Actions</h3>
+        <!-- Usage Statistics -->
+        {% if not session.get('is_premium') %}
+        <div class="usage-stats">
+            <div class="stats-title">
+                📊 Trial Usage
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">{{ session.get('scans_used', 0) }}</div>
+                    <div class="stat-label">Scans Used</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ 10 - session.get('scans_used', 0) }}</div>
+                    <div class="stat-label">Remaining</div>
+                </div>
+            </div>
             
-            <div class="action-buttons">
-                <a href="/" class="btn btn-secondary">📸 Back to Scanner</a>
-                <a href="/history" class="btn btn-secondary">📊 Scan History</a>
-                <a href="/reset-trial" class="btn btn-secondary">🔄 Reset Trial (Debug)</a>
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>Trial Progress</span>
+                    <span>{{ session.get('scans_used', 0) }}/10</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ (session.get('scans_used', 0) / 10 * 100) }}%"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            {% if session.get('is_premium') %}
+                <a href="{{ billing_portal_url }}" class="btn btn-primary">
+                    💳 Manage Billing
+                </a>
+                <button onclick="openCancelModal()" class="btn btn-danger">
+                    ❌ Cancel Subscription
+                </button>
+            {% elif session.get('scans_used', 0) >= 10 or trial_expired %}
+                <a href="/upgrade" class="btn btn-primary">
+                    🚀 Upgrade to Premium
+                </a>
+            {% else %}
+                <a href="/upgrade" class="btn btn-primary">
+                    🚀 Upgrade to Premium
+                </a>
+                <a href="/" class="btn btn-secondary">
+                    📸 Continue Scanning
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Cancel Subscription Modal -->
+    <div id="cancelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Cancel Subscription?</div>
+            <div class="modal-text">
+                Are you sure you want to cancel your Premium subscription? You'll lose access to unlimited scanning.
+            </div>
+            <div class="modal-buttons">
+                <button onclick="closeCancelModal()" class="btn btn-secondary">
+                    Keep Premium
+                </button>
+                <button onclick="confirmCancel()" class="btn btn-danger">
+                    Yes, Cancel
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        function showCancelModal() {
-            document.getElementById('cancelModal').classList.add('show');
-            document.body.style.overflow = 'hidden';
+        function openCancelModal() {
+            document.getElementById('cancelModal').style.display = 'block';
         }
 
-        function closeModal() {
-            document.getElementById('cancelModal').classList.remove('show');
-            document.body.style.overflow = 'auto';
+        function closeCancelModal() {
+            document.getElementById('cancelModal').style.display = 'none';
         }
 
         function confirmCancel() {
-            // Show loading state
-            const modal = document.getElementById('cancelModal');
-            modal.querySelector('.modal-title').textContent = '⏳ Canceling...';
-            modal.querySelector('.modal-text').textContent = 'Please wait while we cancel your subscription.';
-            modal.querySelector('.modal-buttons').style.display = 'none';
-
-            // Call cancel endpoint
-            fetch('/cancel-subscription', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message
-                    modal.querySelector('.modal-title').textContent = '✅ Subscription Canceled';
-                    modal.querySelector('.modal-text').textContent = 
-                        'Your subscription has been canceled successfully. You can continue using premium features until the end of your current billing period.';
-                    
-                    // Show close button
-                    modal.querySelector('.modal-buttons').innerHTML = 
-                        '<button class="btn btn-primary" onclick="location.reload()">Continue</button>';
-                    modal.querySelector('.modal-buttons').style.display = 'flex';
-                } else {
-                    throw new Error(data.error || 'Cancellation failed');
-                }
-            })
-            .catch(error => {
-                console.error('Cancel error:', error);
-                
-                // Show error message
-                modal.querySelector('.modal-title').textContent = '❌ Cancellation Failed';
-                modal.querySelector('.modal-text').textContent = 
-                    'Sorry, we couldn\'t cancel your subscription right now. Please try again or contact support.';
-                
-                // Show retry buttons
-                modal.querySelector('.modal-buttons').innerHTML = 
-                    '<button class="btn btn-secondary" onclick="closeModal()">Close</button>' +
-                    '<button class="btn btn-danger" onclick="confirmCancel()">Try Again</button>';
-                modal.querySelector('.modal-buttons').style.display = 'flex';
-            });
-        }
-
-        function openCustomerPortal() {
-            // This would redirect to Stripe Customer Portal
-            fetch('/create-customer-portal', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.portal_url) {
-                    window.location.href = data.portal_url;
-                } else {
-                    alert('Unable to open billing portal. Please contact support.');
-                }
-            })
-            .catch(error => {
-                console.error('Portal error:', error);
-                alert('Unable to open billing portal. Please contact support.');
-            });
+            // You can redirect to a cancellation endpoint or handle via AJAX
+            window.location.href = '/cancel-subscription';
         }
 
         // Close modal when clicking outside
-        document.getElementById('cancelModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
+        window.onclick = function(event) {
+            const modal = document.getElementById('cancelModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
             }
-        });
+        }
 
-        // Close modal with Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeModal();
+        // Auto-update progress bar animation
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressFill = document.querySelector('.progress-fill');
+            if (progressFill) {
+                setTimeout(() => {
+                    progressFill.style.width = progressFill.style.width;
+                }, 500);
             }
         });
     </script>
