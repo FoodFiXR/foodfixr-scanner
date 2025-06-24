@@ -17,47 +17,43 @@
         body {
             background: #e50ce8;
             font-family: 'Comfortaa', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            overflow-x: hidden;
-            text-align: center;
             min-height: 100vh;
-            position: relative;
             padding: 20px 15px;
         }
 
-        /* Main Container */
-        .account-container {
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px 24px;
-            max-width: 500px;
-            width: 100%;
+            margin-bottom: 24px;
+            text-align: center;
             box-shadow: 
                 0 20px 60px rgba(229, 12, 232, 0.15),
                 0 8px 32px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 1;
-            margin-bottom: 20px;
         }
 
-        /* Header */
-        .account-header {
-            margin-bottom: 32px;
-            text-align: center;
-        }
-
-        .account-title {
-            font-size: 36px;
+        .logo-text {
+            font-size: 48px;
             font-weight: 800;
             background: linear-gradient(135deg, #e91e63, #9c27b0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+        }
+
+        .account-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
             margin-bottom: 8px;
         }
 
@@ -67,85 +63,73 @@
             font-weight: 500;
         }
 
-        /* Navigation Buttons */
         .nav-buttons {
-            position: absolute;
-            top: 24px;
-            left: 24px;
-            right: 24px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
         }
 
-        .back-button, .logout-button {
-            background: rgba(229, 12, 232, 0.1);
-            color: #e50ce8;
-            padding: 10px 16px;
-            border: 2px solid rgba(229, 12, 232, 0.3);
+        .nav-btn {
+            background: linear-gradient(135deg, #666, #555);
+            color: white;
+            padding: 10px 20px;
             border-radius: 12px;
             text-decoration: none;
             font-weight: 600;
             font-size: 14px;
             transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
-        .logout-button {
-            background: rgba(244, 67, 54, 0.1);
-            color: #f44336;
-            border-color: rgba(244, 67, 54, 0.3);
-        }
-
-        .back-button:hover {
-            background: #e50ce8;
-            color: white;
+        .nav-btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 102, 102, 0.4);
         }
 
-        .logout-button:hover {
-            background: #f44336;
-            color: white;
-            transform: translateY(-2px);
+        .nav-btn.logout {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+
+        .nav-btn.logout:hover {
+            box-shadow: 0 8px 20px rgba(244, 67, 54, 0.4);
         }
 
         /* Success/Error Messages */
         .alert {
             padding: 12px 16px;
             border-radius: 12px;
-            margin: 16px 0;
+            margin-bottom: 20px;
             font-weight: 600;
         }
 
         .alert-success {
-            background: linear-gradient(135deg, #d4edda, #c3e6cb);
-            color: #155724;
+            background: linear-gradient(135deg, #e8f5e8, #c3e6cb);
+            color: #2e7d32;
             border: 2px solid #4CAF50;
         }
 
         .alert-error {
-            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-            color: #721c24;
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: #c62828;
             border: 2px solid #f44336;
         }
 
         .alert-info {
-            background: linear-gradient(135deg, #d1ecf1, #bee5eb);
-            color: #0c5460;
-            border: 2px solid #17a2b8;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: #1565c0;
+            border: 2px solid #2196F3;
         }
 
         /* User Profile Section */
         .user-profile {
-            background: linear-gradient(135deg, #f8f9ff, #e8f4fd);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
             padding: 24px;
             margin-bottom: 24px;
-            border: 2px solid rgba(229, 12, 232, 0.1);
-            text-align: left;
-            margin-top: 60px; /* Account for nav buttons */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .profile-header {
@@ -188,7 +172,7 @@
 
         .profile-details {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 16px;
             margin-top: 20px;
         }
@@ -198,6 +182,7 @@
             padding: 12px 16px;
             border-radius: 12px;
             border: 1px solid rgba(229, 12, 232, 0.1);
+            text-align: center;
         }
 
         .detail-label {
@@ -223,6 +208,10 @@
             text-align: center;
             position: relative;
             overflow: hidden;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .subscription-status.premium {
@@ -260,14 +249,15 @@
             margin-bottom: 16px;
         }
 
-        /* Enhanced Subscription Details */
+        /* Subscription Details */
         .subscription-details {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
             padding: 24px;
             margin-bottom: 24px;
-            text-align: left;
-            border: 2px solid rgba(229, 12, 232, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .details-title {
@@ -278,6 +268,8 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            text-align: center;
+            justify-content: center;
         }
 
         .detail-row {
@@ -327,14 +319,19 @@
             color: #f44336;
         }
 
-        /* Renewal Countdown */
-        .renewal-countdown {
+        /* Countdown */
+        .countdown {
             background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
             border: 2px solid #4CAF50;
             border-radius: 12px;
             padding: 16px;
             margin: 16px 0;
             text-align: center;
+        }
+
+        .countdown.trial {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-color: #ff9800;
         }
 
         .countdown-title {
@@ -344,11 +341,19 @@
             margin-bottom: 8px;
         }
 
+        .countdown.trial .countdown-title {
+            color: #e65100;
+        }
+
         .countdown-time {
             font-size: 24px;
             font-weight: 800;
             color: #4CAF50;
             font-family: 'Courier New', monospace;
+        }
+
+        .countdown.trial .countdown-time {
+            color: #ff9800;
         }
 
         .countdown-label {
@@ -357,46 +362,32 @@
             margin-top: 4px;
         }
 
-        /* Trial Countdown */
-        .trial-countdown {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border: 2px solid #ff9800;
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
-            text-align: center;
-        }
-
-        .trial-countdown .countdown-title {
-            color: #e65100;
-        }
-
-        .trial-countdown .countdown-time {
-            color: #ff9800;
-        }
-
         /* Usage Statistics */
         .usage-stats {
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-            border-radius: 16px;
-            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
             margin-bottom: 24px;
-            border: 2px solid rgba(255, 152, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .stats-title {
             font-size: 18px;
             font-weight: 700;
-            color: #e65100;
+            color: #333;
             margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
+            text-align: center;
+            justify-content: center;
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 16px;
         }
 
@@ -405,13 +396,13 @@
             padding: 16px;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid rgba(255, 152, 0, 0.1);
+            border: 1px solid rgba(229, 12, 232, 0.1);
         }
 
         .stat-number {
             font-size: 24px;
             font-weight: 800;
-            color: #e65100;
+            color: #e50ce8;
             margin-bottom: 4px;
         }
 
@@ -472,6 +463,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+            font-family: 'Comfortaa', sans-serif;
         }
 
         .btn-primary {
@@ -522,7 +514,8 @@
         }
 
         .modal-content {
-            background: white;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
             margin: 15% auto;
             padding: 32px;
             border-radius: 20px;
@@ -530,6 +523,7 @@
             max-width: 400px;
             text-align: center;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .modal-title {
@@ -553,38 +547,43 @@
         }
 
         /* Mobile Responsiveness */
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
             body {
                 padding: 12px 8px;
             }
             
-            .account-container {
+            .container {
+                max-width: 100%;
+            }
+
+            .header {
                 padding: 24px 20px;
-                margin: 0 3px 12px 3px;
             }
 
-            .nav-buttons {
-                position: static;
-                justify-content: space-between;
-                margin-bottom: 20px;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-
-            .user-profile {
-                margin-top: 0;
+            .logo-text {
+                font-size: 42px;
             }
 
             .account-title {
-                font-size: 28px;
+                font-size: 24px;
+            }
+
+            .nav-buttons {
+                flex-direction: column;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 12px;
             }
 
             .profile-details {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
 
             .modal-content {
@@ -601,26 +600,33 @@
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 4px;
+                text-align: left;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .profile-details {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="account-container">
-        <!-- Navigation Buttons -->
-        <div class="nav-buttons">
-            <a href="/" class="back-button">
-                ← Back to Scanner
-            </a>
-            <a href="/logout" class="logout-button">
-                🚪 Logout
-            </a>
-        </div>
-
+    <div class="container">
         <!-- Header -->
-        <div class="account-header">
-            <h1 class="account-title">My Account</h1>
-            <p class="account-subtitle">Manage your FoodFixr subscription</p>
+        <div class="header">
+            <div class="logo-text">FOOD FIXR</div>
+            <div class="account-title">👤 My Account</div>
+            <div class="account-subtitle">Manage your FoodFixr subscription</div>
+            <div class="nav-buttons">
+                <a href="/" class="nav-btn">← Back to Scanner</a>
+                <a href="/history" class="nav-btn">📊 Scan History</a>
+                <a href="/logout" class="nav-btn logout">🚪 Logout</a>
+            </div>
         </div>
 
         <!-- Flash Messages -->
@@ -658,20 +664,10 @@
                     </div>
                 </div>
                 <div class="detail-item">
-                    <div class="detail-label">Customer ID</div>
-                    <div class="detail-value">
-                        {% if session.get('stripe_customer_id') %}
-                            {{ session.get('stripe_customer_id')[:8] }}...
-                        {% else %}
-                            Not Available
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="detail-item">
                     <div class="detail-label">Account Status</div>
                     <div class="detail-value">
                         {% if session.get('is_premium') %}
-                            Active Premium
+                            Premium Active
                         {% else %}
                             Free Trial
                         {% endif %}
@@ -681,6 +677,16 @@
                     <div class="detail-label">Total Scans</div>
                     <div class="detail-value">
                         {{ total_scans_ever or session.get('scans_used', 0) }}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Customer ID</div>
+                    <div class="detail-value">
+                        {% if session.get('stripe_customer_id') %}
+                            {{ session.get('stripe_customer_id')[:8] }}...
+                        {% else %}
+                            Not Available
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -709,7 +715,7 @@
         </div>
         {% endif %}
 
-        <!-- Enhanced Subscription Details -->
+        <!-- Subscription Details -->
         <div class="subscription-details">
             <div class="details-title">
                 📋 Subscription Details
@@ -739,7 +745,7 @@
                 
                 <!-- Renewal Countdown -->
                 {% if days_until_renewal %}
-                <div class="renewal-countdown">
+                <div class="countdown">
                     <div class="countdown-title">🗓️ Next Renewal In</div>
                     <div class="countdown-time">{{ days_until_renewal }} days</div>
                     <div class="countdown-label">Your subscription will automatically renew</div>
@@ -770,7 +776,7 @@
                 
                 <!-- Trial Countdown -->
                 {% if trial_hours_left %}
-                <div class="trial-countdown">
+                <div class="countdown trial">
                     <div class="countdown-title">⏳ Trial Expires In</div>
                     <div class="countdown-time">{{ trial_hours_left }}h {{ trial_minutes_left }}m</div>
                     <div class="countdown-label">Upgrade to keep unlimited access</div>
@@ -793,6 +799,14 @@
                 <div class="stat-item">
                     <div class="stat-number">{{ 10 - session.get('scans_used', 0) }}</div>
                     <div class="stat-label">Remaining</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ ((session.get('scans_used', 0) / 10) * 100)|int }}%</div>
+                    <div class="stat-label">Progress</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ trial_hours_left or '48' }}h</div>
+                    <div class="stat-label">Time Left</div>
                 </div>
             </div>
             
@@ -928,12 +942,6 @@
                 }, 500);
             }
         });
-
-        // Real-time countdown updates (optional)
-        function updateCountdowns() {
-            // You could implement WebSocket or periodic AJAX calls here
-            // to update trial/renewal countdowns in real-time
-        }
     </script>
 </body>
 </html>
