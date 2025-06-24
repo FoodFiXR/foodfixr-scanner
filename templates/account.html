@@ -624,7 +624,7 @@
             <div class="account-subtitle">Manage your FoodFixr subscription</div>
             <div class="nav-buttons">
                 <a href="/" class="nav-btn">← Back to Scanner</a>
-                <a href="/history" class="nav-btn">📊 Scan History</a>
+                <a href="/history" class="nav-btn">👁️‍🗨️ Scan History</a>
                 <a href="/logout" class="nav-btn logout">🚪 Logout</a>
             </div>
         </div>
@@ -756,7 +756,7 @@
                     <span class="row-value trial">{{ trial_time_left or '48h 0m' }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="row-label">📊 Scans Used</span>
+                    <span class="row-label">👁️‍🗨️ Scans Used</span>
                     <span class="row-value">{{ session.get('scans_used', 0) }}/10</span>
                 </div>
                 <div class="detail-row">
@@ -819,7 +819,7 @@
                     💳 Manage Billing & Payment
                 </button>
                 <a href="/history" class="btn btn-secondary">
-                    📊 View Scan History
+                    👁️‍🗨️ View Scan History
                 </a>
                 <button onclick="openCancelModal()" class="btn btn-danger">
                     ❌ Cancel Subscription
@@ -839,7 +839,7 @@
                     📸 Continue Scanning ({{ 10 - session.get('scans_used', 0) }} left)
                 </a>
                 <a href="/history" class="btn btn-secondary">
-                    📊 View Scan History
+                    👁️‍🗨️ View Scan History
                 </a>
             {% endif %}
         </div>
