@@ -79,7 +79,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            return redirect('/working-login')
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -156,112 +156,138 @@ def format_datetime_for_db(dt=None):
         dt = datetime.now()
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-# WORKING LOGIN ROUTE - COMPLETELY SELF CONTAINED
-@app.route('/working-login', methods=['GET', 'POST'])
-def working_login():
-    error_msg = None
+# AUTHENTICATION ROUTES
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not all([name, email, password, confirm_password]):
+            flash('All fields are required', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('register.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            flash('An account with this email already exists. Please login instead.', 'error')
+            conn.close()
+            return render_template('register.html')
+        
+        password_hash = generate_password_hash(password)
+        now = datetime.now()
+        trial_start = format_datetime_for_db(now)
+        trial_end = format_datetime_for_db(now + timedelta(hours=48))
+        
+        try:
+            cursor.execute('''
+                INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
+            
+            user_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            
+            session.clear()
+            session.permanent = True
+            session['user_id'] = user_id
+            session['user_email'] = email
+            session['user_name'] = name
+            session['is_premium'] = False
+            session['scans_used'] = 0
+            session['stripe_customer_id'] = None
+            
+            return redirect('/')
+            
+        except Exception as e:
+            flash('Registration failed. Please try again.', 'error')
+            conn.close()
+            return render_template('register.html')
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    print(f"DEBUG: Login route called with method: {request.method}")
     
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         
-        print(f"DEBUG: Working login attempt for: {email}")
+        print(f"DEBUG: Login attempt for email: {email}")
         
         if not email or not password:
-            error_msg = "Please enter both email and password"
-        else:
-            conn = sqlite3.connect('foodfixr.db')
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-            user = cursor.fetchone()
-            
-            if user:
-                print(f"DEBUG: User found: {user['name']}")
-                if check_password_hash(user['password_hash'], password):
-                    print("DEBUG: Password correct!")
-                    
-                    cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                                 (format_datetime_for_db(), user['id']))
-                    conn.commit()
-                    conn.close()
-                    
-                    session.clear()
-                    session.permanent = True
-                    session['user_id'] = user['id']
-                    session['user_email'] = user['email']
-                    session['user_name'] = user['name']
-                    session['is_premium'] = bool(user['is_premium'])
-                    session['scans_used'] = user['scans_used']
-                    session['stripe_customer_id'] = user['stripe_customer_id']
-                    
-                    print("DEBUG: Session set, redirecting...")
-                    return redirect('/')
-                else:
-                    error_msg = "Invalid password"
-                    print("DEBUG: Invalid password")
-            else:
-                error_msg = "No account found with that email"
-                print("DEBUG: User not found")
+            flash('Please enter both email and password', 'error')
+            return render_template('login.html')
+        
+        conn = sqlite3.connect('foodfixr.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if user:
+            print(f"DEBUG: User found: {user['name']}")
+            if check_password_hash(user['password_hash'], password):
+                print("DEBUG: Password correct, logging in...")
                 
-            conn.close()
+                cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
+                             (format_datetime_for_db(), user['id']))
+                conn.commit()
+                conn.close()
+                
+                session.clear()
+                session.permanent = True
+                session['user_id'] = user['id']
+                session['user_email'] = user['email']
+                session['user_name'] = user['name']
+                session['is_premium'] = bool(user['is_premium'])
+                session['scans_used'] = user['scans_used']
+                session['stripe_customer_id'] = user['stripe_customer_id']
+                
+                print("DEBUG: Session set, redirecting to scanner...")
+                return redirect('/')
+            else:
+                print("DEBUG: Invalid password")
+                flash('Invalid email or password', 'error')
+                conn.close()
+        else:
+            print("DEBUG: User not found")
+            flash('Invalid email or password', 'error')
+            if 'conn' in locals():
+                conn.close()
     
-    error_html = ""
-    if error_msg:
-        error_html = f'<div style="background: #ffebee; color: #c62828; padding: 12px; border-radius: 5px; margin-bottom: 20px; text-align: center; border: 1px solid #ffcdd2;">{error_msg}</div>'
-    
-    return f'''<!DOCTYPE html>
-<html>
-<head>
-    <title>FoodFixr Login</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
-    <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #e91e63; margin: 0; font-size: 28px;">🍎 FoodFixr</h1>
-            <p style="color: #666; margin: 10px 0 0 0;">Smart Ingredient Scanner</p>
-        </div>
-        
-        {error_html}
-        
-        <form method="POST" action="/working-login">
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Email Address</label>
-                <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px;" placeholder="Enter your email">
-            </div>
-            
-            <div style="margin-bottom: 25px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Password</label>
-                <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px;" placeholder="Enter your password">
-            </div>
-            
-            <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold;">
-                🔑 Login to FoodFixr
-            </button>
-        </form>
-        
-        <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; margin-bottom: 15px;">Having trouble logging in?</p>
-            <a href="/reset-all-passwords" style="display: inline-block; background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; font-size: 14px;">🔧 Reset All Passwords</a>
-            <a href="/check-users" style="display: inline-block; background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; font-size: 14px;">👥 View Users</a>
-        </div>
-        
-        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 14px;">
-            <p>Don't have an account? <a href="/register" style="color: #e91e63;">Sign up here</a></p>
-        </div>
-    </div>
-</body>
-</html>'''
+    print("DEBUG: Rendering login.html template")
+    return render_template('login.html')
 
-# MAIN ROUTES
+@app.route('/logout')
+def logout():
+    user_name = session.get('user_name', 'User')
+    session.clear()
+    flash(f'Goodbye {user_name}! You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+# MAIN APPLICATION ROUTES
 @app.route('/')
 @login_required
 def index():
     user_data = get_user_data(session['user_id'])
     if not user_data:
-        return redirect('/working-login')
+        return redirect(url_for('logout'))
     
     trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
     session['scans_used'] = user_data['scans_used']
@@ -278,11 +304,11 @@ def index():
 def scan():
     user_data = get_user_data(session['user_id'])
     if not user_data:
-        return redirect('/working-login')
+        return redirect(url_for('logout'))
     
     if not can_scan():
         flash('You have used all your free scans. Please upgrade to continue.', 'error')
-        return redirect('/upgrade')
+        return redirect(url_for('upgrade'))
     
     trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
     
@@ -351,84 +377,12 @@ def scan():
                              user_name=user_data['name'],
                              error=f"Scanning failed: {str(e)}. Please try again.")
 
-# REGISTRATION ROUTE
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-        
-        if not all([name, email, password, confirm_password]):
-            flash('All fields are required', 'error')
-            return render_template('register.html')
-        
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('register.html')
-        
-        if len(password) < 6:
-            flash('Password must be at least 6 characters long', 'error')
-            return render_template('register.html')
-        
-        conn = sqlite3.connect('foodfixr.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
-        if cursor.fetchone():
-            flash('An account with this email already exists. Please login instead.', 'error')
-            conn.close()
-            return render_template('register.html')
-        
-        password_hash = generate_password_hash(password)
-        now = datetime.now()
-        trial_start = format_datetime_for_db(now)
-        trial_end = format_datetime_for_db(now + timedelta(hours=48))
-        
-        try:
-            cursor.execute('''
-                INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (name, email, password_hash, trial_start, trial_end, format_datetime_for_db(now)))
-            
-            user_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
-            
-            session.clear()
-            session.permanent = True
-            session['user_id'] = user_id
-            session['user_email'] = email
-            session['user_name'] = name
-            session['is_premium'] = False
-            session['scans_used'] = 0
-            session['stripe_customer_id'] = None
-            
-            return redirect('/')
-            
-        except Exception as e:
-            flash('Registration failed. Please try again.', 'error')
-            conn.close()
-            return render_template('register.html')
-    
-    return render_template('register.html')
-
-# LOGOUT ROUTE
-@app.route('/logout')
-def logout():
-    user_name = session.get('user_name', 'User')
-    session.clear()
-    flash(f'Goodbye {user_name}! You have been logged out.', 'info')
-    return redirect('/working-login')
-
-# OTHER ROUTES
 @app.route('/account')
 @login_required
 def account():
     user_data = get_user_data(session['user_id'])
     if not user_data:
-        return redirect('/working-login')
+        return redirect(url_for('logout'))
     
     trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
     
@@ -508,6 +462,83 @@ def upgrade():
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
+# SIMPLE LOGIN PAGE
+@app.route('/simple-login', methods=['GET', 'POST'])
+def simple_login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            error_msg = "Please enter both email and password"
+        else:
+            try:
+                conn = sqlite3.connect('foodfixr.db')
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    session.clear()
+                    session.permanent = True
+                    session['user_id'] = user['id']
+                    session['user_email'] = user['email']
+                    session['user_name'] = user['name']
+                    session['is_premium'] = bool(user['is_premium'])
+                    session['scans_used'] = user['scans_used']
+                    session['stripe_customer_id'] = user['stripe_customer_id']
+                    
+                    conn.close()
+                    return redirect('/')
+                else:
+                    error_msg = "Invalid email or password"
+                    
+                conn.close()
+            except Exception as e:
+                error_msg = f"Login error: {str(e)}"
+    else:
+        error_msg = None
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FoodFixr Login</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0;">
+        <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
+            
+            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
+            
+            <form method="POST" action="/simple-login">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
+                    <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
+                    <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                    Login
+                </button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 25px;">
+                <a href="/reset-all-passwords" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Passwords</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Check Users</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
 # DEBUG ROUTES
 @app.route('/reset-all-passwords')
 def reset_all_passwords():
@@ -522,15 +553,15 @@ def reset_all_passwords():
         conn.commit()
         conn.close()
         
-        return f'''<html>
-<body style="font-family: Arial; padding: 20px;">
-<h1>✅ Passwords Reset</h1>
-<p><strong>{updated} users updated</strong></p>
-<p>All passwords are now: <strong>test123</strong></p>
-<br>
-<a href="/working-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-</body>
-</html>'''
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+        <h1>Passwords Reset</h1>
+        <p>{updated} users updated. All passwords are now: <strong>test123</strong></p>
+        <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
+        </body>
+        </html>
+        """
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -545,31 +576,68 @@ def check_users():
         users = cursor.fetchall()
         conn.close()
         
-        html = '''<html>
-<body style="font-family: Arial; padding: 20px;">
-<h1>👥 Users in Database</h1>
-<table border="1" style="border-collapse: collapse;">
-<tr><th style="padding: 8px;">ID</th><th style="padding: 8px;">Name</th><th style="padding: 8px;">Email</th></tr>'''
+        html = "<html><body style='font-family: Arial; padding: 20px;'><h1>Users in Database</h1><table border='1' style='border-collapse: collapse;'><tr><th style='padding: 8px;'>ID</th><th style='padding: 8px;'>Name</th><th style='padding: 8px;'>Email</th></tr>"
         
         for user in users:
-            html += f'<tr><td style="padding: 8px;">{user["id"]}</td><td style="padding: 8px;">{user["name"]}</td><td style="padding: 8px;">{user["email"]}</td></tr>'
+            html += f"<tr><td style='padding: 8px;'>{user['id']}</td><td style='padding: 8px;'>{user['name']}</td><td style='padding: 8px;'>{user['email']}</td></tr>"
         
-        html += '''</table>
-<br>
-<p>All users can login with password: <strong>test123</strong></p>
-<a href="/working-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Login</a>
-</body>
-</html>'''
+        html += "</table><br><p>All users can login with password: <strong>test123</strong></p><a href='/simple-login' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Try Login</a></body></html>"
         
         return html
         
     except Exception as e:
         return f"Database error: {str(e)}"
 
-# REDIRECT OLD LOGIN TO NEW LOGIN
-@app.route('/login')
-def old_login():
-    return redirect('/working-login')
+@app.route('/debug-routes')
+def debug_routes():
+    """Show all available routes"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'path': rule.rule
+        })
+    
+    html = "<html><body style='font-family: Arial; padding: 20px;'><h1>Available Routes</h1><table border='1' style='border-collapse: collapse;'>"
+    html += "<tr><th style='padding: 8px;'>Path</th><th style='padding: 8px;'>Methods</th><th style='padding: 8px;'>Function</th></tr>"
+    
+    for route in routes:
+        html += f"<tr><td style='padding: 8px;'>{route['path']}</td><td style='padding: 8px;'>{', '.join(route['methods'])}</td><td style='padding: 8px;'>{route['endpoint']}</td></tr>"
+    
+    html += "</table><br><a href='/simple-login' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Try Simple Login</a></body></html>"
+    
+    return html
+
+@app.route('/test-login-form')
+def test_login_form():
+    """Simple test login form that posts to /login"""
+    return f"""
+    <html>
+    <head><title>Test Login Form</title></head>
+    <body style="font-family: Arial; padding: 20px;">
+    <h1>Test Login Form</h1>
+    <p>This form posts directly to /login route</p>
+    
+    <form method="POST" action="/login" style="max-width: 300px;">
+        <div style="margin-bottom: 15px;">
+            <label>Email:</label><br>
+            <input type="email" name="email" required style="width: 100%; padding: 8px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Password:</label><br>
+            <input type="password" name="password" required style="width: 100%; padding: 8px;">
+        </div>
+        <button type="submit" style="padding: 10px 20px; background: #4CAF50; color: white; border: none;">Login</button>
+    </form>
+    
+    <br><br>
+    <a href="/reset-all-passwords">Reset All Passwords to test123</a><br>
+    <a href="/check-users">Check Users</a><br>
+    <a href="/simple-login">Simple Login</a>
+    </body>
+    </html>
+    """
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
