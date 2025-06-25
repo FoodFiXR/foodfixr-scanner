@@ -75,7 +75,73 @@ def get_db_connection():
         return conn
 
 # Database initialization
-def init_db():
+def init_db()
+
+# Database migration function
+def update_database_schema():
+    """Update database schema to include new columns"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if we're using PostgreSQL or SQLite
+        database_url = os.getenv('DATABASE_URL')
+        
+        if database_url:
+            # PostgreSQL version (for production)
+            print("Updating PostgreSQL schema...")
+            
+            # Add columns if they don't exist
+            schema_updates = [
+                "ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS extracted_text TEXT;",
+                "ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_length INTEGER DEFAULT 0;",
+                "ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS confidence VARCHAR(20) DEFAULT 'medium';",
+                "ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_quality VARCHAR(20) DEFAULT 'unknown';",
+                "ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS has_safety_labels BOOLEAN DEFAULT FALSE;"
+            ]
+            
+            for update_sql in schema_updates:
+                try:
+                    cursor.execute(update_sql)
+                    print(f"✅ Executed: {update_sql}")
+                except Exception as e:
+                    print(f"⚠️ Column may already exist: {e}")
+            
+        else:
+            # SQLite version (for local development)
+            print("Updating SQLite schema...")
+            
+            # Check existing columns first
+            cursor.execute("PRAGMA table_info(scan_history)")
+            existing_columns = [column[1] for column in cursor.fetchall()]
+            print(f"Existing columns: {existing_columns}")
+            
+            # Add columns that don't exist
+            new_columns = [
+                ("extracted_text", "TEXT"),
+                ("text_length", "INTEGER DEFAULT 0"),
+                ("confidence", "TEXT DEFAULT 'medium'"),
+                ("text_quality", "TEXT DEFAULT 'unknown'"),
+                ("has_safety_labels", "INTEGER DEFAULT 0")
+            ]
+            
+            for column_name, column_def in new_columns:
+                if column_name not in existing_columns:
+                    try:
+                        cursor.execute(f"ALTER TABLE scan_history ADD COLUMN {column_name} {column_def}")
+                        print(f"✅ Added column: {column_name}")
+                    except Exception as e:
+                        print(f"❌ Error adding {column_name}: {e}")
+                else:
+                    print(f"⚠️ Column {column_name} already exists")
+        
+        conn.commit()
+        conn.close()
+        print("🎉 Database schema update completed successfully!")
+        
+    except Exception as e:
+        print(f"❌ Database schema update failed: {e}")
+        raise e:
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -1032,6 +1098,57 @@ def export_history():
         return redirect(url_for('history'))
 
 # ADMIN/DEBUG ROUTES
+@app.route('/migrate-database')
+def migrate_database():
+    """Route to manually trigger database migration"""
+    try:
+        update_database_schema()
+        return """
+        <html>
+        <body style="font-family: Arial; padding: 20px; background: #f0f8ff;">
+            <div style="max-width: 600px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h1 style="color: #28a745; text-align: center;">✅ Database Migration Successful!</h1>
+                <p style="text-align: center; font-size: 16px; color: #333;">
+                    Your database schema has been updated with the new columns:
+                </p>
+                <ul style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <li><code>extracted_text</code> - Stores OCR extracted text</li>
+                    <li><code>text_length</code> - Length of extracted text</li>
+                    <li><code>confidence</code> - Scanner confidence level</li>
+                    <li><code>text_quality</code> - Quality assessment of extracted text</li>
+                    <li><code>has_safety_labels</code> - Whether safety labels were detected</li>
+                </ul>
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="/" style="background: #e91e63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                        🏠 Back to App
+                    </a>
+                    <a href="/history" style="background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-left: 10px;">
+                        📱 Test History
+                    </a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px; background: #ffe6e6;">
+            <div style="max-width: 600px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h1 style="color: #dc3545; text-align: center;">❌ Migration Failed</h1>
+                <p style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">
+                    <strong>Error:</strong> {str(e)}
+                </p>
+                <div style="text-align: center; margin-top: 20px;">
+                    <a href="/check-users" style="background: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">
+                        🔧 Admin Panel
+                    </a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
 @login_required
 def test_upgrade_user():
