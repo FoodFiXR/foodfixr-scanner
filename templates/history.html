@@ -647,21 +647,38 @@
                 </button>
 
                 <div class="scan-details">
-                    {% if scan.image_url %}
+                    {% if scan.image_url and scan.image_url != '' %}
                     <div class="detail-section">
                         <div class="detail-title">📸 Scanned Product</div>
                         <div class="detail-content" style="padding: 8px; background: white;">
                             <img src="{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('{{ scan.image_url }}')">
                         </div>
                     </div>
+                    {% else %}
+                    <div class="detail-section">
+                        <div class="detail-title">📸 Scanned Product</div>
+                        <div class="detail-content">
+                            <div style="padding: 20px; text-align: center; color: #999; font-style: italic;">
+                                📷 Original image not saved<br>
+                                <small>(Images are processed but not stored for privacy)</small>
+                            </div>
+                        </div>
+                    </div>
                     {% endif %}
 
                     <div class="detail-section">
                         <div class="detail-title">🎯 Scanner Confidence Level</div>
-                        <div class="detail-content">High</div>
+                        <div class="detail-content">{{ scan.confidence|title if scan.confidence else 'Medium' }}</div>
                     </div>
 
-                    {% if scan.detected_ingredients %}
+                    {% if scan.raw_rating %}
+                    <div class="detail-section">
+                        <div class="detail-title">📋 Full Scan Result</div>
+                        <div class="detail-content">{{ scan.raw_rating }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if scan.detected_ingredients and scan.detected_ingredients|length > 0 %}
                     <div class="detail-section">
                         <div class="detail-title">🧬 All Detected Ingredients ({{ scan.detected_ingredients|length }})</div>
                         <div class="detail-content">
@@ -670,12 +687,31 @@
                             {% endfor %}
                         </div>
                     </div>
+                    {% else %}
+                    <div class="detail-section">
+                        <div class="detail-title">🧬 Detected Ingredients</div>
+                        <div class="detail-content">
+                            <div style="color: #999; font-style: italic;">
+                                No specific ingredients were detected or stored for this scan
+                            </div>
+                        </div>
+                    </div>
                     {% endif %}
 
-                    {% if scan.extracted_text %}
+                    {% if scan.extracted_text and scan.extracted_text != '' %}
                     <div class="detail-section">
                         <div class="detail-title">📝 Extracted Text ({{ scan.text_length or scan.extracted_text|length }} characters)</div>
                         <div class="detail-content">{{ scan.extracted_text[:500] }}{% if (scan.text_length or scan.extracted_text|length) > 500 %}...{% endif %}</div>
+                    </div>
+                    {% else %}
+                    <div class="detail-section">
+                        <div class="detail-title">📝 Extracted Text</div>
+                        <div class="detail-content">
+                            <div style="color: #999; font-style: italic;">
+                                Extracted text not available for this scan<br>
+                                <small>(Text processing completed but not stored)</small>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
                 </div>
