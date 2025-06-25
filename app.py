@@ -107,7 +107,12 @@ def init_db():
             result_rating TEXT,
             ingredients_found TEXT,
             image_url TEXT,
-            scan_id VARCHAR(255)
+            scan_id VARCHAR(255),
+            extracted_text TEXT,
+            text_length INTEGER DEFAULT 0,
+            confidence VARCHAR(20) DEFAULT 'medium',
+            text_quality VARCHAR(20) DEFAULT 'unknown',
+            has_safety_labels BOOLEAN DEFAULT FALSE
         )
     ''')
     
@@ -512,10 +517,24 @@ def scan():
                 WHERE id = %s
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
+            # Enhanced scan history insert with all the new data
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s)
-            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), str(uuid.uuid4())))
+                INSERT INTO scan_history (
+                    user_id, result_rating, ingredients_found, scan_date, scan_id,
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels
+                )
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s)
+            ''', (
+                session['user_id'], 
+                result.get('rating', ''), 
+                json.dumps(result.get('matched_ingredients', {})),
+                str(uuid.uuid4()),
+                result.get('extracted_text', ''),
+                result.get('extracted_text_length', 0),
+                result.get('confidence', 'medium'),
+                result.get('text_quality', 'unknown'),
+                result.get('has_safety_labels', False)
+            ))
         else:
             cursor.execute('''
                 UPDATE users 
@@ -523,11 +542,25 @@ def scan():
                 WHERE id = ?
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
+            # Enhanced scan history insert for SQLite
             cursor.execute('''
-                INSERT INTO scan_history (user_id, result_rating, ingredients_found, scan_date, scan_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (session['user_id'], result.get('rating', ''), str(result.get('matched_ingredients', {})), 
-                  format_datetime_for_db(), str(uuid.uuid4())))
+                INSERT INTO scan_history (
+                    user_id, result_rating, ingredients_found, scan_date, scan_id,
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                session['user_id'], 
+                result.get('rating', ''), 
+                json.dumps(result.get('matched_ingredients', {})),
+                format_datetime_for_db(),
+                str(uuid.uuid4()),
+                result.get('extracted_text', ''),
+                result.get('extracted_text_length', 0),
+                result.get('confidence', 'medium'),
+                result.get('text_quality', 'unknown'),
+                int(result.get('has_safety_labels', False))  # Convert to int for SQLite
+            ))
         
         conn.commit()
         conn.close()
@@ -632,12 +665,51 @@ def history():
             elif 'Proceed' in rating or 'carefully' in rating:
                 rating_type = 'caution'
             
+            # Parse ingredients_found safely
+            ingredients_data = {}
+            try:
+                if row['ingredients_found']:
+                    # Try to parse as JSON first, then eval as fallback
+                    if row['ingredients_found'].startswith('{'):
+                        ingredients_data = json.loads(row['ingredients_found'])
+                    else:
+                        # Fallback for string representation
+                        ingredients_data = eval(row['ingredients_found'])
+            except:
+                ingredients_data = {}
+            
+            # Create ingredient summary
+            ingredient_summary = {}
+            detected_ingredients = []
+            has_gmo = False
+            
+            if isinstance(ingredients_data, dict):
+                for category, items in ingredients_data.items():
+                    if isinstance(items, list) and items:
+                        ingredient_summary[category] = len(items)
+                        detected_ingredients.extend(items)
+                        if category == 'gmo' and items:
+                            has_gmo = True
+                    elif category == 'all_detected' and isinstance(items, list):
+                        detected_ingredients = items
+                        
+            # Count total unique ingredients
+            detected_ingredients = list(set(detected_ingredients))
+            stats['ingredients_found'] += len(detected_ingredients)
+            
             scan_entry = {
                 'scan_id': row['scan_id'],
                 'date': scan_date.strftime("%m/%d/%Y"),
                 'time': scan_date.strftime("%I:%M %p"),
                 'rating_type': rating_type,
                 'raw_rating': rating,
+                'ingredient_summary': ingredient_summary,
+                'detected_ingredients': detected_ingredients,
+                'has_gmo': has_gmo,
+                'image_url': row.get('image_url', ''),
+                'extracted_text': row.get('extracted_text', ''),
+                'text_length': row.get('text_length', 0),
+                'confidence': row.get('confidence', 'medium')
             }
             
             scans.append(scan_entry)
@@ -648,6 +720,8 @@ def history():
         
     except Exception as e:
         print(f"History error: {e}")
+        import traceback
+        traceback.print_exc()
         return render_template('history.html', scans=[], stats={'total_scans': 0, 'safe_scans': 0, 'danger_scans': 0, 'ingredients_found': 0})
 
 @app.route('/upgrade')
@@ -872,6 +946,90 @@ def stripe_webhook():
             print(f"Webhook cancellation error: {e}")
     
     return '', 200
+
+# CLEAR HISTORY ROUTE
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Clear user's scan history (Premium feature)"""
+    try:
+        user_data = get_user_data(session['user_id'])
+        if not user_data or not user_data['is_premium']:
+            return jsonify({'success': False, 'error': 'Premium required'}), 403
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('DELETE FROM scan_history WHERE user_id = %s', (session['user_id'],))
+        else:
+            cursor.execute('DELETE FROM scan_history WHERE user_id = ?', (session['user_id'],))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Clear history error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# EXPORT HISTORY ROUTE
+@app.route('/export-history')
+@login_required
+def export_history():
+    """Export user's scan history as JSON (Premium feature)"""
+    try:
+        user_data = get_user_data(session['user_id'])
+        if not user_data or not user_data['is_premium']:
+            flash('Premium subscription required for export feature', 'error')
+            return redirect(url_for('history'))
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('SELECT * FROM scan_history WHERE user_id = %s ORDER BY scan_date DESC', (session['user_id'],))
+        else:
+            cursor.execute('SELECT * FROM scan_history WHERE user_id = ? ORDER BY scan_date DESC', (session['user_id'],))
+        
+        scans_data = []
+        for row in cursor.fetchall():
+            scan_data = {
+                'scan_id': row['scan_id'],
+                'scan_date': str(row['scan_date']),
+                'result_rating': row['result_rating'],
+                'ingredients_found': row['ingredients_found'],
+                'extracted_text': row.get('extracted_text', ''),
+                'confidence': row.get('confidence', 'unknown'),
+                'text_quality': row.get('text_quality', 'unknown')
+            }
+            scans_data.append(scan_data)
+        
+        conn.close()
+        
+        # Create JSON response
+        export_data = {
+            'user_email': session['user_email'],
+            'export_date': datetime.now().isoformat(),
+            'total_scans': len(scans_data),
+            'scans': scans_data
+        }
+        
+        response = Response(
+            json.dumps(export_data, indent=2),
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename=foodfixr_history_{session["user_email"]}_{datetime.now().strftime("%Y%m%d")}.json'}
+        )
+        
+        return response
+        
+    except Exception as e:
+        print(f"Export history error: {e}")
+        flash('Export failed. Please try again.', 'error')
+        return redirect(url_for('history'))
 
 # ADMIN/DEBUG ROUTES
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
