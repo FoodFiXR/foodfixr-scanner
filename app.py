@@ -75,6 +75,7 @@ def get_db_connection():
         return conn
 
 # Database initialization
+# Updated init_db function with all required columns
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -99,6 +100,7 @@ def init_db():
         )
     ''')
     
+    # Updated scan_history table with ALL required columns
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS scan_history (
             id SERIAL PRIMARY KEY,
@@ -116,10 +118,19 @@ def init_db():
         )
     ''')
     
+    # Add missing columns to existing table (PostgreSQL specific)
+    try:
+        cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS extracted_text TEXT")
+        cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_length INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS confidence VARCHAR(20) DEFAULT 'medium'")
+        cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_quality VARCHAR(20) DEFAULT 'unknown'")
+        cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS has_safety_labels BOOLEAN DEFAULT FALSE")
+    except Exception as e:
+        print(f"Column addition note: {e}")  # May fail if columns already exist
+    
     conn.commit()
     conn.close()
-    print("Database initialized successfully")
-
+    print("Database initialized successfully with all required columns")
 init_db()
 
 # Helper functions
