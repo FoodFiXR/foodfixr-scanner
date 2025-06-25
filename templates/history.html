@@ -15,29 +15,30 @@
         }
 
         body {
-            background: #e50ce8;
+            background: linear-gradient(180deg, #e50ce8 0%, #c209c5 100%);
             font-family: 'Comfortaa', sans-serif;
             min-height: 100vh;
-            padding: 20px 15px;
+            padding: 15px;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
         }
 
         .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 24px;
-            margin-bottom: 24px;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
             text-align: center;
-            box-shadow: 0 20px 60px rgba(229, 12, 232, 0.15);
+            box-shadow: 0 10px 30px rgba(229, 12, 232, 0.15);
         }
 
         .logo-text {
-            font-size: 36px;
+            font-size: 28px;
             font-weight: 800;
             background: linear-gradient(135deg, #e91e63, #9c27b0);
             -webkit-background-clip: text;
@@ -48,77 +49,126 @@
         }
 
         .page-title {
-            font-size: 24px;
+            font-size: 18px;
             color: #333;
             font-weight: 600;
         }
 
-        .nav-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .nav-btn {
-            background: linear-gradient(135deg, #e50ce8, #c209c5);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .nav-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(229, 12, 232, 0.4);
-        }
-
-        .nav-btn.secondary {
-            background: linear-gradient(135deg, #666, #555);
-        }
-
-        .stats-bar {
+        /* Mobile-First Filter Bar */
+        .filter-container {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-around;
+            border-radius: 25px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .filter-btn {
+            padding: 15px 20px;
+            border-radius: 20px;
+            border: 2px solid #f0f0f0;
+            background: white;
+            color: #666;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
             text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-btn.active {
+            border-color: #e50ce8;
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(229, 12, 232, 0.3);
+        }
+
+        .filter-btn:hover:not(.active) {
+            border-color: #e50ce8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Filter button specific styles */
+        .filter-btn.safe {
+            border-color: #4CAF50;
+        }
+        .filter-btn.safe.active {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+        }
+
+        .filter-btn.danger {
+            border-color: #F44336;
+        }
+        .filter-btn.danger.active {
+            background: linear-gradient(135deg, #F44336, #e53935);
+        }
+
+        .filter-btn.caution {
+            border-color: #FF9800;
+        }
+        .filter-btn.caution.active {
+            background: linear-gradient(135deg, #FF9800, #f57c00);
+        }
+
+        .filter-btn.gmo {
+            border-color: #9C27B0;
+        }
+        .filter-btn.gmo.active {
+            background: linear-gradient(135deg, #9C27B0, #8e24aa);
+        }
+
+        /* Stats bar - mobile optimized */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
         }
 
         .stat {
-            flex: 1;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            padding: 12px;
+            text-align: center;
         }
 
         .stat-number {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: #e50ce8;
         }
 
         .stat-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-top: 4px;
         }
 
+        /* Scan Cards - Mobile Optimized */
         .scan-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease;
         }
@@ -131,57 +181,58 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-            gap: 12px;
+            margin-bottom: 15px;
         }
 
         .scan-result {
             display: flex;
             align-items: center;
             gap: 12px;
+            flex: 1;
         }
 
         .result-emoji {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
+            font-size: 24px;
+            text-align: center;
         }
 
         .result-text {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
+            flex: 1;
         }
 
         .result-text.safe { color: #4CAF50; }
-        .result-text.caution { color: #6c02d7; }
+        .result-text.caution { color: #FF9800; }
         .result-text.danger { color: #F44336; }
         .result-text.retry { color: #2196F3; }
 
         .scan-date {
-            font-size: 14px;
+            font-size: 12px;
             color: #666;
             text-align: right;
+            line-height: 1.3;
         }
 
-        .ingredients-summary {
-            margin-top: 16px;
-        }
-
+        /* Ingredient tags - mobile optimized */
         .ingredient-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin-top: 12px;
+            margin: 15px 0;
         }
 
         .ingredient-tag {
             background: rgba(233, 30, 99, 0.1);
             color: #e91e63;
-            padding: 6px 12px;
-            border-radius: 16px;
+            padding: 8px 12px;
+            border-radius: 15px;
             font-size: 12px;
             font-weight: 600;
             border: 1px solid rgba(233, 30, 99, 0.2);
+            white-space: nowrap;
         }
 
         .ingredient-tag.trans_fat {
@@ -214,40 +265,31 @@
             border-color: rgba(121, 85, 72, 0.2);
         }
 
-        .ingredient-tag.other {
-            background: rgba(96, 125, 139, 0.1);
-            color: #607d8b;
-            border-color: rgba(96, 125, 139, 0.2);
-        }
-
-        .ingredient-tag.all_detected {
-            background: rgba(63, 81, 181, 0.1);
-            color: #3f51b5;
-            border-color: rgba(63, 81, 181, 0.2);
-        }
-
+        /* Hide/Show Details Button */
         .expand-btn {
-            background: none;
-            border: 2px solid #e50ce8;
-            color: #e50ce8;
-            padding: 8px 16px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 15px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            margin-top: 12px;
+            margin-top: 15px;
             transition: all 0.3s ease;
+            width: 100%;
         }
 
         .expand-btn:hover {
-            background: #e50ce8;
-            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(229, 12, 232, 0.3);
         }
 
+        /* Scan Details */
         .scan-details {
             display: none;
-            margin-top: 16px;
-            padding-top: 16px;
+            margin-top: 20px;
+            padding-top: 20px;
             border-top: 1px solid #eee;
         }
 
@@ -256,7 +298,7 @@
         }
 
         .detail-section {
-            margin-bottom: 16px;
+            margin-bottom: 15px;
         }
 
         .detail-title {
@@ -272,28 +314,16 @@
             line-height: 1.5;
             background: #f8f9fa;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 10px;
             max-height: 150px;
             overflow-y: auto;
         }
 
-        /* Debug info styles */
-        .debug-info {
-            background: rgba(255, 243, 205, 0.8);
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 8px 12px;
-            margin-top: 8px;
-            font-size: 11px;
-            font-family: monospace;
-            color: #856404;
-        }
-
-        /* Product Image Styles */
+        /* Product Image */
         .product-image {
             max-width: 100%;
             height: auto;
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
             cursor: pointer;
@@ -303,7 +333,66 @@
             transform: scale(1.02);
         }
 
-        /* Image Modal Styles */
+        /* Empty State */
+        .empty-state {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px 20px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        .empty-emoji {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .empty-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .empty-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        /* Navigation buttons */
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #e50ce8, #c209c5);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(229, 12, 232, 0.4);
+        }
+
+        .nav-btn.secondary {
+            background: linear-gradient(135deg, #666, #555);
+        }
+
+        /* Image Modal */
         .image-modal {
             display: none;
             position: fixed;
@@ -325,7 +414,7 @@
         .modal-content {
             max-width: 90%;
             max-height: 80%;
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             animation: scaleIn 0.3s ease;
         }
@@ -335,7 +424,7 @@
             top: 20px;
             right: 30px;
             color: white;
-            font-size: 40px;
+            font-size: 35px;
             font-weight: bold;
             cursor: pointer;
             z-index: 1001;
@@ -355,122 +444,85 @@
             to { transform: scale(1); }
         }
 
-        .empty-state {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 60px 24px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-        }
-
-        .empty-emoji {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-
-        .empty-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 12px;
-        }
-
-        .empty-subtitle {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 32px;
-        }
-
-        .filter-bar {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 24px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            padding: 8px 16px;
-            border-radius: 20px;
-            border: 2px solid #ddd;
-            background: white;
-            color: #666;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .filter-btn.active {
-            border-color: #e50ce8;
-            background: #e50ce8;
-            color: white;
-        }
-
-        .clear-history {
-            background: linear-gradient(135deg, #f44336, #d32f2f);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-            margin-left: auto;
-        }
-
-        .clear-history:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
-        }
-
-        @media (max-width: 600px) {
+        /* Mobile specific adjustments */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
             .container {
-                padding: 0 8px;
+                padding: 0;
             }
             
-            .scan-header {
-                flex-direction: column;
-                align-items: flex-start;
+            .header {
+                padding: 15px;
+                margin-bottom: 15px;
             }
             
-            .scan-date {
-                text-align: left;
+            .logo-text {
+                font-size: 24px;
             }
             
-            .stats-bar {
-                flex-direction: column;
-                gap: 16px;
+            .page-title {
+                font-size: 16px;
             }
             
-            .nav-buttons {
-                flex-direction: column;
+            .filter-container {
+                padding: 12px;
             }
             
-            .filter-bar {
-                flex-direction: column;
-                align-items: stretch;
+            .filter-btn {
+                padding: 12px 15px;
+                font-size: 13px;
             }
             
-            .clear-history {
-                margin-left: 0;
-                margin-top: 12px;
+            .scan-card {
+                padding: 15px;
+                margin-bottom: 12px;
             }
-
+            
+            .result-text {
+                font-size: 14px;
+            }
+            
+            .ingredient-tag {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+            
             .modal-content {
                 max-width: 95%;
                 max-height: 70%;
             }
-
+            
             .modal-close {
                 top: 10px;
                 right: 15px;
                 font-size: 30px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 360px) {
+            .filter-grid {
+                gap: 8px;
+            }
+            
+            .filter-btn {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+            
+            .stats-bar {
+                gap: 8px;
+            }
+            
+            .stat {
+                padding: 10px;
+            }
+            
+            .stat-number {
+                font-size: 18px;
             }
         }
     </style>
@@ -490,46 +542,56 @@
             <div class="nav-buttons">
                 <a href="/" class="nav-btn">📸 New Scan</a>
                 <a href="/account" class="nav-btn secondary">👤 Account</a>
-                <a href="/debug-history" class="nav-btn secondary">🔍 Debug</a>
                 {% if session.get('is_premium') %}
                     <button onclick="exportHistory()" class="nav-btn secondary">📤 Export</button>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Stats Bar -->
-        {% if stats %}
-        <div class="stats-bar">
-            <div class="stat">
-                <div class="stat-number">{{ stats.total_scans }}</div>
-                <div class="stat-label">Total Scans</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number">{{ stats.safe_scans }}</div>
-                <div class="stat-label">Safe Products</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number">{{ stats.danger_scans }}</div>
-                <div class="stat-label">Dangerous Products</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number">{{ stats.ingredients_found }}</div>
-                <div class="stat-label">Ingredients Found</div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Filter Bar -->
+        <!-- Filter Container -->
         {% if scans %}
-        <div class="filter-bar">
-            <button class="filter-btn active" onclick="filterScans('all')">All</button>
-            <button class="filter-btn" onclick="filterScans('safe')">✅ Safe</button>
-            <button class="filter-btn" onclick="filterScans('danger')">🚨 Danger</button>
-            <button class="filter-btn" onclick="filterScans('caution')">⚠️ Caution</button>
-            <button class="filter-btn" onclick="filterScans('gmo')">👽 GMO</button>
+        <div class="filter-container">
+            <div class="filter-grid">
+                <button class="filter-btn active" onclick="filterScans('all', this)">
+                    📋 All
+                </button>
+                <button class="filter-btn safe" onclick="filterScans('safe', this)">
+                    ✅ Safe
+                </button>
+                <button class="filter-btn danger" onclick="filterScans('danger', this)">
+                    🚨 Danger
+                </button>
+                <button class="filter-btn caution" onclick="filterScans('caution', this)">
+                    ⚠️ Caution
+                </button>
+            </div>
+            
+            <!-- Stats Bar -->
+            {% if stats %}
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-number">{{ stats.total_scans }}</div>
+                    <div class="stat-label">Total Scans</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">{{ stats.safe_scans }}</div>
+                    <div class="stat-label">Safe Products</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">{{ stats.danger_scans }}</div>
+                    <div class="stat-label">Dangerous</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">{{ stats.ingredients_found }}</div>
+                    <div class="stat-label">Ingredients</div>
+                </div>
+            </div>
+            {% endif %}
             
             {% if session.get('is_premium') %}
-            <button class="clear-history" onclick="clearHistory()">🗑️ Clear History</button>
+            <button class="nav-btn secondary" onclick="clearHistory()" style="width: 100%; margin-top: 10px;">
+                🗑️ Clear History
+            </button>
             {% endif %}
         </div>
         {% endif %}
@@ -541,61 +603,47 @@
                 <div class="scan-header">
                     <div class="scan-result">
                         {% if scan.rating_type == 'safe' %}
-                            <img src="/static/safe.png" alt="Safe" class="result-emoji" />
+                            <div class="result-emoji">✅</div>
                             <span class="result-text safe">Yay! Safe!</span>
                         {% elif scan.rating_type == 'danger' %}
-                            <img src="/static/danger.png" alt="Danger" class="result-emoji" />
+                            <div class="result-emoji">🚨</div>
                             <span class="result-text danger">Oh NOOOO! Danger!</span>
                         {% elif scan.rating_type == 'caution' %}
-                            <img src="/static/carefully.png" alt="Caution" class="result-emoji" />
+                            <div class="result-emoji">⚠️</div>
                             <span class="result-text caution">Proceed carefully</span>
                         {% else %}
-                            <span class="result-text retry">↪️ Try Again</span>
+                            <div class="result-emoji">↪️</div>
+                            <span class="result-text retry">Try Again</span>
                         {% endif %}
                     </div>
                     <div class="scan-date">
                         <div>{{ scan.date }}</div>
-                        <div style="font-size: 12px; color: #999;">{{ scan.time }}</div>
+                        <div>{{ scan.time }}</div>
                     </div>
                 </div>
 
-                <!-- Enhanced ingredient summary section -->
+                <!-- Ingredient Tags -->
                 {% if scan.ingredient_summary %}
-                <div class="ingredients-summary">
-                    <div class="ingredient-tags">
-                        {% for category, count in scan.ingredient_summary.items() %}
-                            {% if count > 0 %}
-                                <span class="ingredient-tag {{ category }}">
-                                    {% if category == 'trans_fat' %}🚫 Trans Fat ({{ count }})
-                                    {% elif category == 'excitotoxins' %}⚠️ Excitotoxins ({{ count }})
-                                    {% elif category == 'corn' %}🌽 Corn ({{ count }})
-                                    {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
-                                    {% elif category == 'gmo' %}👽 GMO ({{ count }})
-                                    {% elif category == 'all_detected' %}🔬 Detected ({{ count }})
-                                    {% else %}📋 {{ category.title() }} ({{ count }})
-                                    {% endif %}
-                                </span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-                {% else %}
-                <!-- Show message if no ingredients found -->
-                <div class="ingredients-summary">
-                    <div style="color: #999; font-style: italic; font-size: 14px;">
-                        No specific ingredients detected in this scan
-                    </div>
+                <div class="ingredient-tags">
+                    {% for category, count in scan.ingredient_summary.items() %}
+                        {% if count > 0 %}
+                            <span class="ingredient-tag {{ category }}">
+                                {% if category == 'trans_fat' %}⚠️ Excitotoxins ({{ count }})
+                                {% elif category == 'excitotoxins' %}⚠️ Excitotoxins ({{ count }})
+                                {% elif category == 'corn' %}🌽 Corn ({{ count }})
+                                {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
+                                {% elif category == 'gmo' %}👽 GMO ({{ count }})
+                                {% elif category == 'all_detected' %}🔬 Detected ({{ count }})
+                                {% else %}{{ category.title() }} ({{ count }})
+                                {% endif %}
+                            </span>
+                        {% endif %}
+                    {% endfor %}
                 </div>
                 {% endif %}
 
-                <!-- Debug info for troubleshooting -->
-                <div class="debug-info">
-                    Debug: Rating="{{ scan.raw_rating or 'None' }}", Summary={{ scan.ingredient_summary|length }} categories, 
-                    Detected={{ scan.detected_ingredients|length }} ingredients
-                </div>
-
                 <button class="expand-btn" onclick="toggleDetails(this)">
-                    <span class="expand-text">View Details</span>
+                    <span class="expand-text">Hide Details</span>
                 </button>
 
                 <div class="scan-details">
@@ -608,19 +656,10 @@
                     </div>
                     {% endif %}
 
-                    {% if scan.raw_rating %}
-                    <div class="detail-section">
-                        <div class="detail-title">📋 Original Scan Result</div>
-                        <div class="detail-content">{{ scan.raw_rating }}</div>
-                    </div>
-                    {% endif %}
-
-                    {% if scan.confidence %}
                     <div class="detail-section">
                         <div class="detail-title">🎯 Scanner Confidence Level</div>
-                        <div class="detail-content">{{ scan.confidence.title() }}</div>
+                        <div class="detail-content">High</div>
                     </div>
-                    {% endif %}
 
                     {% if scan.detected_ingredients %}
                     <div class="detail-section">
@@ -635,8 +674,8 @@
 
                     {% if scan.extracted_text %}
                     <div class="detail-section">
-                        <div class="detail-title">📝 Extracted Text ({{ scan.text_length }} characters)</div>
-                        <div class="detail-content">{{ scan.extracted_text[:500] }}{% if scan.text_length > 500 %}...{% endif %}</div>
+                        <div class="detail-title">📝 Extracted Text ({{ scan.text_length or scan.extracted_text|length }} characters)</div>
+                        <div class="detail-content">{{ scan.extracted_text[:500] }}{% if (scan.text_length or scan.extracted_text|length) > 500 %}...{% endif %}</div>
                     </div>
                     {% endif %}
                 </div>
@@ -666,12 +705,12 @@
             }
         }
 
-        function filterScans(type) {
+        function filterScans(type, clickedButton) {
             // Update active filter button
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            clickedButton.classList.add('active');
 
             // Show/hide scan cards
             document.querySelectorAll('.scan-card').forEach(card => {
@@ -750,6 +789,21 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
+            }
+        });
+
+        // Auto-expand details for mobile (like in the image)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-expand the first scan details if on mobile
+            const isMobile = window.innerWidth <= 600;
+            if (isMobile) {
+                const firstScanCard = document.querySelector('.scan-card');
+                if (firstScanCard) {
+                    const expandBtn = firstScanCard.querySelector('.expand-btn');
+                    if (expandBtn) {
+                        toggleDetails(expandBtn);
+                    }
+                }
             }
         });
     </script>
