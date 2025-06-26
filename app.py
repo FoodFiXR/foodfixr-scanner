@@ -15,6 +15,8 @@ from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import gc  # Add for memory management
+import shutil
+from pathlib import Path
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -32,6 +34,9 @@ MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # Reduced from 16MB to 8MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.permanent_session_lifetime = timedelta(days=30)
+
+UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # Add memory management hooks
 @app.before_request
@@ -223,6 +228,35 @@ def cleanup_uploaded_file(filepath):
     except Exception as e:
         print(f"DEBUG: Error cleaning up file {filepath}: {e}")
 
+def save_scan_image(temp_filepath, user_id):
+    """Save uploaded image permanently for history viewing"""
+    try:
+        if not temp_filepath or not os.path.exists(temp_filepath):
+            return None
+            
+        # Create unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        original_extension = os.path.splitext(temp_filepath)[1].lower()
+        new_filename = f"scan_{user_id}_{timestamp}_{uuid.uuid4().hex[:8]}{original_extension}"
+        
+        # Create user directory
+        user_dir = os.path.join(UPLOADS_DIR, str(user_id))
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Copy file to permanent location
+        permanent_path = os.path.join(user_dir, new_filename)
+        shutil.copy2(temp_filepath, permanent_path)
+        
+        # Return relative path for database storage
+        relative_path = f"static/uploads/{user_id}/{new_filename}"
+        print(f"DEBUG: Saved image to: {relative_path}")
+        
+        return relative_path
+        
+    except Exception as e:
+        print(f"DEBUG: Error saving scan image: {e}")
+        return None
+        
 # AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -508,6 +542,9 @@ def scan():
                                  user_name=user_data['name'],
                                  error="Image too large. Please upload a smaller image (max 2MB).")
         
+        # Save image permanently for history
+        saved_image_path = save_scan_image(filepath, session['user_id'])
+        
         # Process the image with memory management
         print("DEBUG: Starting image processing...")
         result = scan_image_for_ingredients(filepath)
@@ -528,13 +565,13 @@ def scan():
                 WHERE id = %s
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert with all the new data
+            # Enhanced scan history insert with image URL
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
-                    extracted_text, text_length, confidence, text_quality, has_safety_labels
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
                 )
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
@@ -544,7 +581,8 @@ def scan():
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                result.get('has_safety_labels', False)
+                result.get('has_safety_labels', False),
+                saved_image_path
             ))
         else:
             cursor.execute('''
@@ -557,9 +595,9 @@ def scan():
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
-                    extracted_text, text_length, confidence, text_quality, has_safety_labels
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
@@ -570,7 +608,8 @@ def scan():
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                int(result.get('has_safety_labels', False))  # Convert to int for SQLite
+                int(result.get('has_safety_labels', False)),  # Convert to int for SQLite
+                saved_image_path
             ))
         
         conn.commit()
@@ -578,7 +617,7 @@ def scan():
         
         session['scans_used'] = new_scans_used
         
-        # Clean up uploaded file
+        # Clean up temp uploaded file
         cleanup_uploaded_file(filepath)
         
         print("DEBUG: Scan completed successfully")
@@ -609,7 +648,7 @@ def scan():
         # Always ensure cleanup
         cleanup_uploaded_file(filepath)
         gc.collect()
-
+        
 @app.route('/account')
 @login_required
 def account():
@@ -971,6 +1010,12 @@ def clear_history():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Delete user's uploaded images directory
+        user_upload_dir = os.path.join(UPLOADS_DIR, str(session['user_id']))
+        if os.path.exists(user_upload_dir):
+            shutil.rmtree(user_upload_dir)
+            print(f"DEBUG: Deleted user images directory: {user_upload_dir}")
+        
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             cursor.execute('DELETE FROM scan_history WHERE user_id = %s', (session['user_id'],))
@@ -985,7 +1030,7 @@ def clear_history():
     except Exception as e:
         print(f"Clear history error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
+        
 # EXPORT HISTORY ROUTE
 @app.route('/export-history')
 @login_required
@@ -1041,6 +1086,17 @@ def export_history():
         print(f"Export history error: {e}")
         flash('Export failed. Please try again.', 'error')
         return redirect(url_for('history'))
+
+@app.route('/static/uploads/<int:user_id>/<filename>')
+@login_required
+def uploaded_file(user_id, filename):
+    """Serve uploaded images (only to the user who uploaded them)"""
+    # Security check: users can only view their own images
+    if session['user_id'] != user_id:
+        return "Access denied", 403
+        
+    user_upload_dir = os.path.join(UPLOADS_DIR, str(user_id))
+    return send_file(os.path.join(user_upload_dir, filename))
 
 # ADMIN/DEBUG ROUTES
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
