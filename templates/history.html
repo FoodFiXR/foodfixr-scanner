@@ -677,24 +677,24 @@
 
                 <div class="scan-details">
                     <!-- UPDATED: Proper image display with error handling -->
-                    {% if scan.image_url and scan.image_url != '' %}
-                    <div class="detail-section">
-                        <div class="detail-title">📸 Scanned Product</div>
-                        <div class="detail-content" style="padding: 8px; background: white;">
-                            <img src="/{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('/{{ scan.image_url }}')" onerror="handleImageError(this)">
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="detail-section">
-                        <div class="detail-title">📸 Scanned Product</div>
-                        <div class="detail-content">
-                            <div class="image-error">
-                                📷 Image not available<br>
-                                <small>This scan was processed before image saving was enabled, or the image file was removed for storage optimization.</small>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
+                   {% if scan.image_url and scan.image_url != '' %}
+<div class="detail-section">
+    <div class="detail-title">📸 Scanned Product</div>
+    <div class="detail-content" style="padding: 8px; background: white;">
+        <img src="/{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('/{{ scan.image_url }}')" onerror="handleImageError(this)">
+    </div>
+</div>
+{% else %}
+<div class="detail-section">
+    <div class="detail-title">📸 Scanned Product</div>
+    <div class="detail-content">
+        <div class="image-error">
+            📷 Image not available<br>
+            <small>This scan was processed before image saving was enabled, or the image file was removed for storage optimization.</small>
+        </div>
+    </div>
+</div>
+{% endif %}
 
                     <div class="detail-section">
                         <div class="detail-title">🎯 Scanner Confidence Level</div>
