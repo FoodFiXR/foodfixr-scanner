@@ -976,9 +976,9 @@ def scan_image_for_ingredients(image_path):
             file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
             print(f"DEBUG: Input file size: {file_size_mb:.2f} MB")
             
-            if file_size_mb > 5:  # Very conservative limit
+            if file_size_mb > 10:  # Very conservative limit
                 print("DEBUG: File too large, rejecting")
-                return create_error_result("Image file too large. Please use a smaller image (max 5MB).")
+                return create_error_result("Image file too large. Please use a smaller image (max 10MB).")
         
         # Extract text using OCR.space with memory management
         print("🔍 Starting OCR.space text extraction...")
