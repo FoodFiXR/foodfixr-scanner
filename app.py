@@ -741,44 +741,6 @@ def scan():
             signal.alarm(0)
         except:
             pass
-
-# Add a health check that monitors memory
-@app.route('/health')
-def health_check():
-    """Enhanced health check with memory monitoring"""
-    try:
-        # Check database connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1')
-        conn.close()
-        
-        # Check memory usage
-        import psutil
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        
-        # Memory health status
-        memory_status = "healthy"
-        if memory_mb > 400:
-            memory_status = "warning"
-        if memory_mb > 500:
-            memory_status = "critical"
-            # Force cleanup at critical levels
-            gc.collect()
-        
-        return jsonify({
-            'status': 'healthy' if memory_status != 'critical' else 'degraded',
-            'memory_mb': round(memory_mb, 1),
-            'memory_status': memory_status,
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
         
 @app.route('/account')
 @login_required
