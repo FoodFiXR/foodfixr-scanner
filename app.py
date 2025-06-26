@@ -14,7 +14,11 @@ import sqlite3
 from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import gc  # Add for memory management
+import gc
+import signal
+import psutil
+import resource
+import sys
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -24,38 +28,117 @@ stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 
-# Configuration - Reduced limits for memory-constrained environments
+# Configuration - Conservative limits for memory-constrained environments
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # Reduced from 16MB to 8MB
+MAX_CONTENT_LENGTH = 3 * 1024 * 1024  # Reduced to 3MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.permanent_session_lifetime = timedelta(days=30)
 
-# Add memory management hooks
+# Setup worker protection against memory issues
+def setup_worker_protection():
+    """Set up worker protection against memory issues"""
+    try:
+        # Set memory limit for the process (soft limit)
+        # 150MB limit (conservative for Render)
+        memory_limit_mb = 150
+        memory_limit_bytes = memory_limit_mb * 1024 * 1024
+        
+        # Set soft memory limit
+        try:
+            resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+            print(f"DEBUG: Set memory limit to {memory_limit_mb} MB")
+        except Exception as e:
+            print(f"DEBUG: Could not set memory limit: {e}")
+        
+        # Set up signal handlers for graceful shutdown
+        def memory_handler(signum, frame):
+            print("DEBUG: Memory limit signal received, forcing cleanup")
+            gc.collect()
+            sys.exit(1)
+        
+        def term_handler(signum, frame):
+            print("DEBUG: Term signal received, graceful shutdown")
+            gc.collect()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGUSR1, memory_handler)
+        signal.signal(signal.SIGTERM, term_handler)
+        
+    except Exception as e:
+        print(f"DEBUG: Worker protection setup error: {e}")
+
+# Call this after imports
+setup_worker_protection()
+
+def cleanup_old_temp_files():
+    """Clean up old temporary files"""
+    try:
+        temp_dir = tempfile.gettempdir()
+        current_time = time.time()
+        
+        for filename in os.listdir(temp_dir):
+            if any(pattern in filename for pattern in ['20250626', 'compressed', 'ultra_']):
+                filepath = os.path.join(temp_dir, filename)
+                try:
+                    if os.path.isfile(filepath):
+                        file_age = current_time - os.path.getmtime(filepath)
+                        if file_age > 10:  # 10 seconds
+                            os.remove(filepath)
+                except:
+                    pass
+    except:
+        pass
+
+# Enhanced before_request with memory monitoring
 @app.before_request
 def before_request():
-    """Run memory cleanup before each request"""
+    """Enhanced memory management before each request"""
     try:
-        # Force garbage collection
-        gc.collect()
+        # Check worker memory
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        # If memory is too high, force cleanup
+        if memory_mb > 90:
+            print(f"DEBUG: High memory detected ({memory_mb:.1f} MB), forcing cleanup")
+            for _ in range(5):
+                gc.collect()
+            
+            # Check again after cleanup
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            if memory_mb > 110:
+                print(f"DEBUG: Memory still high ({memory_mb:.1f} MB), restarting worker")
+                # Gracefully restart worker
+                os.kill(os.getpid(), signal.SIGTERM)
         
         # Set conservative PIL limits
         from PIL import Image
-        Image.MAX_IMAGE_PIXELS = 40000000  # Conservative limit
+        Image.MAX_IMAGE_PIXELS = 20000000  # Very conservative
         
-        print("DEBUG: Pre-request cleanup completed")
+        print(f"DEBUG: Pre-request memory: {memory_mb:.1f} MB")
+        
     except Exception as e:
-        print(f"DEBUG: Pre-request cleanup error: {e}")
+        print(f"DEBUG: Pre-request error: {e}")
 
+# Enhanced after_request with aggressive cleanup
 @app.after_request
 def after_request(response):
-    """Run cleanup after each request"""
+    """Enhanced cleanup after each request"""
     try:
-        # Force garbage collection after request
-        gc.collect()
-        print("DEBUG: Post-request cleanup completed")
+        # Force garbage collection
+        for _ in range(3):
+            gc.collect()
+        
+        # Check memory
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Post-request memory: {memory_mb:.1f} MB")
+        
+        # If memory is high, clean up temp files
+        if memory_mb > 80:
+            cleanup_old_temp_files()
+        
     except Exception as e:
         print(f"DEBUG: Post-request cleanup error: {e}")
     
@@ -75,7 +158,6 @@ def get_db_connection():
         return conn
 
 # Database initialization
-# Updated init_db function with all required columns
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -131,6 +213,7 @@ def init_db():
     conn.commit()
     conn.close()
     print("Database initialized successfully with all required columns")
+
 init_db()
 
 # Helper functions
@@ -455,52 +538,63 @@ def index():
 @app.route('/', methods=['POST'])
 @login_required
 def scan():
-    # CRITICAL: Memory cleanup before processing
-    print("DEBUG: Starting scan with memory cleanup")
-    before_scan_cleanup()
-    
-    user_data = get_user_data(session['user_id'])
-    if not user_data:
-        return redirect(url_for('logout'))
-    
-    if not can_scan():
-        flash('You have used all your free scans. Please upgrade to continue.', 'error')
-        return redirect(url_for('upgrade'))
-    
-    trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
-    
-    if 'image' not in request.files:
-        return render_template('scanner.html',
-                             trial_expired=trial_expired,
-                             trial_time_left=trial_time_left,
-                             user_name=user_data['name'],
-                             error="No image uploaded.")
-    
-    file = request.files['image']
-    if file.filename == '' or not allowed_file(file.filename):
-        return render_template('scanner.html',
-                             trial_expired=trial_expired,
-                             trial_time_left=trial_time_left,
-                             user_name=user_data['name'],
-                             error="Invalid file. Please upload an image.")
-    
+    """Memory-protected scanning route"""
     filepath = None
+    
     try:
-        # Save uploaded file with memory-conscious handling
+        # CRITICAL: Check worker memory before starting
+        initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Worker memory before scan: {initial_memory:.1f} MB")
+        
+        # If memory is already high, reject the request
+        if initial_memory > 100:
+            print(f"DEBUG: Worker memory too high ({initial_memory:.1f} MB), rejecting request")
+            flash('System busy. Please try again in a moment.', 'error')
+            return redirect('/')
+        
+        # Force cleanup before proceeding
+        for _ in range(3):
+            gc.collect()
+        
+        user_data = get_user_data(session['user_id'])
+        if not user_data:
+            return redirect(url_for('logout'))
+        
+        if not can_scan():
+            flash('You have used all your free scans. Please upgrade to continue.', 'error')
+            return redirect(url_for('upgrade'))
+        
+        trial_time_left, trial_expired, _, _ = calculate_trial_time_left(user_data['trial_start_date'])
+        
+        if 'image' not in request.files:
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="No image uploaded.")
+        
+        file = request.files['image']
+        if file.filename == '' or not allowed_file(file.filename):
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Invalid file. Please upload an image.")
+        
+        # Save uploaded file
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{filename}"
         filepath = os.path.join(tempfile.gettempdir(), filename)
         
-        print(f"DEBUG: Saving uploaded file to: {filepath}")
         file.save(filepath)
         
-        # Check file size before processing
-        file_size_kb = os.path.getsize(filepath) / 1024
-        print(f"DEBUG: Uploaded file size: {file_size_kb:.1f} KB")
+        # CRITICAL: Check file size immediately
+        file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+        print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
-        # If file is too large, reject it early
-        if file_size_kb > 10240:  # 10MB limit
+        # Strict size limit to prevent memory issues
+        if file_size_mb > 2.0:  # Very conservative limit
             cleanup_uploaded_file(filepath)
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
@@ -508,18 +602,50 @@ def scan():
                                  user_name=user_data['name'],
                                  error="Image too large. Please upload a smaller image (max 2MB).")
         
-        # Process the image with memory management
-        print("DEBUG: Starting image processing...")
-        result = scan_image_for_ingredients(filepath)
+        # Check memory after file save
+        memory_after_save = psutil.Process().memory_info().rss / 1024 / 1024
+        if memory_after_save > 110:
+            cleanup_uploaded_file(filepath)
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="System memory limit reached. Please try with a smaller image.")
         
-        # Update user scan counts
+        # Force cleanup before processing
+        before_scan_cleanup()
+        
+        print("DEBUG: Starting memory-protected image processing...")
+        
+        # Process with timeout and memory monitoring
+        try:
+            result = scan_image_for_ingredients(filepath)
+        except MemoryError:
+            cleanup_uploaded_file(filepath)
+            for _ in range(5):
+                gc.collect()
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Memory limit reached. Please try with a smaller image.")
+        
+        # Check if result indicates memory error
+        if result.get('error') and 'memory' in result.get('error', '').lower():
+            cleanup_uploaded_file(filepath)
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error=result.get('error', 'Memory limit reached.'))
+        
+        # Update database
         conn = get_db_connection()
         cursor = conn.cursor()
         
         new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
         new_total_scans = user_data['total_scans_ever'] + 1
         
-        # Use appropriate placeholder for database type
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             cursor.execute('''
@@ -528,7 +654,6 @@ def scan():
                 WHERE id = %s
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert with all the new data
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
@@ -547,13 +672,13 @@ def scan():
                 result.get('has_safety_labels', False)
             ))
         else:
+            # SQLite version
             cursor.execute('''
                 UPDATE users 
                 SET scans_used = ?, total_scans_ever = ?
                 WHERE id = ?
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert for SQLite
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
@@ -570,7 +695,7 @@ def scan():
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                int(result.get('has_safety_labels', False))  # Convert to int for SQLite
+                int(result.get('has_safety_labels', False))
             ))
         
         conn.commit()
@@ -581,7 +706,13 @@ def scan():
         # Clean up uploaded file
         cleanup_uploaded_file(filepath)
         
-        print("DEBUG: Scan completed successfully")
+        # Force final cleanup
+        for _ in range(3):
+            gc.collect()
+        
+        final_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Final memory after scan: {final_memory:.1f} MB")
+        
         return render_template('scanner.html',
                              result=result,
                              trial_expired=trial_expired,
@@ -589,26 +720,22 @@ def scan():
                              user_name=user_data['name'])
         
     except Exception as e:
-        print(f"DEBUG: Scan error: {e}")
+        print(f"DEBUG: Scan route error: {e}")
         import traceback
         traceback.print_exc()
         
-        # Clean up uploaded file on error
+        # Emergency cleanup
         cleanup_uploaded_file(filepath)
         
-        # Force memory cleanup on error
-        gc.collect()
+        # Force aggressive cleanup on error
+        for _ in range(5):
+            gc.collect()
         
         return render_template('scanner.html',
                              trial_expired=trial_expired,
                              trial_time_left=trial_time_left,
                              user_name=user_data['name'],
-                             error=f"Scanning failed: {str(e)}. Please try again with a smaller image.")
-    
-    finally:
-        # Always ensure cleanup
-        cleanup_uploaded_file(filepath)
-        gc.collect()
+                             error="Scanning failed. Please try again with a smaller image.")
 
 @app.route('/account')
 @login_required
@@ -755,7 +882,6 @@ def create_checkout_session():
         plan = data.get('plan', 'monthly')  # Default to monthly
         
         # Map plan names to Stripe price IDs
-        # You'll need to create these price IDs in your Stripe dashboard
         plan_price_mapping = {
             'weekly': os.getenv('STRIPE_WEEKLY_PRICE_ID', 'price_weekly_placeholder'),
             'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_placeholder'), 
@@ -1221,250 +1347,22 @@ def simple_login():
     </html>
     """
 
-@app.route('/admin-password-reset', methods=['GET', 'POST'])
-def admin_password_reset():
-    """Admin route to reset individual user passwords"""
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        new_password = request.form.get('new_password', '')
-        
-        if not email or not new_password:
-            error_msg = "Both email and password are required"
-        elif len(new_password) < 6:
-            error_msg = "Password must be at least 6 characters long"
-        else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                # Check if user exists
-                database_url = os.getenv('DATABASE_URL')
-                if database_url:
-                    cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
-                else:
-                    cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
-                
-                user = cursor.fetchone()
-                
-                if not user:
-                    error_msg = f"No user found with email: {email}"
-                else:
-                    # Update password
-                    password_hash = generate_password_hash(new_password)
-                    
-                    if database_url:
-                        cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
-                                     (password_hash, email))
-                    else:
-                        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
-                                     (password_hash, email))
-                    
-                    conn.commit()
-                    success_msg = f"Password updated for {user['name']} ({email})"
-                
-                conn.close()
-                
-            except Exception as e:
-                error_msg = f"Database error: {str(e)}"
-    else:
-        error_msg = None
-        success_msg = None
-    
-    # Get all users for the dropdown
+# Add memory monitoring endpoint
+@app.route('/memory-status')
+def memory_status():
+    """Debug endpoint to check memory usage"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT email, name FROM users ORDER BY name')
-        users = cursor.fetchall()
-        conn.close()
-    except:
-        users = []
-    
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Admin Password Reset</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-            .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            input, select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-primary {{ background: #e91e63; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
-            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
-            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
-            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔐 Admin Password Reset</h1>
-            
-            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
-            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label for="email">Select User Email:</label>
-                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
-                        <option value="">-- Select a user --</option>
-                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
-                    </select>
-                    <div class="quick-fill">
-                        Or type manually: 
-                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password">New Password:</label>
-                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
-                    <div class="quick-fill">
-                        Quick passwords: 
-                        <button type="button" onclick="setPassword('password123')">password123</button>
-                        <button type="button" onclick="setPassword('admin123')">admin123</button>
-                        <button type="button" onclick="setPassword('test123')">test123</button>
-                        <button type="button" onclick="setPassword('user123')">user123</button>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
-                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
-                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
-                </div>
-            </form>
-            
-            <div class="user-list">
-                <h3>📋 Registered Users ({len(users)} total):</h3>
-                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
-            </div>
-        </div>
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
         
-        <script>
-            function fillEmail(email) {{
-                document.getElementById('manual_email').value = email;
-            }}
-            
-            function setPassword(password) {{
-                document.getElementById('new_password').value = password;
-            }}
-        </script>
-    </body>
-    </html>
-    """
-
-@app.route('/check-users')
-def check_users():
-    """Enhanced user management interface"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
-        users = cursor.fetchall()
-        conn.close()
-        
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>User Management</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-                table {{ width: 100%%; border-collapse: collapse; margin: 20px 0; }}
-                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
-                tr:hover {{ background-color: #f5f5f5; }}
-                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
-                .btn-primary {{ background: #e91e63; color: white; }}
-                .btn-secondary {{ background: #666; color: white; }}
-                .btn-success {{ background: #28a745; color: white; }}
-                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
-                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
-                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
-                .premium {{ color: #28a745; font-weight: bold; }}
-                .trial {{ color: #ffc107; font-weight: bold; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>👥 User Management Dashboard</h1>
-                
-                <div class="stats">
-                    <div class="stat-box">
-                        <div class="stat-number">{len(users)}</div>
-                        <div>Total Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
-                        <div>Premium Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
-                        <div>Total Scans</div>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin: 20px 0;">
-                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
-                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
-                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
-                </div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Scans Used</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {''.join([f'''
-                        <tr>
-                            <td>{user[0]}</td>
-                            <td>{user[1]}</td>
-                            <td>{user[2]}</td>
-                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
-                            <td>{user[5] or 0}</td>
-                            <td>{user[3]}</td>
-                        </tr>
-                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </body>
-        </html>
-        """
-        
+        return jsonify({
+            'memory_mb': round(memory_mb, 1),
+            'memory_percent': process.memory_percent(),
+            'status': 'critical' if memory_mb > 100 else 'ok',
+            'timestamp': datetime.now().isoformat()
+        })
     except Exception as e:
-        return f"""
-        <html>
-        <body style="font-family: Arial; padding: 20px;">
-            <h1>❌ Database Error</h1>
-            <p><strong>Error:</strong> {str(e)}</p>
-            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
-        </body>
-        </html>
-        """
+        return jsonify({'error': str(e)}), 500
 
 # Health check endpoint for monitoring
 @app.route('/health')
@@ -1478,7 +1376,6 @@ def health_check():
         conn.close()
         
         # Check memory usage
-        import psutil
         memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
         
         return jsonify({
@@ -1498,7 +1395,7 @@ def health_check():
 def too_large(e):
     return render_template('error.html', 
                          error_title="File Too Large", 
-                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
+                         error_message="The uploaded image is too large. Please upload an image smaller than 3MB."), 413
 
 @app.errorhandler(500)
 def internal_error(e):
