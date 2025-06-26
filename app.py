@@ -594,7 +594,7 @@ def scan():
         print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
         # Strict size limit to prevent memory issues
-        if file_size_mb > 2.0:  # Very conservative limit
+        if file_size_mb > 10.0:  # Very conservative limit
             cleanup_uploaded_file(filepath)
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
