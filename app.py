@@ -15,7 +15,6 @@ from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import gc  # Add for memory management
-import shutil  # Add this import
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -25,15 +24,10 @@ stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 
-# Configuration - Updated for image storage
-TEMP_FOLDER = tempfile.gettempdir()
-UPLOAD_FOLDER = 'static/uploads'  # Changed from temp directory
+# Configuration - Reduced limits for memory-constrained environments
+UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # 8MB
-
-# Create uploads directory if it doesn't exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs('static', exist_ok=True)
+MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # Reduced from 16MB to 8MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -81,6 +75,7 @@ def get_db_connection():
         return conn
 
 # Database initialization
+# Updated init_db function with all required columns
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -136,7 +131,6 @@ def init_db():
     conn.commit()
     conn.close()
     print("Database initialized successfully with all required columns")
-
 init_db()
 
 # Helper functions
@@ -228,80 +222,6 @@ def cleanup_uploaded_file(filepath):
             print(f"DEBUG: Cleaned up uploaded file: {filepath}")
     except Exception as e:
         print(f"DEBUG: Error cleaning up file {filepath}: {e}")
-
-# NEW: Image storage functions
-def compress_and_save_image(image_path, user_id, scan_id, max_size_kb=200):
-    """Compress and save image for history display"""
-    try:
-        # Create user-specific directory
-        user_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(user_id))
-        os.makedirs(user_dir, exist_ok=True)
-        
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"scan_{scan_id[:8]}_{timestamp}.jpg"
-        save_path = os.path.join(user_dir, filename)
-        
-        # Compress image
-        with Image.open(image_path) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            
-            # Calculate target size (smaller for storage)
-            width, height = img.size
-            max_dimension = 800  # Reasonable size for display
-            
-            if width > max_dimension or height > max_dimension:
-                if width > height:
-                    new_width = max_dimension
-                    new_height = int(height * max_dimension / width)
-                else:
-                    new_height = max_dimension
-                    new_width = int(width * max_dimension / height)
-                
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Save with compression
-            img.save(save_path, 'JPEG', quality=75, optimize=True)
-        
-        # Check file size
-        file_size_kb = os.path.getsize(save_path) / 1024
-        print(f"DEBUG: Compressed image saved: {file_size_kb:.1f} KB")
-        
-        # Return relative path
-        return f"uploads/{user_id}/{filename}"
-        
-    except Exception as e:
-        print(f"DEBUG: Error compressing and saving image: {e}")
-        return None
-
-def cleanup_old_images():
-    """Clean up images older than 30 days"""
-    try:
-        uploads_dir = app.config['UPLOAD_FOLDER']
-        current_time = time.time()
-        cleaned_count = 0
-        
-        for root, dirs, files in os.walk(uploads_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    file_age = current_time - os.path.getmtime(file_path)
-                    
-                    # Delete files older than 30 days
-                    if file_age > (30 * 24 * 60 * 60):
-                        os.remove(file_path)
-                        cleaned_count += 1
-                        print(f"DEBUG: Cleaned up old image: {file_path}")
-                except Exception as e:
-                    print(f"DEBUG: Error cleaning up {file_path}: {e}")
-        
-        if cleaned_count > 0:
-            print(f"DEBUG: Cleaned up {cleaned_count} old images")
-                        
-    except Exception as e:
-        print(f"DEBUG: Error in cleanup_old_images: {e}")
 
 # AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
@@ -565,14 +485,12 @@ def scan():
                              error="Invalid file. Please upload an image.")
     
     filepath = None
-    saved_image_url = None  # NEW: Track saved image
-    
     try:
         # Save uploaded file with memory-conscious handling
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(TEMP_FOLDER, filename)  # Use temp folder for processing
+        filepath = os.path.join(tempfile.gettempdir(), filename)
         
         print(f"DEBUG: Saving uploaded file to: {filepath}")
         file.save(filepath)
@@ -589,13 +507,6 @@ def scan():
                                  trial_time_left=trial_time_left,
                                  user_name=user_data['name'],
                                  error="Image too large. Please upload a smaller image (max 2MB).")
-        
-        # Generate scan ID early
-        scan_id = str(uuid.uuid4())
-        
-        # NEW: Save compressed image for history BEFORE processing
-        saved_image_url = compress_and_save_image(filepath, session['user_id'], scan_id)
-        print(f"DEBUG: Saved image URL: {saved_image_url}")
         
         # Process the image with memory management
         print("DEBUG: Starting image processing...")
@@ -617,24 +528,23 @@ def scan():
                 WHERE id = %s
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert with all the new data INCLUDING image_url
+            # Enhanced scan history insert with all the new data
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
-                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels
                 )
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s)
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
                 json.dumps(result.get('matched_ingredients', {})),
-                scan_id,
+                str(uuid.uuid4()),
                 result.get('extracted_text', ''),
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                result.get('has_safety_labels', False),
-                saved_image_url  # NEW: Add the image URL
+                result.get('has_safety_labels', False)
             ))
         else:
             cursor.execute('''
@@ -647,21 +557,20 @@ def scan():
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
-                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
                 json.dumps(result.get('matched_ingredients', {})),
                 format_datetime_for_db(),
-                scan_id,
+                str(uuid.uuid4()),
                 result.get('extracted_text', ''),
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                int(result.get('has_safety_labels', False)),  # Convert to int for SQLite
-                saved_image_url  # NEW: Add the image URL
+                int(result.get('has_safety_labels', False))  # Convert to int for SQLite
             ))
         
         conn.commit()
@@ -669,7 +578,7 @@ def scan():
         
         session['scans_used'] = new_scans_used
         
-        # Clean up temp file
+        # Clean up uploaded file
         cleanup_uploaded_file(filepath)
         
         print("DEBUG: Scan completed successfully")
@@ -684,18 +593,8 @@ def scan():
         import traceback
         traceback.print_exc()
         
-        # Clean up temp file on error
+        # Clean up uploaded file on error
         cleanup_uploaded_file(filepath)
-        
-        # NEW: Clean up saved image if processing failed
-        if saved_image_url:
-            try:
-                full_path = os.path.join('static', saved_image_url)
-                if os.path.exists(full_path):
-                    os.remove(full_path)
-                    print(f"DEBUG: Cleaned up saved image due to processing error")
-            except Exception as cleanup_error:
-                print(f"DEBUG: Error cleaning up saved image: {cleanup_error}")
         
         # Force memory cleanup on error
         gc.collect()
@@ -710,29 +609,6 @@ def scan():
         # Always ensure cleanup
         cleanup_uploaded_file(filepath)
         gc.collect()
-
-# NEW: Route to serve uploaded images
-@app.route('/uploads/<path:filename>')
-@login_required
-def uploaded_file(filename):
-    """Serve uploaded images (with user verification for security)"""
-    try:
-        user_id = str(session['user_id'])
-        
-        # Security: Only allow users to access their own images
-        if not filename.startswith(f'{user_id}/'):
-            print(f"DEBUG: Unauthorized access attempt: {filename} by user {user_id}")
-            return "Access denied", 403
-        
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if not os.path.exists(file_path):
-            print(f"DEBUG: File not found: {file_path}")
-            return "File not found", 404
-        
-        return send_file(file_path)
-    except Exception as e:
-        print(f"DEBUG: Error serving file: {e}")
-        return "Error serving file", 500
 
 @app.route('/account')
 @login_required
@@ -841,7 +717,7 @@ def history():
                 'ingredient_summary': ingredient_summary,
                 'detected_ingredients': detected_ingredients,
                 'has_gmo': has_gmo,
-                'image_url': row.get('image_url', ''),  # Include image URL
+                'image_url': row.get('image_url', ''),
                 'extracted_text': row.get('extracted_text', ''),
                 'text_length': row.get('text_length', 0),
                 'confidence': row.get('confidence', 'medium')
@@ -879,6 +755,7 @@ def create_checkout_session():
         plan = data.get('plan', 'monthly')  # Default to monthly
         
         # Map plan names to Stripe price IDs
+        # You'll need to create these price IDs in your Stripe dashboard
         plan_price_mapping = {
             'weekly': os.getenv('STRIPE_WEEKLY_PRICE_ID', 'price_weekly_placeholder'),
             'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_placeholder'), 
@@ -1094,16 +971,7 @@ def clear_history():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get all image URLs before deleting records
         database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            cursor.execute('SELECT image_url FROM scan_history WHERE user_id = %s', (session['user_id'],))
-        else:
-            cursor.execute('SELECT image_url FROM scan_history WHERE user_id = ?', (session['user_id'],))
-        
-        image_urls = [row['image_url'] for row in cursor.fetchall() if row['image_url']]
-        
-        # Delete database records
         if database_url:
             cursor.execute('DELETE FROM scan_history WHERE user_id = %s', (session['user_id'],))
         else:
@@ -1112,18 +980,6 @@ def clear_history():
         conn.commit()
         conn.close()
         
-        # Clean up associated image files
-        deleted_images = 0
-        for image_url in image_urls:
-            try:
-                file_path = os.path.join('static', image_url)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    deleted_images += 1
-            except Exception as e:
-                print(f"DEBUG: Error deleting image {image_url}: {e}")
-        
-        print(f"DEBUG: Cleared history and deleted {deleted_images} images")
         return jsonify({'success': True})
         
     except Exception as e:
@@ -1159,8 +1015,7 @@ def export_history():
                 'ingredients_found': row['ingredients_found'],
                 'extracted_text': row.get('extracted_text', ''),
                 'confidence': row.get('confidence', 'unknown'),
-                'text_quality': row.get('text_quality', 'unknown'),
-                'image_url': row.get('image_url', '')  # Include image URL in export
+                'text_quality': row.get('text_quality', 'unknown')
             }
             scans_data.append(scan_data)
         
@@ -1230,288 +1085,25 @@ def test_upgrade_user():
     else:
         success_msg = None
     
-    # Create HTML response
-    html_content = """
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Test Upgrade User</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
-            .container { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
-            .form-group { margin-bottom: 20px; }
-            label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
-            select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-            .btn { padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
-            .btn-primary { background: #e91e63; color: white; }
-            .btn-secondary { background: #666; color: white; }
-            .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-            .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }
-            .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }
-            .user-list { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .user-item { padding: 8px; border-bottom: 1px solid #ddd; }
-            .quick-fill { font-size: 12px; color: #666; margin-top: 5px; }
-            .quick-fill button { background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔐 Admin Password Reset</h1>
-            
-            {success_div}
-            {error_div}
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label for="email">Select User Email:</label>
-                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
-                        <option value="">-- Select a user --</option>
-                        {user_options}
-                    </select>
-                    <div class="quick-fill">
-                        Or type manually: 
-                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password">New Password:</label>
-                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
-                    <div class="quick-fill">
-                        Quick passwords: 
-                        <button type="button" onclick="setPassword('password123')">password123</button>
-                        <button type="button" onclick="setPassword('admin123')">admin123</button>
-                        <button type="button" onclick="setPassword('test123')">test123</button>
-                        <button type="button" onclick="setPassword('user123')">user123</button>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 30px;">
-                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
-                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
-                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
-                </div>
-            </form>
-            
-            <div class="user-list">
-                <h3>📋 Registered Users ({user_count} total):</h3>
-                {user_list}
-            </div>
-        </div>
-        
-        <script>
-            function fillEmail(email) {
-                document.getElementById('manual_email').value = email;
-            }
-            
-            function setPassword(password) {
-                document.getElementById('new_password').value = password;
-            }
-        </script>
-    </body>
-    </html>
-    """
-    
-    # Build the template components
-    success_div = f'<div class="success">{success_msg}</div>' if 'success_msg' in locals() and success_msg else ''
-    error_div = f'<div class="error">{error_msg}</div>' if 'error_msg' in locals() and error_msg else ''
-    
-    user_options = ''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])
-    user_list = ''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'
-    
-    # Return the formatted template
-    return html_template.format(
-        success_div=success_div,
-        error_div=error_div,
-        user_options=user_options,
-        user_count=len(users),
-        user_list=user_list
-    )
-
-@app.route('/check-users')
-def check_users():
-    """Enhanced user management interface"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
-        users = cursor.fetchall()
-        conn.close()
-        
-        # Create HTML template
-        html_template = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>User Management</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
-                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
-                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-                th { background-color: #f8f9fa; font-weight: bold; color: #333; }
-                tr:hover { background-color: #f5f5f5; }
-                .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }
-                .btn-primary { background: #e91e63; color: white; }
-                .btn-secondary { background: #666; color: white; }
-                .btn-success { background: #28a745; color: white; }
-                .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-                .stats { display: flex; gap: 20px; margin: 20px 0; }
-                .stat-box { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
-                .stat-number { font-size: 24px; font-weight: bold; color: #e91e63; }
-                .premium { color: #28a745; font-weight: bold; }
-                .trial { color: #ffc107; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>👥 User Management Dashboard</h1>
-                
-                <div class="stats">
-                    <div class="stat-box">
-                        <div class="stat-number">{total_users}</div>
-                        <div>Total Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{premium_users}</div>
-                        <div>Premium Users</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">{total_scans}</div>
-                        <div>Total Scans</div>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin: 20px 0;">
-                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
-                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
-                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
-                </div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Scans Used</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {user_rows}
-                    </tbody>
-                </table>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # Build template components
-        total_users = len(users)
-        premium_users = len([u for u in users if u[4]])
-        total_scans = sum(u[5] or 0 for u in users)
-        
-        user_rows = ''
-        if users:
-            for user in users:
-                status_class = 'premium' if user[4] else 'trial'
-                status_text = 'Premium' if user[4] else 'Trial'
-                user_rows += f'''
-                        <tr>
-                            <td>{user[0]}</td>
-                            <td>{user[1]}</td>
-                            <td>{user[2]}</td>
-                            <td class="{status_class}">{status_text}</td>
-                            <td>{user[5] or 0}</td>
-                            <td>{user[3]}</td>
-                        </tr>
-                        '''
-        else:
-            user_rows = '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'
-        
-        return html_template.format(
-            total_users=total_users,
-            premium_users=premium_users,
-            total_scans=total_scans,
-            user_rows=user_rows
-        )
-        
-    except Exception as e:
-        return f"""
-        <html>
-        <body style="font-family: Arial; padding: 20px;">
-            <h1>❌ Database Error</h1>
-            <p><strong>Error:</strong> {str(e)}</p>
-            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
-        </body>
-        </html>
-        """
-
-# Health check endpoint for monitoring
-@app.route('/health')
-def health_check():
-    """Simple health check endpoint"""
-    try:
-        # Check database connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1')
-        conn.close()
-        
-        # Check memory usage
-        import psutil
-        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-        
-        return jsonify({
-            'status': 'healthy',
-            'memory_mb': round(memory_mb, 1),
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
-
-# Error handlers
-@app.errorhandler(413)
-def too_large(e):
-    return render_template('error.html', 
-                         error_title="File Too Large", 
-                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
-
-@app.errorhandler(500)
-def internal_error(e):
-    # Force cleanup on 500 errors
-    gc.collect()
-    return render_template('error.html', 
-                         error_title="Internal Server Error", 
-                         error_message="Something went wrong. Please try again."), 500
-
-# Run cleanup on startup
-def startup_cleanup():
-    """Run cleanup tasks on app startup"""
-    try:
-        cleanup_old_images()
-        print("DEBUG: Startup cleanup completed")
-    except Exception as e:
-        print(f"DEBUG: Startup cleanup error: {e}")
-
-# Call startup cleanup
-startup_cleanup()
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }
-            .info { background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
         </style>
     </head>
     <body>
@@ -1519,12 +1111,12 @@ if __name__ == '__main__':
             <h1>🧪 Test User Upgrade</h1>
             
             <div class="info">
-                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.<br>
-                <strong>Current User:</strong> {user_name} ({user_email})<br>
-                <strong>Premium Status:</strong> {premium_status}
+                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
+                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
+                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
             </div>
             
-            {success_div}
+            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
             
             <form method="POST">
                 <div class="form-group">
@@ -1546,19 +1138,6 @@ if __name__ == '__main__':
     </body>
     </html>
     """
-    
-    # Format the template
-    user_name = session.get('user_name', 'Unknown')
-    user_email = session.get('user_email', 'Unknown')
-    premium_status = '✅ Premium' if session.get('is_premium') else '❌ Trial'
-    success_div = f'<div class="success">{success_msg}</div>' if success_msg else ''
-    
-    return html_content.format(
-        user_name=user_name,
-        user_email=user_email,
-        premium_status=premium_status,
-        success_div=success_div
-    )
 
 @app.route('/simple-login', methods=['GET', 'POST'])
 def simple_login():
@@ -1603,8 +1182,7 @@ def simple_login():
     else:
         error_msg = None
     
-    # Create HTML template
-    html_template = """
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -1615,20 +1193,20 @@ def simple_login():
         <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
             
-            {error_div}
+            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
             
             <form method="POST" action="/simple-login">
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
-                    <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                    <input type="email" name="email" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
                 </div>
                 
                 <div style="margin-bottom: 25px;">
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
-                    <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                    <input type="password" name="password" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
                 </div>
                 
-                <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                <button type="submit" style="width: 100%%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
                     Login
                 </button>
             </form>
@@ -1642,10 +1220,6 @@ def simple_login():
     </body>
     </html>
     """
-    
-    error_div = f'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">{error_msg}</div>' if error_msg else ''
-    
-    return html_template.format(error_div=error_div)
 
 @app.route('/admin-password-reset', methods=['GET', 'POST'])
 def admin_password_reset():
@@ -1706,23 +1280,234 @@ def admin_password_reset():
     except:
         users = []
     
-    # Create HTML template
-    html_template = """
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Admin Password Reset</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
-            .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
-            .form-group { margin-bottom: 20px; }
-            label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
-            input, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-            input:focus, select:focus { border-color: #e91e63; outline: none; }
-            .btn { padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
-            .btn-primary { background: #e91e63; color: white; }
-            .btn-secondary { background: #666; color: white; }
-            .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-            .success { background: #d4edda; color: #155724; padding: 15px; border-
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input, select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
+            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
+            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Admin Password Reset</h1>
+            
+            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
+            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Select User Email:</label>
+                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
+                        <option value="">-- Select a user --</option>
+                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
+                    </select>
+                    <div class="quick-fill">
+                        Or type manually: 
+                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                    <div class="quick-fill">
+                        Quick passwords: 
+                        <button type="button" onclick="setPassword('password123')">password123</button>
+                        <button type="button" onclick="setPassword('admin123')">admin123</button>
+                        <button type="button" onclick="setPassword('test123')">test123</button>
+                        <button type="button" onclick="setPassword('user123')">user123</button>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
+                </div>
+            </form>
+            
+            <div class="user-list">
+                <h3>📋 Registered Users ({len(users)} total):</h3>
+                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
+            </div>
+        </div>
+        
+        <script>
+            function fillEmail(email) {{
+                document.getElementById('manual_email').value = email;
+            }}
+            
+            function setPassword(password) {{
+                document.getElementById('new_password').value = password;
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/check-users')
+def check_users():
+    """Enhanced user management interface"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        conn.close()
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>User Management</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+                table {{ width: 100%%; border-collapse: collapse; margin: 20px 0; }}
+                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
+                tr:hover {{ background-color: #f5f5f5; }}
+                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
+                .btn-primary {{ background: #e91e63; color: white; }}
+                .btn-secondary {{ background: #666; color: white; }}
+                .btn-success {{ background: #28a745; color: white; }}
+                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
+                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
+                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
+                .premium {{ color: #28a745; font-weight: bold; }}
+                .trial {{ color: #ffc107; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>👥 User Management Dashboard</h1>
+                
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-number">{len(users)}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
+                        <div>Premium Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
+                        <div>Total Scans</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
+                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Scans Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join([f'''
+                        <tr>
+                            <td>{user[0]}</td>
+                            <td>{user[1]}</td>
+                            <td>{user[2]}</td>
+                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
+                            <td>{user[5] or 0}</td>
+                            <td>{user[3]}</td>
+                        </tr>
+                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>❌ Database Error</h1>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
+        </body>
+        </html>
+        """
+
+# Health check endpoint for monitoring
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint"""
+    try:
+        # Check database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        conn.close()
+        
+        # Check memory usage
+        import psutil
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        return jsonify({
+            'status': 'healthy',
+            'memory_mb': round(memory_mb, 1),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+# Error handlers
+@app.errorhandler(413)
+def too_large(e):
+    return render_template('error.html', 
+                         error_title="File Too Large", 
+                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
+
+@app.errorhandler(500)
+def internal_error(e):
+    # Force cleanup on 500 errors
+    gc.collect()
+    return render_template('error.html', 
+                         error_title="Internal Server Error", 
+                         error_message="Something went wrong. Please try again."), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
