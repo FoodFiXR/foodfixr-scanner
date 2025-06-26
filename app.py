@@ -17,6 +17,8 @@ from psycopg2.extras import RealDictCursor
 import gc  # Add for memory management
 import shutil
 from pathlib import Path
+import signal
+import sys
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -137,6 +139,33 @@ def init_db():
     conn.close()
     print("Database initialized successfully with all required columns")
 init_db()
+
+# Add memory monitoring and worker restart handling
+def setup_memory_monitoring():
+    """Setup memory monitoring and graceful shutdown"""
+    def memory_check():
+        try:
+            import psutil
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            if memory_mb > 400:  # Adjust based on your plan
+                print(f"WARNING: High memory usage: {memory_mb:.1f}MB - forcing cleanup")
+                gc.collect()
+                return False
+            return True
+        except Exception as e:
+            print(f"Memory check error: {e}")
+            return True
+    
+    def signal_handler(signum, frame):
+        print(f"Received signal {signum}, cleaning up...")
+        gc.collect()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+# Call this at startup
+setup_memory_monitoring()
 
 # Helper functions
 def login_required(f):
@@ -520,6 +549,18 @@ def scan():
     
     filepath = None
     try:
+        # Check memory before processing
+        import psutil
+        initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Initial memory before scan: {initial_memory:.1f}MB")
+        
+        if initial_memory > 300:  # If already high, force cleanup
+            print("DEBUG: High initial memory, forcing cleanup")
+            gc.collect()
+            time.sleep(0.5)
+            initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
+            print(f"DEBUG: Memory after cleanup: {initial_memory:.1f}MB")
+        
         # Save uploaded file with memory-conscious handling
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -529,25 +570,63 @@ def scan():
         print(f"DEBUG: Saving uploaded file to: {filepath}")
         file.save(filepath)
         
-        # Check file size before processing
-        file_size_kb = os.path.getsize(filepath) / 1024
-        print(f"DEBUG: Uploaded file size: {file_size_kb:.1f} KB")
+        # Check file size before processing - be more restrictive
+        file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+        print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
-        # If file is too large, reject it early
-        if file_size_kb > 10240:  # 10MB limit
+        # More restrictive file size limits for memory-constrained environment
+        max_size_mb = 3 if initial_memory > 200 else 5  # Dynamic limit based on current memory
+        
+        if file_size_mb > max_size_mb:
             cleanup_uploaded_file(filepath)
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
                                  trial_time_left=trial_time_left,
                                  user_name=user_data['name'],
-                                 error="Image too large. Please upload a smaller image (max 2MB).")
+                                 error=f"Image too large ({file_size_mb:.1f}MB). Please upload a smaller image (max {max_size_mb}MB).")
         
-        # Save image permanently for history
+        # Save image permanently for history (before processing to avoid memory issues)
         saved_image_path = save_scan_image(filepath, session['user_id'])
         
-        # Process the image with memory management
+        # Process the image with memory management and timeout
         print("DEBUG: Starting image processing...")
-        result = scan_image_for_ingredients(filepath)
+        
+        # Use a timeout wrapper for the scan
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Scan processing timed out")
+        
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(60)  # 60 second timeout
+        
+        try:
+            result = scan_image_for_ingredients(filepath)
+            signal.alarm(0)  # Cancel the alarm
+        except TimeoutError:
+            cleanup_uploaded_file(filepath)
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Scan timed out. Please try with a smaller or clearer image.")
+        except MemoryError as e:
+            cleanup_uploaded_file(filepath)
+            gc.collect()  # Force cleanup after memory error
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Out of memory. Please try with a smaller image.")
+        
+        # Check if scan failed due to memory issues
+        if result.get('error'):
+            cleanup_uploaded_file(filepath)
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error=result['error'])
         
         # Update user scan counts
         conn = get_db_connection()
@@ -577,7 +656,7 @@ def scan():
                 result.get('rating', ''), 
                 json.dumps(result.get('matched_ingredients', {})),
                 str(uuid.uuid4()),
-                result.get('extracted_text', ''),
+                result.get('extracted_text', '')[:1000],  # Limit text length
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
@@ -604,7 +683,7 @@ def scan():
                 json.dumps(result.get('matched_ingredients', {})),
                 format_datetime_for_db(),
                 str(uuid.uuid4()),
-                result.get('extracted_text', ''),
+                result.get('extracted_text', '')[:1000],  # Limit text length
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
@@ -619,6 +698,10 @@ def scan():
         
         # Clean up temp uploaded file
         cleanup_uploaded_file(filepath)
+        
+        # Final memory check
+        final_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Final memory after scan: {final_memory:.1f}MB")
         
         print("DEBUG: Scan completed successfully")
         return render_template('scanner.html',
@@ -638,16 +721,64 @@ def scan():
         # Force memory cleanup on error
         gc.collect()
         
+        error_message = "Scanning failed. Please try again with a smaller, clearer image."
+        if "memory" in str(e).lower() or "MemoryError" in str(e):
+            error_message = "Out of memory. Please try with a much smaller image."
+        
         return render_template('scanner.html',
                              trial_expired=trial_expired,
                              trial_time_left=trial_time_left,
                              user_name=user_data['name'],
-                             error=f"Scanning failed: {str(e)}. Please try again with a smaller image.")
+                             error=error_message)
     
     finally:
         # Always ensure cleanup
         cleanup_uploaded_file(filepath)
         gc.collect()
+        
+        # Cancel any pending alarms
+        try:
+            signal.alarm(0)
+        except:
+            pass
+
+# Add a health check that monitors memory
+@app.route('/health')
+def health_check():
+    """Enhanced health check with memory monitoring"""
+    try:
+        # Check database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        conn.close()
+        
+        # Check memory usage
+        import psutil
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        
+        # Memory health status
+        memory_status = "healthy"
+        if memory_mb > 400:
+            memory_status = "warning"
+        if memory_mb > 500:
+            memory_status = "critical"
+            # Force cleanup at critical levels
+            gc.collect()
+        
+        return jsonify({
+            'status': 'healthy' if memory_status != 'critical' else 'degraded',
+            'memory_mb': round(memory_mb, 1),
+            'memory_status': memory_status,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
         
 @app.route('/account')
 @login_required
