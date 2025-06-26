@@ -31,7 +31,7 @@ DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 # Configuration - Conservative limits for memory-constrained environments
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-MAX_CONTENT_LENGTH = 3 * 1024 * 1024  # Reduced to 3MB
+MAX_CONTENT_LENGTH = 10 * 1024 * 1024  
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
