@@ -319,7 +319,7 @@
             overflow-y: auto;
         }
 
-        /* Product Image */
+        /* Product Image - UPDATED STYLES */
         .product-image {
             max-width: 100%;
             height: auto;
@@ -327,10 +327,38 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
             cursor: pointer;
+            max-height: 300px;
+            object-fit: cover;
         }
 
         .product-image:hover {
             transform: scale(1.02);
+        }
+
+        /* Image loading and error states */
+        .image-loading {
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            border-radius: 10px;
+            color: #999;
+            font-style: italic;
+        }
+
+        .image-error {
+            background: #ffebee;
+            border: 2px dashed #ffcdd2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            border-radius: 10px;
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
         }
 
         /* Empty State */
@@ -392,7 +420,7 @@
             background: linear-gradient(135deg, #666, #555);
         }
 
-        /* Image Modal */
+        /* Image Modal - UPDATED */
         .image-modal {
             display: none;
             position: fixed;
@@ -417,6 +445,7 @@
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             animation: scaleIn 0.3s ease;
+            object-fit: contain;
         }
 
         .modal-close {
@@ -628,7 +657,7 @@
                     {% for category, count in scan.ingredient_summary.items() %}
                         {% if count > 0 %}
                             <span class="ingredient-tag {{ category }}">
-                                {% if category == 'trans_fat' %}⚠️ Excitotoxins ({{ count }})
+                                {% if category == 'trans_fat' %}⚠️ Trans Fat ({{ count }})
                                 {% elif category == 'excitotoxins' %}⚠️ Excitotoxins ({{ count }})
                                 {% elif category == 'corn' %}🌽 Corn ({{ count }})
                                 {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
@@ -643,24 +672,25 @@
                 {% endif %}
 
                 <button class="expand-btn" onclick="toggleDetails(this)">
-                    <span class="expand-text">Hide Details</span>
+                    <span class="expand-text">View Details</span>
                 </button>
 
                 <div class="scan-details">
+                    <!-- UPDATED: Proper image display with error handling -->
                     {% if scan.image_url and scan.image_url != '' %}
                     <div class="detail-section">
                         <div class="detail-title">📸 Scanned Product</div>
                         <div class="detail-content" style="padding: 8px; background: white;">
-                            <img src="{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('{{ scan.image_url }}')">
+                            <img src="/{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('/{{ scan.image_url }}')" onerror="handleImageError(this)">
                         </div>
                     </div>
                     {% else %}
                     <div class="detail-section">
                         <div class="detail-title">📸 Scanned Product</div>
                         <div class="detail-content">
-                            <div style="padding: 20px; text-align: center; color: #999; font-style: italic;">
-                                📷 Original image not saved<br>
-                                <small>(Images are processed but not stored for privacy)</small>
+                            <div class="image-error">
+                                📷 Image not available<br>
+                                <small>This scan was processed before image saving was enabled, or the image file was removed for storage optimization.</small>
                             </div>
                         </div>
                     </div>
@@ -768,7 +798,7 @@
         }
 
         function clearHistory() {
-            if (confirm('Are you sure you want to clear all scan history? This cannot be undone.')) {
+            if (confirm('Are you sure you want to clear all scan history? This cannot be undone and will also delete all saved images.')) {
                 fetch('/clear-history', {
                     method: 'POST',
                     headers: {
@@ -794,13 +824,29 @@
             window.location.href = '/export-history';
         }
 
-        // Image Modal Functions
+        // UPDATED: Enhanced image modal functions with error handling
         function openModal(imageSrc) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
             
+            // Show loading state
+            modalImg.style.opacity = '0.5';
             modal.classList.add('show');
+            
+            // Set image source
             modalImg.src = imageSrc;
+            
+            // Handle successful load
+            modalImg.onload = function() {
+                modalImg.style.opacity = '1';
+            };
+            
+            // Handle error
+            modalImg.onerror = function() {
+                modalImg.style.opacity = '1';
+                modalImg.alt = 'Image could not be loaded';
+                console.log('Modal image failed to load:', imageSrc);
+            };
             
             // Prevent body scrolling when modal is open
             document.body.style.overflow = 'hidden';
@@ -812,6 +858,18 @@
             
             // Restore body scrolling
             document.body.style.overflow = 'auto';
+        }
+
+        // NEW: Handle image loading errors in scan cards
+        function handleImageError(img) {
+            console.log('Image failed to load:', img.src);
+            
+            // Replace with error placeholder
+            const placeholder = document.createElement('div');
+            placeholder.className = 'image-error';
+            placeholder.innerHTML = '📷 Image not available<br><small>File may have been moved or deleted</small>';
+            
+            img.parentNode.replaceChild(placeholder, img);
         }
 
         // Close modal when clicking outside the image
@@ -828,9 +886,22 @@
             }
         });
 
-        // Auto-expand details for mobile (like in the image)
+        // Enhanced DOM ready function with image error handling
         document.addEventListener('DOMContentLoaded', function() {
-            // Auto-expand the first scan details if on mobile
+            // Handle image loading errors for all product images
+            const images = document.querySelectorAll('.product-image');
+            
+            images.forEach(function(img) {
+                img.addEventListener('error', function() {
+                    handleImageError(this);
+                });
+                
+                img.addEventListener('load', function() {
+                    console.log('Image loaded successfully:', this.src);
+                });
+            });
+
+            // Auto-expand details for mobile (like in the original)
             const isMobile = window.innerWidth <= 600;
             if (isMobile) {
                 const firstScanCard = document.querySelector('.scan-card');
