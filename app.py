@@ -81,7 +81,6 @@ def get_db_connection():
         return conn
 
 # Database initialization
-# Updated init_db function with all required columns
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -137,6 +136,7 @@ def init_db():
     conn.commit()
     conn.close()
     print("Database initialized successfully with all required columns")
+
 init_db()
 
 # Helper functions
@@ -879,7 +879,6 @@ def create_checkout_session():
         plan = data.get('plan', 'monthly')  # Default to monthly
         
         # Map plan names to Stripe price IDs
-        # You'll need to create these price IDs in your Stripe dashboard
         plan_price_mapping = {
             'weekly': os.getenv('STRIPE_WEEKLY_PRICE_ID', 'price_weekly_placeholder'),
             'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_placeholder'), 
@@ -1231,25 +1230,288 @@ def test_upgrade_user():
     else:
         success_msg = None
     
-    return f"""
+    # Create HTML response
+    html_content = """
     <!DOCTYPE html>
     <html>
     <head>
         <title>Test Upgrade User</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-            .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-primary {{ background: #e91e63; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
+            body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
+            .container { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+            select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+            .btn { padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+            .btn-primary { background: #e91e63; color: white; }
+            .btn-secondary { background: #666; color: white; }
+            .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+            .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }
+            .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }
+            .user-list { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .user-item { padding: 8px; border-bottom: 1px solid #ddd; }
+            .quick-fill { font-size: 12px; color: #666; margin-top: 5px; }
+            .quick-fill button { background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Admin Password Reset</h1>
+            
+            {success_div}
+            {error_div}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Select User Email:</label>
+                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
+                        <option value="">-- Select a user --</option>
+                        {user_options}
+                    </select>
+                    <div class="quick-fill">
+                        Or type manually: 
+                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                    <div class="quick-fill">
+                        Quick passwords: 
+                        <button type="button" onclick="setPassword('password123')">password123</button>
+                        <button type="button" onclick="setPassword('admin123')">admin123</button>
+                        <button type="button" onclick="setPassword('test123')">test123</button>
+                        <button type="button" onclick="setPassword('user123')">user123</button>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
+                </div>
+            </form>
+            
+            <div class="user-list">
+                <h3>📋 Registered Users ({user_count} total):</h3>
+                {user_list}
+            </div>
+        </div>
+        
+        <script>
+            function fillEmail(email) {
+                document.getElementById('manual_email').value = email;
+            }
+            
+            function setPassword(password) {
+                document.getElementById('new_password').value = password;
+            }
+        </script>
+    </body>
+    </html>
+    """
+    
+    # Build the template components
+    success_div = f'<div class="success">{success_msg}</div>' if 'success_msg' in locals() and success_msg else ''
+    error_div = f'<div class="error">{error_msg}</div>' if 'error_msg' in locals() and error_msg else ''
+    
+    user_options = ''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])
+    user_list = ''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'
+    
+    # Return the formatted template
+    return html_template.format(
+        success_div=success_div,
+        error_div=error_div,
+        user_options=user_options,
+        user_count=len(users),
+        user_list=user_list
+    )
+
+@app.route('/check-users')
+def check_users():
+    """Enhanced user management interface"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        conn.close()
+        
+        # Create HTML template
+        html_template = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>User Management</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
+                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+                th { background-color: #f8f9fa; font-weight: bold; color: #333; }
+                tr:hover { background-color: #f5f5f5; }
+                .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }
+                .btn-primary { background: #e91e63; color: white; }
+                .btn-secondary { background: #666; color: white; }
+                .btn-success { background: #28a745; color: white; }
+                .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+                .stats { display: flex; gap: 20px; margin: 20px 0; }
+                .stat-box { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
+                .stat-number { font-size: 24px; font-weight: bold; color: #e91e63; }
+                .premium { color: #28a745; font-weight: bold; }
+                .trial { color: #ffc107; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>👥 User Management Dashboard</h1>
+                
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-number">{total_users}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{premium_users}</div>
+                        <div>Premium Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{total_scans}</div>
+                        <div>Total Scans</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
+                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Scans Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {user_rows}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Build template components
+        total_users = len(users)
+        premium_users = len([u for u in users if u[4]])
+        total_scans = sum(u[5] or 0 for u in users)
+        
+        user_rows = ''
+        if users:
+            for user in users:
+                status_class = 'premium' if user[4] else 'trial'
+                status_text = 'Premium' if user[4] else 'Trial'
+                user_rows += f'''
+                        <tr>
+                            <td>{user[0]}</td>
+                            <td>{user[1]}</td>
+                            <td>{user[2]}</td>
+                            <td class="{status_class}">{status_text}</td>
+                            <td>{user[5] or 0}</td>
+                            <td>{user[3]}</td>
+                        </tr>
+                        '''
+        else:
+            user_rows = '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'
+        
+        return html_template.format(
+            total_users=total_users,
+            premium_users=premium_users,
+            total_scans=total_scans,
+            user_rows=user_rows
+        )
+        
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>❌ Database Error</h1>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
+        </body>
+        </html>
+        """
+
+# Health check endpoint for monitoring
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint"""
+    try:
+        # Check database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        conn.close()
+        
+        # Check memory usage
+        import psutil
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        return jsonify({
+            'status': 'healthy',
+            'memory_mb': round(memory_mb, 1),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+# Error handlers
+@app.errorhandler(413)
+def too_large(e):
+    return render_template('error.html', 
+                         error_title="File Too Large", 
+                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
+
+@app.errorhandler(500)
+def internal_error(e):
+    # Force cleanup on 500 errors
+    gc.collect()
+    return render_template('error.html', 
+                         error_title="Internal Server Error", 
+                         error_message="Something went wrong. Please try again."), 500
+
+# Run cleanup on startup
+def startup_cleanup():
+    """Run cleanup tasks on app startup"""
+    try:
+        cleanup_old_images()
+        print("DEBUG: Startup cleanup completed")
+    except Exception as e:
+        print(f"DEBUG: Startup cleanup error: {e}")
+
+# Call startup cleanup
+startup_cleanup()
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }
+            .info { background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }
         </style>
     </head>
     <body>
@@ -1257,12 +1519,12 @@ def test_upgrade_user():
             <h1>🧪 Test User Upgrade</h1>
             
             <div class="info">
-                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
-                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
-                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
+                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.<br>
+                <strong>Current User:</strong> {user_name} ({user_email})<br>
+                <strong>Premium Status:</strong> {premium_status}
             </div>
             
-            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
+            {success_div}
             
             <form method="POST">
                 <div class="form-group">
@@ -1284,6 +1546,19 @@ def test_upgrade_user():
     </body>
     </html>
     """
+    
+    # Format the template
+    user_name = session.get('user_name', 'Unknown')
+    user_email = session.get('user_email', 'Unknown')
+    premium_status = '✅ Premium' if session.get('is_premium') else '❌ Trial'
+    success_div = f'<div class="success">{success_msg}</div>' if success_msg else ''
+    
+    return html_content.format(
+        user_name=user_name,
+        user_email=user_email,
+        premium_status=premium_status,
+        success_div=success_div
+    )
 
 @app.route('/simple-login', methods=['GET', 'POST'])
 def simple_login():
@@ -1328,7 +1603,8 @@ def simple_login():
     else:
         error_msg = None
     
-    return f"""
+    # Create HTML template
+    html_template = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -1339,20 +1615,20 @@ def simple_login():
         <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
             
-            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
+            {error_div}
             
             <form method="POST" action="/simple-login">
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
-                    <input type="email" name="email" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                    <input type="email" name="email" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
                 </div>
                 
                 <div style="margin-bottom: 25px;">
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
-                    <input type="password" name="password" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                    <input type="password" name="password" required style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
                 </div>
                 
-                <button type="submit" style="width: 100%%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                <button type="submit" style="width: 100%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
                     Login
                 </button>
             </form>
@@ -1366,6 +1642,10 @@ def simple_login():
     </body>
     </html>
     """
+    
+    error_div = f'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">{error_msg}</div>' if error_msg else ''
+    
+    return html_template.format(error_div=error_div)
 
 @app.route('/admin-password-reset', methods=['GET', 'POST'])
 def admin_password_reset():
@@ -1426,25 +1706,23 @@ def admin_password_reset():
     except:
         users = []
     
-    return f"""
+    # Create HTML template
+    html_template = """
     <!DOCTYPE html>
     <html>
     <head>
         <title>Admin Password Reset</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
-            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
-            .form-group {{ margin-bottom: 20px; }}
-            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
-            input, select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
-            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
-            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
-            .btn-primary {{ background: #e91e63; color: white; }}
-            .btn-secondary {{ background: #666; color: white; }}
-            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
-            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
-            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+            body { font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            h1 { color: #e91e63; text-align: center; margin-bottom: 30px; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+            input, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+            input:focus, select:focus { border-color: #e91e63; outline: none; }
+            .btn { padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+            .btn-primary { background: #e91e63; color: white; }
+            .btn-secondary { background: #666; color: white; }
+            .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+            .success { background: #d4edda; color: #155724; padding: 15px; border-
