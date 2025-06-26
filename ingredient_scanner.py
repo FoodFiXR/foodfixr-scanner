@@ -14,8 +14,6 @@ from PIL import Image
 import requests
 import resource  # Add this import at the top
 import sys
-import subprocess
-import json
 
 # Enhanced memory monitoring function
 def log_memory_usage(stage="", force_gc=False):
@@ -46,149 +44,6 @@ def log_memory_usage(stage="", force_gc=False):
     except Exception as e:
         print(f"DEBUG: Memory monitoring error: {e}")
         return 0
-
-def scan_image_isolated(image_path):
-    """Run OCR in completely isolated subprocess - guarantees memory cleanup"""
-    try:
-        print(f"DEBUG: Starting isolated OCR processing for {image_path}")
-        
-        # Create a separate Python script for OCR processing
-        ocr_script = '''
-import sys
-import json
-import os
-import tempfile
-import requests
-from PIL import Image
-import gc
-
-def isolated_ocr(image_path):
-    """OCR processing in isolated environment"""
-    try:
-        print(f"ISOLATED: Processing {image_path}")
-        
-        # Aggressive image compression first
-        temp_path = None
-        with Image.open(image_path) as img:
-            print(f"ISOLATED: Original size: {img.size}, mode: {img.mode}")
-            
-            # Convert and resize aggressively  
-            if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            
-            # Very small target size for memory safety
-            max_dim = 250
-            if img.width > max_dim or img.height > max_dim:
-                ratio = min(max_dim/img.width, max_dim/img.height)
-                new_size = (int(img.width * ratio), int(img.height * ratio))
-                img = img.resize(new_size, Image.Resampling.LANCZOS)
-                print(f"ISOLATED: Resized to: {new_size}")
-            
-            # Save compressed version
-            temp_path = tempfile.mktemp(suffix='.jpg')
-            img.save(temp_path, 'JPEG', quality=15, optimize=True)
-            
-            # Check final size
-            final_size_kb = os.path.getsize(temp_path) / 1024
-            print(f"ISOLATED: Compressed to {final_size_kb:.1f} KB")
-        
-        # OCR API call with compressed image
-        api_url = 'https://api.ocr.space/parse/image'
-        api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
-        
-        with open(temp_path, 'rb') as f:
-            files = {'file': f}
-            data = {
-                'apikey': api_key,
-                'language': 'eng',
-                'isOverlayRequired': False,
-                'detectOrientation': True,
-                'scale': True,
-                'OCREngine': 2,
-                'isTable': False
-            }
-            
-            print("ISOLATED: Sending to OCR.space API...")
-            response = requests.post(api_url, files=files, data=data, timeout=25)
-        
-        # Clean up temp file immediately
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-            print("ISOLATED: Cleaned up temp file")
-        
-        # Process response
-        if response.status_code == 200:
-            result = response.json()
-            if not result.get('IsErroredOnProcessing', True):
-                parsed_results = result.get('ParsedResults', [])
-                if parsed_results:
-                    text = parsed_results[0].get('ParsedText', '')
-                    # Clean up text
-                    cleaned_text = text.replace('\\r', ' ').replace('\\n', ' ')
-                    cleaned_text = ' '.join(cleaned_text.split())  # Remove extra whitespace
-                    print(f"ISOLATED: Extracted {len(cleaned_text)} characters")
-                    return cleaned_text
-        
-        print("ISOLATED: No text extracted")
-        return ""
-        
-    except Exception as e:
-        print(f"ISOLATED: OCR error: {e}")
-        return ""
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(json.dumps({"error": "Invalid arguments"}))
-        sys.exit(1)
-    
-    image_path = sys.argv[1]
-    result = isolated_ocr(image_path)
-    print(json.dumps({"text": result}))
-'''
-        
-        # Write OCR script to temp file
-        script_path = tempfile.mktemp(suffix='.py')
-        with open(script_path, 'w') as f:
-            f.write(ocr_script)
-        
-        print(f"DEBUG: Created isolated script: {script_path}")
-        
-        try:
-            # Run OCR in completely separate process
-            print("DEBUG: Launching isolated OCR process...")
-            result = subprocess.run([
-                'python', script_path, image_path
-            ], capture_output=True, text=True, timeout=60)
-            
-            print(f"DEBUG: Process returned with code: {result.returncode}")
-            
-            if result.returncode == 0:
-                try:
-                    output = json.loads(result.stdout.strip())
-                    extracted_text = output.get('text', '')
-                    print(f"DEBUG: Isolated OCR extracted {len(extracted_text)} characters")
-                    return extracted_text
-                except json.JSONDecodeError as e:
-                    print(f"DEBUG: JSON decode error: {e}")
-                    print(f"DEBUG: Raw output: {result.stdout}")
-                    return ""
-            else:
-                print(f"DEBUG: OCR subprocess error: {result.stderr}")
-                return ""
-                
-        except subprocess.TimeoutExpired:
-            print("DEBUG: OCR subprocess timed out")
-            return ""
-            
-        finally:
-            # Clean up script file
-            if os.path.exists(script_path):
-                os.remove(script_path)
-                print("DEBUG: Cleaned up script file")
-                
-    except Exception as e:
-        print(f"DEBUG: Process isolation error: {e}")
-        return ""
 
 def aggressive_cleanup():
     """Ultra-aggressive memory cleanup"""
@@ -410,33 +265,33 @@ def compress_image_for_ocr(image_path, max_size_kb=100):  # Reduced from 150KB
         log_memory_usage("end compression", force_gc=True)
 
 def extract_text_with_multiple_methods(image_path):
-    """Extract text using isolated OCR process - prevents memory leaks"""
+    """Extract text using OCR.space API with fallback options"""
     try:
-        print(f"DEBUG: Starting isolated text extraction from {image_path}")
+        print(f"DEBUG: Starting OCR.space API text extraction from {image_path}")
         
         # Force garbage collection before starting
         aggressive_cleanup()
         
-        # Use isolated OCR process - this guarantees memory cleanup
-        text = scan_image_isolated(image_path)
+        # Try OCR.space API first
+        text = extract_text_ocr_space(image_path)
         
         if text and len(text.strip()) > 5:
-            print(f"DEBUG: Isolated OCR successful - extracted {len(text)} characters")
+            print(f"DEBUG: OCR.space successful - extracted {len(text)} characters")
             return text
         
-        # If isolated OCR fails, try fallback (also isolated)
-        print("DEBUG: Isolated OCR failed, trying fallback...")
-        text = extract_text_pytesseract_fallback(image_path)
+        # If OCR.space fails, try with different settings
+        print("DEBUG: First attempt failed, trying with enhanced settings...")
+        text = extract_text_ocr_space_enhanced(image_path)
         
         if text and len(text.strip()) > 5:
-            print(f"DEBUG: Fallback successful - extracted {len(text)} characters")
+            print(f"DEBUG: OCR.space enhanced successful - extracted {len(text)} characters")
             return text
         
-        print("DEBUG: All OCR methods failed")
-        return ""
+        print("DEBUG: OCR.space failed, trying basic pytesseract fallback...")
+        return extract_text_pytesseract_fallback(image_path)
         
     except Exception as e:
-        print(f"DEBUG: Isolated OCR methods failed: {e}")
+        print(f"DEBUG: All OCR methods failed: {e}")
         # Force cleanup on error
         aggressive_cleanup()
         return ""
@@ -1102,10 +957,17 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with process isolation - NO MORE MEMORY LEAKS"""
+    """Main scanning function with comprehensive memory management and error recovery"""
     try:
+        # Set memory limits first
+        set_memory_limits()
+        
+        # CRITICAL: Clean up before starting any processing
+        before_scan_cleanup()
+        monitor_memory_and_cleanup("initial")
+        
         print(f"\n{'='*80}")
-        print(f"🔬 STARTING PROCESS-ISOLATED SCAN: {image_path}")
+        print(f"🔬 STARTING MEMORY-OPTIMIZED SCAN: {image_path}")
         print(f"{'='*80}")
         print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
@@ -1114,13 +976,16 @@ def scan_image_for_ingredients(image_path):
             file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
             print(f"DEBUG: Input file size: {file_size_mb:.2f} MB")
             
-            if file_size_mb > 8:  # Increased limit since we're using isolation
+            if file_size_mb > 5:  # Very conservative limit
                 print("DEBUG: File too large, rejecting")
-                return create_error_result("Image file too large. Please use a smaller image (max 8MB).")
+                return create_error_result("Image file too large. Please use a smaller image (max 5MB).")
         
-        # Extract text using ISOLATED OCR process
-        print("🔍 Starting isolated OCR process...")
+        # Extract text using OCR.space with memory management
+        print("🔍 Starting OCR.space text extraction...")
+        monitor_memory_and_cleanup("before OCR")
+        
         text = extract_text_with_multiple_methods(image_path)
+        monitor_memory_and_cleanup("after OCR")
         
         print(f"📝 Extracted text length: {len(text)} characters")
         
@@ -1129,44 +994,66 @@ def scan_image_for_ingredients(image_path):
         else:
             print("❌ No text extracted!")
         
-        # Continue with normal processing (no memory issues here)
+        # Assess text quality
         text_quality = assess_text_quality_enhanced(text)
         print(f"📊 Text quality assessment: {text_quality}")
         
+        # Match ingredients using PRECISE system
+        print("🧬 Starting PRECISE ingredient matching...")
+        monitor_memory_and_cleanup("before matching")
+        
         matches = match_all_ingredients(text)
+        monitor_memory_and_cleanup("after matching")
+        
+        # Rate ingredients according to hierarchy (now with safety label override)
+        print("⚖️ Applying hierarchy-based rating with safety label override...")
         rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
         print(f"🏆 Final rating: {rating}")
         
+        # Determine confidence
         confidence = determine_confidence(text_quality, text, matches)
         
+        # Check for GMO Alert (but don't show if safety labels found)
         gmo_alert = None
         if matches["gmo"] and not matches.get("has_safety_labels", False):
             gmo_alert = "📣 GMO Alert!"
         
+        # Create comprehensive result
         result = {
             "rating": rating,
             "matched_ingredients": matches,
             "confidence": confidence,
             "extracted_text_length": len(text),
             "text_quality": text_quality,
-            "extracted_text": text[:1000] if text else "",
+            "extracted_text": text[:1000] if text else "",  # Limit stored text length
             "gmo_alert": gmo_alert,
             "has_safety_labels": matches.get("has_safety_labels", False)
         }
         
+        # Print comprehensive summary
         print_scan_summary(result)
         
-        # Minimal cleanup needed - OCR memory was already freed by process isolation
-        gc.collect()
+        # Final cleanup
+        monitor_memory_and_cleanup("final")
+        aggressive_cleanup()
         
         return result
         
+    except MemoryError as e:
+        print(f"❌ MEMORY ERROR in scan_image_for_ingredients: {e}")
+        emergency_memory_cleanup()
+        return create_error_result("Out of memory. Please try with a smaller image.")
+        
     except Exception as e:
-        print(f"❌ SCAN ERROR: {e}")
+        print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
         import traceback
         traceback.print_exc()
         
+        # Force cleanup on error
+        emergency_memory_cleanup()
+        
         return create_error_result(f"Scanning failed: {str(e)}")
+
 
 def determine_confidence(text_quality, text, matches):
     """Determine confidence level based on multiple factors"""
