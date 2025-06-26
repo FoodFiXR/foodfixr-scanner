@@ -1,32 +1,21 @@
 import re
 import os
 import gc
-import signal
-import sys
 from scanner_config import *
 import requests
 from PIL import Image, ImageOps, ImageEnhance
-import psutil
+
+import gc
+import psutil  # Add this for memory monitoring
+import os
 import tempfile
 import time
+from PIL import Image
+import requests
 
-# Setup memory limits and protection
-def setup_memory_limits():
-    """Set up memory monitoring and limits"""
-    def memory_limit_handler(signum, frame):
-        print("DEBUG: Memory limit reached, forcing cleanup and exit")
-        aggressive_cleanup()
-        sys.exit(1)
-    
-    # Set up signal handler for memory issues
-    signal.signal(signal.SIGUSR1, memory_limit_handler)
-
-# Call this once when module loads
-setup_memory_limits()
-
-# Enhanced memory monitoring function with worker protection
+# Enhanced memory monitoring function
 def log_memory_usage(stage="", force_gc=False):
-    """Enhanced memory monitoring with worker protection"""
+    """Enhanced memory monitoring with optional garbage collection"""
     try:
         if force_gc:
             # Force multiple GC cycles before measuring
@@ -38,8 +27,8 @@ def log_memory_usage(stage="", force_gc=False):
         memory_mb = process.memory_info().rss / 1024 / 1024
         print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
         
-        # CRITICAL: Much lower threshold for Render environment
-        if memory_mb > 120:  # Reduced from 150
+        # Critical memory threshold - force cleanup if too high
+        if memory_mb > 150:  # Lowered threshold for memory-constrained environments
             print(f"DEBUG: CRITICAL memory usage! Forcing aggressive cleanup...")
             for _ in range(5):
                 gc.collect()
@@ -49,86 +38,37 @@ def log_memory_usage(stage="", force_gc=False):
             memory_mb = process.memory_info().rss / 1024 / 1024
             print(f"DEBUG: Memory after emergency cleanup: {memory_mb:.1f} MB")
             
-            # If still too high, trigger worker restart
-            if memory_mb > 130:
-                print(f"DEBUG: Memory still critical ({memory_mb:.1f} MB), triggering worker restart")
-                # Send signal to restart worker gracefully
-                os.kill(os.getpid(), signal.SIGTERM)
-            
         return memory_mb
     except Exception as e:
         print(f"DEBUG: Memory monitoring error: {e}")
         return 0
 
-def cleanup_temp_files_emergency():
-    """Emergency temp file cleanup"""
-    try:
-        temp_dir = tempfile.gettempdir()
-        current_time = time.time()
-        
-        cleaned_count = 0
-        for filename in os.listdir(temp_dir):
-            if any(pattern in filename for pattern in ['compressed', 'ultra_', 'ocr_', '20250626']):
-                filepath = os.path.join(temp_dir, filename)
-                try:
-                    if os.path.isfile(filepath):
-                        # Very aggressive cleanup - delete files older than 5 seconds
-                        file_age = current_time - os.path.getmtime(filepath)
-                        if file_age > 5:
-                            os.remove(filepath)
-                            cleaned_count += 1
-                except:
-                    pass
-        
-        if cleaned_count > 0:
-            print(f"DEBUG: Emergency cleanup removed {cleaned_count} temp files")
-            
-    except Exception as e:
-        print(f"DEBUG: Emergency temp cleanup error: {e}")
-
 def aggressive_cleanup():
-    """Ultra-aggressive memory cleanup with worker protection"""
+    """Ultra-aggressive memory cleanup"""
     try:
-        print("DEBUG: Starting aggressive cleanup...")
-        
         # Force multiple garbage collection cycles
-        for i in range(7):  # Increased from 5
+        for _ in range(5):  # Increased from 3
             gc.collect()
-            if i > 0:
-                time.sleep(0.05)  # Small delay between cycles
         
-        # Clear PIL cache completely
-        Image.MAX_IMAGE_PIXELS = 30000000  # Even more conservative
+        # Clear PIL cache
+        Image.MAX_IMAGE_PIXELS = 50000000  # Set conservative limit
         
-        # Clear any PIL internal caches
-        if hasattr(Image, '_getdecoder'):
-            try:
-                Image._getdecoder.cache_clear()
-            except:
-                pass
-        
-        # Force Python to release memory back to OS
+        # Force Python to release memory back to OS (if possible)
         if hasattr(gc, 'set_threshold'):
-            gc.set_threshold(100, 5, 5)  # Very aggressive GC settings
-        
-        # Clean up temp files aggressively
-        cleanup_temp_files_emergency()
+            gc.set_threshold(0, 0, 0)  # Disable automatic GC temporarily
+            gc.collect()
+            gc.set_threshold(700, 10, 10)  # Re-enable with aggressive settings
         
         print("DEBUG: Aggressive cleanup completed")
-        
-        # Final memory check
-        final_memory = psutil.Process().memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Memory after aggressive cleanup: {final_memory:.1f} MB")
-        
     except Exception as e:
         print(f"DEBUG: Cleanup error: {e}")
 
 def ultra_minimal_compress(image_path, max_size_kb=80):
-    """Ultra-minimal memory footprint compression - MEMORY SAFE VERSION"""
-    print(f"DEBUG: Starting MEMORY-SAFE ultra minimal compression")
+    """Ultra-minimal memory footprint compression for emergency situations"""
     log_memory_usage("before ultra minimal", force_gc=True)
     
     temp_path = None
+    img = None
     
     try:
         # Check if compression is even needed
@@ -139,34 +79,20 @@ def ultra_minimal_compress(image_path, max_size_kb=80):
             print("DEBUG: Size OK, no compression needed")
             return image_path
         
-        # MEMORY CHECK: If memory is already high, reject the operation
-        current_memory = log_memory_usage("pre-compression check", force_gc=True)
-        if current_memory > 90:  # Conservative threshold
-            print(f"DEBUG: Memory too high ({current_memory:.1f} MB), rejecting compression")
-            raise MemoryError("Memory limit reached before compression")
-        
         # Create temp file
         temp_dir = tempfile.gettempdir()
         temp_path = os.path.join(temp_dir, f"ultra_compressed_{int(time.time())}.jpg")
         
-        # CRITICAL: Use context manager and process in chunks
-        print("DEBUG: Opening image with memory-safe processing...")
-        
+        # Single-pass processing with minimal memory
         with Image.open(image_path) as img:
-            # Get basic info without loading full image
+            # Get dimensions without loading full image into memory
             width, height = img.size
             mode = img.mode
             
             print(f"DEBUG: Original: {width}x{height}, mode: {mode}")
             
-            # MEMORY CHECK: Monitor memory after opening
-            memory_after_open = log_memory_usage("after image open", force_gc=False)
-            if memory_after_open > 100:
-                print(f"DEBUG: Memory spiked to {memory_after_open:.1f} MB after opening image")
-                raise MemoryError("Memory limit exceeded during image open")
-            
-            # Calculate ULTRA-CONSERVATIVE target size
-            max_dim = min(300, max(width, height) // 5)  # Even more aggressive
+            # Calculate target size very aggressively for memory-constrained environments
+            max_dim = min(350, max(width, height) // 4)  # Very aggressive downsizing
             if width > height:
                 new_width = max_dim
                 new_height = int(height * max_dim / width)
@@ -174,84 +100,51 @@ def ultra_minimal_compress(image_path, max_size_kb=80):
                 new_height = max_dim
                 new_width = int(width * max_dim / height)
             
-            # Ensure minimum but keep it small
-            new_width = max(new_width, 150)  # Reduced from 200
-            new_height = max(new_height, 100)  # Reduced from 150
+            # Ensure minimum readable size for OCR
+            new_width = max(new_width, 200)
+            new_height = max(new_height, 150)
             
             print(f"DEBUG: Target size: {new_width}x{new_height}")
             
-            # Convert mode if necessary
+            # Convert mode if necessary (in-place)
             if mode in ('RGBA', 'LA', 'P'):
-                print("DEBUG: Converting image mode...")
                 img = img.convert('RGB')
-                
-                # MEMORY CHECK after conversion
-                memory_after_convert = log_memory_usage("after mode conversion")
-                if memory_after_convert > 105:
-                    raise MemoryError("Memory limit exceeded during mode conversion")
+                log_memory_usage("after mode conversion")
             
-            # CRITICAL: Resize with immediate cleanup
-            print("DEBUG: Resizing image...")
+            # Single resize operation
             img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
-            # IMMEDIATE cleanup of original
+            # Clear original reference immediately
             img.close()
             del img
+            img = None
+            gc.collect()
+            log_memory_usage("after resize")
             
-            # Force garbage collection immediately
-            for _ in range(3):
-                gc.collect()
-            
-            # MEMORY CHECK after resize
-            memory_after_resize = log_memory_usage("after resize")
-            if memory_after_resize > 110:
-                print(f"DEBUG: Memory too high after resize: {memory_after_resize:.1f} MB")
-                img_resized.close()
-                del img_resized
-                gc.collect()
-                raise MemoryError("Memory limit exceeded during resize")
-            
-            # Save with ultra-low quality
-            print("DEBUG: Saving compressed image...")
-            img_resized.save(temp_path, 'JPEG', quality=10, optimize=True, progressive=False)
+            # Save with minimal quality
+            img_resized.save(temp_path, 'JPEG', quality=15, optimize=True, progressive=False)
             
             # Check result
             result_size_kb = os.path.getsize(temp_path) / 1024
             print(f"DEBUG: Ultra minimal result: {result_size_kb:.1f} KB")
             
-            # Clean up resized image immediately
+            # Clean up resized image
             img_resized.close()
             del img_resized
-            
-            # Force cleanup
-            for _ in range(3):
-                gc.collect()
-            
-            log_memory_usage("end ultra minimal compression")
+            gc.collect()
             
             return temp_path
             
-    except MemoryError as e:
-        print(f"DEBUG: Memory error in compression: {e}")
-        
-        # Emergency cleanup
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-        
-        # Force aggressive cleanup
-        for _ in range(5):
-            gc.collect()
-        
-        # Return original path as fallback
-        return image_path
-        
     except Exception as e:
         print(f"DEBUG: Ultra minimal compression failed: {e}")
         
         # Emergency cleanup
+        if img:
+            try:
+                img.close()
+            except:
+                pass
+        
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
@@ -262,10 +155,14 @@ def ultra_minimal_compress(image_path, max_size_kb=80):
         return image_path
     
     finally:
-        # Final cleanup regardless of success/failure
-        for _ in range(3):
-            gc.collect()
-        log_memory_usage("final cleanup ultra minimal", force_gc=True)
+        # Final cleanup
+        if img:
+            try:
+                img.close()
+            except:
+                pass
+        gc.collect()
+        log_memory_usage("end ultra minimal", force_gc=True)
 
 def compress_image_for_ocr(image_path, max_size_kb=100):  # Reduced from 150KB
     """Memory-efficient compression specifically optimized for OCR"""
@@ -588,7 +485,7 @@ def process_request_with_memory_management():
                 try:
                     if os.path.isfile(filepath):
                         file_age = current_time - os.path.getmtime(filepath)
-                        if file_age > 10:  # Reduced from 60 seconds
+                        if file_age > 60:  # 1 minute (very aggressive cleanup)
                             os.remove(filepath)
                             cleaned_count += 1
                 except Exception as e:
@@ -607,7 +504,7 @@ def before_scan_cleanup():
     process_request_with_memory_management()
     
     # Set aggressive PIL limits
-    Image.MAX_IMAGE_PIXELS = 20000000  # Reduced from 40000000 for memory-constrained environments
+    Image.MAX_IMAGE_PIXELS = 40000000  # Reduced from default for memory-constrained environments
     
     # Force Python to be more aggressive with memory
     import sys
@@ -744,6 +641,7 @@ def check_for_safety_labels(text):
     
     normalized_text = normalize_ingredient_text(text)
     print(f"DEBUG: Checking for safety labels in text: {normalized_text[:200]}...")
+    print(f"DEBUG: Full normalized text: {normalized_text}")
     
     # Define safety label patterns (made more flexible and comprehensive)
     safety_patterns = [
@@ -1060,58 +958,25 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
     return "✅ Yay! Safe!"
 
 def scan_image_for_ingredients(image_path):
-    """Main scanning function with memory protection"""
+    """Main scanning function with comprehensive memory management"""
     try:
         # CRITICAL: Clean up before starting any processing
         before_scan_cleanup()
         
         print(f"\n{'='*80}")
-        print(f"🔬 STARTING MEMORY-PROTECTED SCAN: {image_path}")
+        print(f"🔬 STARTING MEMORY-OPTIMIZED SCAN: {image_path}")
         print(f"{'='*80}")
-        
-        # EARLY SIZE AND MEMORY CHECKS
-        if not os.path.exists(image_path):
-            return create_error_result("Image file not found")
-        
-        # Check file size before processing
-        file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
-        print(f"DEBUG: Input file size: {file_size_mb:.2f} MB")
-        
-        # CRITICAL: Reject large files early
-        if file_size_mb > 2.5:  # Very conservative limit
-            return create_error_result("Image too large. Please use an image smaller than 2.5MB.")
-        
-        # Check current memory before processing
-        initial_memory = log_memory_usage("before processing", force_gc=True)
-        if initial_memory > 80:  # Conservative pre-processing limit
-            print(f"DEBUG: Memory already high ({initial_memory:.1f} MB), forcing cleanup")
-            for _ in range(5):
-                gc.collect()
-            
-            initial_memory = log_memory_usage("after pre-cleanup")
-            if initial_memory > 90:
-                return create_error_result("System memory too high. Please try again in a moment.")
+        print(f"DEBUG: File exists: {os.path.exists(image_path)}")
         
         # Extract text using OCR.space with memory management
         print("🔍 Starting OCR.space text extraction...")
-        try:
-            text = extract_text_with_multiple_methods(image_path)
-        except MemoryError:
-            aggressive_cleanup()
-            return create_error_result("Memory limit reached during text extraction. Please try with a smaller image.")
-        
+        text = extract_text_with_multiple_methods(image_path)
         print(f"📝 Extracted text length: {len(text)} characters")
         
         if text:
-            print(f"📋 EXTRACTED TEXT:\n{text[:300]}...")  # Limit debug output
+            print(f"📋 EXTRACTED TEXT:\n{text}")
         else:
             print("❌ No text extracted!")
-        
-        # Check memory after OCR
-        memory_after_ocr = log_memory_usage("after OCR")
-        if memory_after_ocr > 100:
-            print(f"DEBUG: High memory after OCR ({memory_after_ocr:.1f} MB), forcing cleanup")
-            aggressive_cleanup()
         
         # Assess text quality
         text_quality = assess_text_quality_enhanced(text)
@@ -1121,54 +986,48 @@ def scan_image_for_ingredients(image_path):
         print("🧬 Starting PRECISE ingredient matching...")
         matches = match_all_ingredients(text)
         
-        # Rate ingredients according to hierarchy
-        print("⚖️ Applying hierarchy-based rating...")
+        # Rate ingredients according to hierarchy (now with safety label override)
+        print("⚖️ Applying hierarchy-based rating with safety label override...")
         rating = rate_ingredients_according_to_hierarchy(matches, text_quality)
         print(f"🏆 Final rating: {rating}")
         
         # Determine confidence
         confidence = determine_confidence(text_quality, text, matches)
         
-        # Check for GMO Alert
+        # Check for GMO Alert (but don't show if safety labels found)
         gmo_alert = None
         if matches["gmo"] and not matches.get("has_safety_labels", False):
             gmo_alert = "📣 GMO Alert!"
         
-        # Create result with limited text storage
+        # Create comprehensive result
         result = {
             "rating": rating,
             "matched_ingredients": matches,
             "confidence": confidence,
             "extracted_text_length": len(text),
             "text_quality": text_quality,
-            "extracted_text": text[:500] if text else "",  # Limit stored text
+            "extracted_text": text,
             "gmo_alert": gmo_alert,
-            "has_safety_labels": matches.get("has_safety_labels", False)
+            "has_safety_labels": matches.get("has_safety_labels", False)  # NEW: Include in result
         }
         
-        # Print summary (limited)
-        print(f"🏆 FINAL RATING: {result['rating']}")
-        print(f"🎯 Confidence: {result['confidence']}")
+        # Print comprehensive summary
+        print_scan_summary(result)
         
         # Final cleanup
         aggressive_cleanup()
         
-        final_memory = log_memory_usage("final result", force_gc=True)
-        
         return result
-        
-    except MemoryError as e:
-        print(f"❌ MEMORY ERROR in scan: {e}")
-        aggressive_cleanup()
-        return create_error_result("Memory limit reached. Please try with a smaller image.")
         
     except Exception as e:
         print(f"❌ CRITICAL ERROR in scan_image_for_ingredients: {e}")
+        import traceback
+        traceback.print_exc()
         
         # Force cleanup on error
         aggressive_cleanup()
         
-        return create_error_result(f"Scanning failed: {str(e)}")
+        return create_error_result(str(e))
 
 def determine_confidence(text_quality, text, matches):
     """Determine confidence level based on multiple factors"""
@@ -1195,9 +1054,8 @@ def create_error_result(error_message):
             "has_safety_labels": False
         },
         "confidence": "very_low",
-        "text_quality": "error",
+        "text_quality": "very_poor",
         "extracted_text_length": 0,
-        "extracted_text": "",
         "gmo_alert": None,
         "has_safety_labels": False,
         "error": error_message
