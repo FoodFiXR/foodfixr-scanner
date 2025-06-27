@@ -4,7 +4,7 @@ from werkzeug.exceptions import RequestTimeout
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from ingredient_scanner import scan_image_for_ingredients, before_scan_cleanup, safe_ocr_with_fallback
+from ingredient_scanner import scan_image_for_ingredients, before_scan_cleanup, safe_ocr_with_fallback_professional
 import json
 from datetime import datetime, timedelta
 import uuid
