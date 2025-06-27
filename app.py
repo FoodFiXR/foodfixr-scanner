@@ -640,7 +640,7 @@ def scan():
         print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
         # Dynamic file size limits based on current memory
-        max_size_mb = 2 if initial_memory > 200 else 3  # Very restrictive
+        max_size_mb = 10 if initial_memory > 200 else 12 # Very restrictive
         
         if file_size_mb > max_size_mb:
             cleanup_uploaded_file(filepath)
