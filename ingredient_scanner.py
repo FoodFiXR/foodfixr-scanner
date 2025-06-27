@@ -13,6 +13,18 @@ import time
 from PIL import Image
 import requests
 
+# Professional tier detection
+PROFESSIONAL_TIER = os.getenv('RENDER_TIER') == 'professional' or int(os.getenv('WEB_CONCURRENCY', '1')) > 1
+
+if PROFESSIONAL_TIER:
+    print("✅ PROFESSIONAL TIER DETECTED in ingredient_scanner - Using enhanced thresholds")
+    MEMORY_THRESHOLD = 2000  # 2GB
+    COMPRESSION_THRESHOLD = 1000  # 1MB
+else:
+    print("ℹ️ Free tier detected - Using conservative thresholds")
+    MEMORY_THRESHOLD = 120   # 120MB
+    COMPRESSION_THRESHOLD = 300  # 300KB
+
 # Enhanced memory monitoring function
 # Professional tier memory thresholds (more relaxed)
 def log_memory_usage(stage="", force_gc=False):
