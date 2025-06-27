@@ -34,6 +34,23 @@ app.config.update(
     # Add request timeout protection
     REQUEST_TIMEOUT=90,  # 90 seconds max per request
 )
+# Professional tier optimizations
+app.config.update(
+    # Can handle larger files now
+    MAX_CONTENT_LENGTH=15 * 1024 * 1024,  # 15MB (was 5MB)
+    
+    # Less aggressive session timeout
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=4),  # 4 hours (was 1 hour)
+    
+    # Professional tier request timeout
+    REQUEST_TIMEOUT=180,  # 3 minutes (was 90 seconds)
+)
+
+# Detect if running on professional tier
+PROFESSIONAL_TIER = os.getenv('RENDER_TIER') == 'professional' or os.getenv('WEB_CONCURRENCY', '1') != '1'
+
+if PROFESSIONAL_TIER:
+    print("INFO: Professional tier detected - enabling optimizations")
 
 # Stripe Configuration
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
