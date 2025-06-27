@@ -1,9 +1,33 @@
-Flask==3.0.0
-Werkzeug==3.0.1
-Pillow==10.4.0
-pytesseract==0.3.10
-stripe==7.8.1
+# Core Flask application
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# Production WSGI server - CRITICAL for 502 fix
 gunicorn==21.2.0
+
+# Database support
+psycopg2-binary==2.9.7  # PostgreSQL for production
+sqlite3  # SQLite for local development (built-in)
+
+# Image processing and OCR
+Pillow==10.0.1
 requests==2.31.0
-psutil==5.9.8
-psycopg2-binary
+
+# Payment processing
+stripe==6.6.0
+
+# System monitoring and memory management
+psutil==5.9.6
+
+# Security
+cryptography==41.0.7
+
+# Optional process title setting
+setproctitle==1.3.3
+
+# Optional OCR fallback (if needed)
+# pytesseract==0.3.10
+# Note: Uncomment above if you want Tesseract fallback, but it requires system installation
+
+# Development dependencies (optional)
+# python-dotenv==1.0.0  # For local environment variables
