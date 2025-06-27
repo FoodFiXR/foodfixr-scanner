@@ -15,31 +15,30 @@ import requests
 
 # Enhanced memory monitoring function
 # Professional tier memory thresholds (more relaxed)
-def log_memory_usage_professional(stage="", force_gc=False):
-    """Professional tier memory monitoring with higher thresholds"""
+def log_memory_usage(stage="", force_gc=False):
     try:
         if force_gc:
-            for _ in range(2):  # Less aggressive GC
+            for _ in range(2):  # Reduced from 3 for Professional tier
                 gc.collect()
             time.sleep(0.05)  # Shorter cleanup time
         
         process = psutil.Process()
         memory_mb = process.memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Professional memory usage {stage}: {memory_mb:.1f} MB")
+        print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
         
-        # Much higher threshold for professional tier (4GB available)
-        if memory_mb > 2000:  # 2GB threshold (was 120MB)
-            print(f"DEBUG: High professional memory usage! Forcing cleanup...")
+        # PROFESSIONAL TIER: Much higher threshold (you have 4GB!)
+        if memory_mb > 2000:  # Changed from 120MB to 2GB
+            print(f"DEBUG: High memory usage! Forcing cleanup...")
             for _ in range(3):
                 gc.collect()
             time.sleep(0.1)
             
             memory_mb = process.memory_info().rss / 1024 / 1024
-            print(f"DEBUG: Professional memory after cleanup: {memory_mb:.1f} MB")
+            print(f"DEBUG: Memory after cleanup: {memory_mb:.1f} MB")
             
         return memory_mb
     except Exception as e:
-        print(f"DEBUG: Professional memory monitoring error: {e}")
+        print(f"DEBUG: Memory monitoring error: {e}")
         return 0
 
 def aggressive_cleanup():
