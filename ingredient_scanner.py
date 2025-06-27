@@ -15,30 +15,31 @@ import requests
 
 # Enhanced memory monitoring function
 # Professional tier memory thresholds (more relaxed)
-def log_memory_usage(stage="", force_gc=False):
+def log_memory_usage_professional(stage="", force_gc=False):
+    """Professional tier memory monitoring with higher thresholds"""
     try:
         if force_gc:
-            for _ in range(2):  # Reduced from 3 iterations
+            for _ in range(2):  # Less aggressive GC
                 gc.collect()
-            time.sleep(0.05)  # Reduced cleanup time
+            time.sleep(0.05)  # Shorter cleanup time
         
         process = psutil.Process()
         memory_mb = process.memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
+        print(f"DEBUG: Professional memory usage {stage}: {memory_mb:.1f} MB")
         
-        # Higher threshold for professional tier
-        if memory_mb > 800:  # Was 120MB, now 800MB (you have 4GB!)
-            print(f"DEBUG: High memory usage! Forcing cleanup...")
+        # Much higher threshold for professional tier (4GB available)
+        if memory_mb > 2000:  # 2GB threshold (was 120MB)
+            print(f"DEBUG: High professional memory usage! Forcing cleanup...")
             for _ in range(3):
                 gc.collect()
             time.sleep(0.1)
             
             memory_mb = process.memory_info().rss / 1024 / 1024
-            print(f"DEBUG: Memory after cleanup: {memory_mb:.1f} MB")
+            print(f"DEBUG: Professional memory after cleanup: {memory_mb:.1f} MB")
             
         return memory_mb
     except Exception as e:
-        print(f"DEBUG: Memory monitoring error: {e}")
+        print(f"DEBUG: Professional memory monitoring error: {e}")
         return 0
 
 def aggressive_cleanup():
@@ -61,36 +62,32 @@ def aggressive_cleanup():
     except Exception as e:
         print(f"DEBUG: Cleanup error: {e}")
 
-def ultra_minimal_compress(image_path, max_size_kb=60):
-    """Ultra-minimal memory footprint compression for emergency situations"""
-    log_memory_usage("before ultra minimal", force_gc=True)
+def ultra_minimal_compress_professional(image_path, max_size_kb=500):
+    """Professional tier ultra-minimal compression with better minimums"""
+    log_memory_usage("before professional ultra minimal", force_gc=True)
     
     temp_path = None
     img = None
     
     try:
-        # Check if compression is even needed
         current_size_kb = os.path.getsize(image_path) / 1024
-        print(f"DEBUG: Ultra minimal - current size: {current_size_kb:.1f} KB")
+        print(f"DEBUG: Professional ultra minimal - current size: {current_size_kb:.1f} KB")
         
         if current_size_kb <= max_size_kb:
             print("DEBUG: Size OK, no compression needed")
             return image_path
         
-        # Create temp file
         temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"ultra_compressed_{int(time.time())}.jpg")
+        temp_path = os.path.join(temp_dir, f"pro_ultra_compressed_{int(time.time())}.jpg")
         
-        # Single-pass processing with minimal memory
         with Image.open(image_path) as img:
-            # Get dimensions without loading full image into memory
             width, height = img.size
             mode = img.mode
             
-            print(f"DEBUG: Original: {width}x{height}, mode: {mode}")
+            print(f"DEBUG: Professional original: {width}x{height}, mode: {mode}")
             
-            # Calculate target size very aggressively for memory-constrained environments
-            max_dim = min(300, max(width, height) // 4)  # Very aggressive downsizing
+            # Less aggressive downsizing for professional tier
+            max_dim = min(600, max(width, height) // 3)  # Was 300 and //4 on free tier
             if width > height:
                 new_width = max_dim
                 new_height = int(height * max_dim / width)
@@ -98,35 +95,48 @@ def ultra_minimal_compress(image_path, max_size_kb=60):
                 new_height = max_dim
                 new_width = int(width * max_dim / height)
             
-            # Ensure minimum readable size for OCR
-            new_width = max(new_width, 150)
-            new_height = max(new_height, 100)
+            # Higher minimum readable size for professional tier
+            new_width = max(new_width, 300)   # Was 150
+            new_height = max(new_height, 200)  # Was 100
             
-            print(f"DEBUG: Target size: {new_width}x{new_height}")
+            print(f"DEBUG: Professional target size: {new_width}x{new_height}")
             
-            # Convert mode if necessary (in-place)
+            # Convert mode if necessary
             if mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGB')
-                log_memory_usage("after mode conversion")
+                log_memory_usage("after professional mode conversion")
             
             # Single resize operation
             img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
-            # Clear original reference immediately
+            # Clear original reference
             img.close()
             del img
             img = None
             gc.collect()
-            log_memory_usage("after resize")
+            log_memory_usage("after professional resize")
             
-            # Save with minimal quality
-            img_resized.save(temp_path, 'JPEG', quality=10, optimize=True, progressive=False)
+            # Try higher quality first for professional tier
+            quality_levels = [25, 20, 15, 12, 10]  # Was [10, 8] on free tier
             
-            # Check result
+            for quality in quality_levels:
+                img_resized.save(temp_path, 'JPEG', quality=quality, optimize=True, progressive=False)
+                
+                result_size_kb = os.path.getsize(temp_path) / 1024
+                print(f"DEBUG: Professional ultra quality {quality}: {result_size_kb:.1f} KB")
+                
+                if result_size_kb <= max_size_kb:
+                    print(f"✅ Professional ultra success at quality {quality}: {result_size_kb:.1f} KB")
+                    img_resized.close()
+                    del img_resized
+                    gc.collect()
+                    return temp_path
+            
+            # Final attempt with lowest quality
+            img_resized.save(temp_path, 'JPEG', quality=8, optimize=True, progressive=False)
             result_size_kb = os.path.getsize(temp_path) / 1024
-            print(f"DEBUG: Ultra minimal result: {result_size_kb:.1f} KB")
+            print(f"DEBUG: Professional final result: {result_size_kb:.1f} KB")
             
-            # Clean up resized image
             img_resized.close()
             del img_resized
             gc.collect()
@@ -134,7 +144,7 @@ def ultra_minimal_compress(image_path, max_size_kb=60):
             return temp_path
             
     except Exception as e:
-        print(f"DEBUG: Ultra minimal compression failed: {e}")
+        print(f"DEBUG: Professional ultra minimal compression failed: {e}")
         
         # Emergency cleanup
         if img:
@@ -153,19 +163,18 @@ def ultra_minimal_compress(image_path, max_size_kb=60):
         return image_path
     
     finally:
-        # Final cleanup
         if img:
             try:
                 img.close()
             except:
                 pass
         gc.collect()
-        log_memory_usage("end ultra minimal", force_gc=True)
+        log_memory_usage("end professional ultra minimal", force_gc=True)
 
-def compress_image_for_ocr(image_path, max_size_kb=80):  # Reduced from 100KB
-    """Memory-efficient compression specifically optimized for OCR"""
-    print(f"DEBUG: Starting memory-efficient compression for {image_path}")
-    log_memory_usage("start compression", force_gc=True)
+def compress_image_for_ocr_professional(image_path, max_size_kb=500):
+    """Professional tier - Enhanced compression with better quality retention"""
+    print(f"DEBUG: Professional tier compression for {image_path}")
+    log_memory_usage("start professional compression", force_gc=True)
     
     try:
         # Quick size check
@@ -176,139 +185,132 @@ def compress_image_for_ocr(image_path, max_size_kb=80):  # Reduced from 100KB
             print("DEBUG: Size acceptable, no compression needed")
             return image_path
         
-        # If file is very large, use ultra-minimal compression immediately
-        if current_size_kb > 300:  # Lowered threshold from 400KB
-            print("DEBUG: Large file detected, using ultra-minimal compression")
-            return ultra_minimal_compress(image_path, max_size_kb)
+        # Professional tier can handle larger files before ultra-minimal compression
+        if current_size_kb > 2000:  # 2MB threshold (was 300KB on free tier)
+            print("DEBUG: Very large file, using optimized compression")
+            return ultra_minimal_compress_professional(image_path, max_size_kb)
         
-        # For moderate sizes, try standard compression
-        temp_path = os.path.join(tempfile.gettempdir(), f"ocr_compressed_{int(time.time())}.jpg")
+        # Standard compression with better quality settings
+        temp_path = os.path.join(tempfile.gettempdir(), f"pro_compressed_{int(time.time())}.jpg")
         
-        # Memory-conscious processing
-        img = None
         try:
-            # Open and process in single operation
             with Image.open(image_path) as original:
                 width, height = original.size
                 
-                # Calculate reasonable target dimensions
-                scale_factor = min(1.0, (max_size_kb / current_size_kb) ** 0.4)
-                target_width = max(int(width * scale_factor), 200)  # Reduced minimums
-                target_height = max(int(height * scale_factor), 150)
+                # Less aggressive scaling for professional tier
+                scale_factor = min(1.0, (max_size_kb / current_size_kb) ** 0.3)  # Was 0.4
+                target_width = max(int(width * scale_factor), 400)  # Higher minimum (was 200)
+                target_height = max(int(height * scale_factor), 300)  # Higher minimum (was 150)
                 
-                print(f"DEBUG: Scaling {width}x{height} -> {target_width}x{target_height}")
+                print(f"DEBUG: Professional scaling {width}x{height} -> {target_width}x{target_height}")
                 
-                # Convert and resize in one step
+                # Convert mode if necessary
                 if original.mode in ('RGBA', 'LA', 'P'):
                     original = original.convert('RGB')
                 
-                # Resize
+                # Resize with better quality
                 resized = original.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 
-                # Force cleanup of original
+                # Force cleanup
                 original.close()
                 gc.collect()
-                log_memory_usage("after resize")
+                log_memory_usage("after professional resize")
                 
-                # Try different quality levels (more aggressive)
-                for quality in [30, 20, 15, 10, 8]:  # Lower quality range
+                # Try higher quality levels first (professional tier advantage)
+                quality_levels = [70, 60, 50, 40, 30, 25, 20]  # Start higher than free tier
+                
+                for quality in quality_levels:
                     resized.save(temp_path, 'JPEG', quality=quality, optimize=True)
                     
                     result_size_kb = os.path.getsize(temp_path) / 1024
-                    print(f"DEBUG: Quality {quality}: {result_size_kb:.1f} KB")
+                    print(f"DEBUG: Professional quality {quality}: {result_size_kb:.1f} KB")
                     
                     if result_size_kb <= max_size_kb:
-                        print(f"✅ Success at quality {quality}: {result_size_kb:.1f} KB")
+                        print(f"✅ Professional compression success at quality {quality}: {result_size_kb:.1f} KB")
                         resized.close()
                         gc.collect()
                         return temp_path
                 
-                # If still too large, fall back to ultra-minimal
+                # If standard compression fails, try minimal
                 resized.close()
                 gc.collect()
                 
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
                 
-                print("DEBUG: Standard compression failed, falling back to ultra-minimal")
-                return ultra_minimal_compress(image_path, max_size_kb)
+                print("DEBUG: Standard professional compression failed, trying minimal")
+                return ultra_minimal_compress_professional(image_path, max_size_kb)
                 
         except Exception as e:
-            print(f"DEBUG: Standard compression error: {e}")
-            if img:
-                try:
-                    img.close()
-                except:
-                    pass
+            print(f"DEBUG: Professional compression error: {e}")
             gc.collect()
             
-            # Clean up temp file
             if os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
                 except:
                     pass
             
-            # Fall back to ultra-minimal
-            return ultra_minimal_compress(image_path, max_size_kb)
+            return ultra_minimal_compress_professional(image_path, max_size_kb)
     
     except Exception as e:
-        print(f"DEBUG: Compression completely failed: {e}")
+        print(f"DEBUG: Professional compression completely failed: {e}")
         gc.collect()
         return image_path
     
     finally:
         gc.collect()
-        log_memory_usage("end compression", force_gc=True)
+        log_memory_usage("end professional compression", force_gc=True)
+
 
 # CRITICAL: New safe OCR function with circuit breaker
-def safe_ocr_with_fallback(image_path, max_attempts=2):
-    """OCR with circuit breaker to prevent 502 errors"""
-    print(f"DEBUG: Starting safe OCR with circuit breaker")
+def safe_ocr_with_fallback_professional(image_path, max_attempts=3):
+    """Professional tier OCR with more attempts and better error handling"""
+    print(f"DEBUG: Starting professional OCR with {max_attempts} attempts")
     
     for attempt in range(max_attempts):
         try:
-            print(f"DEBUG: OCR attempt {attempt + 1}/{max_attempts}")
+            print(f"DEBUG: Professional OCR attempt {attempt + 1}/{max_attempts}")
             
-            # Check memory before each attempt
+            # More relaxed memory check for professional tier
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-            if memory_mb > 150:  # Conservative threshold
-                print(f"DEBUG: Memory too high ({memory_mb:.1f}MB), forcing cleanup")
+            if memory_mb > 1500:  # 1.5GB threshold (was 150MB on free tier)
+                print(f"DEBUG: High memory usage ({memory_mb:.1f}MB), forcing cleanup")
                 aggressive_cleanup()
-                time.sleep(1)
+                time.sleep(0.5)  # Brief pause
                 
                 # Check again after cleanup
                 memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                if memory_mb > 200:  # Still too high
-                    print(f"DEBUG: Memory still high after cleanup ({memory_mb:.1f}MB), skipping attempt")
+                if memory_mb > 2000:  # 2GB critical threshold
+                    print(f"DEBUG: Memory still very high ({memory_mb:.1f}MB), skipping attempt")
                     if attempt == max_attempts - 1:
                         return ""
                     continue
             
-            # Try OCR with timeout protection
+            # OCR with longer timeout for professional tier
             import signal
             
             def ocr_timeout_handler(signum, frame):
-                raise TimeoutError("OCR timeout")
+                raise TimeoutError("Professional OCR timeout")
             
             old_handler = signal.signal(signal.SIGALRM, ocr_timeout_handler)
-            signal.alarm(45)  # 45 second timeout for OCR
+            signal.alarm(90)  # 90 seconds (was 45 on free tier)
             
             try:
-                result = extract_text_ocr_space(image_path)
-                signal.alarm(0)  # Cancel alarm
+                result = extract_text_ocr_space_professional(image_path)
+                signal.alarm(0)
                 signal.signal(signal.SIGALRM, old_handler)
                 
                 if result and len(result.strip()) > 3:
-                    print(f"DEBUG: OCR successful on attempt {attempt + 1}")
+                    print(f"DEBUG: Professional OCR successful on attempt {attempt + 1}")
                     return result
                 else:
-                    print(f"DEBUG: OCR returned empty result on attempt {attempt + 1}")
+                    print(f"DEBUG: Professional OCR returned empty result on attempt {attempt + 1}")
                     
             except TimeoutError:
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, old_handler)
-                print(f"DEBUG: OCR timed out on attempt {attempt + 1}")
+                print(f"DEBUG: Professional OCR timed out on attempt {attempt + 1}")
                 aggressive_cleanup()
                 
                 if attempt == max_attempts - 1:
@@ -316,95 +318,122 @@ def safe_ocr_with_fallback(image_path, max_attempts=2):
                 continue
                 
         except Exception as e:
-            print(f"DEBUG: OCR attempt {attempt + 1} failed: {e}")
+            print(f"DEBUG: Professional OCR attempt {attempt + 1} failed: {e}")
             aggressive_cleanup()
             
             if attempt == max_attempts - 1:
-                # Last attempt failed, return minimal response
-                print("DEBUG: All OCR attempts failed, returning empty result")
+                print("DEBUG: All professional OCR attempts failed")
                 return ""
             
-            time.sleep(2)  # Wait before retry
+            time.sleep(1)  # Shorter wait between retries
     
     return ""
-
-def extract_text_with_multiple_methods(image_path):
-    """Extract text using safe OCR with fallback options"""
+    
+def extract_text_with_multiple_methods_professional(image_path):
+    """Professional tier text extraction with enhanced methods"""
     try:
-        print(f"DEBUG: Starting safe OCR text extraction from {image_path}")
+        print(f"DEBUG: Starting professional OCR text extraction from {image_path}")
         
-        # Force garbage collection before starting
+        # Less aggressive cleanup for professional tier
         aggressive_cleanup()
         
-        # Try safe OCR with circuit breaker
-        text = safe_ocr_with_fallback(image_path)
+        # Try professional OCR with circuit breaker
+        text = safe_ocr_with_fallback_professional(image_path, max_attempts=3)
         
         if text and len(text.strip()) > 5:
-            print(f"DEBUG: Safe OCR successful - extracted {len(text)} characters")
+            print(f"DEBUG: Professional OCR successful - extracted {len(text)} characters")
             return text
         
-        # If safe OCR fails, try basic pytesseract fallback (if available)
-        print("DEBUG: Safe OCR failed, trying basic pytesseract fallback...")
+        # If professional OCR fails, try enhanced fallback
+        print("DEBUG: Professional OCR failed, trying enhanced fallback...")
         return extract_text_pytesseract_fallback(image_path)
         
     except Exception as e:
-        print(f"DEBUG: All OCR methods failed: {e}")
-        # Force cleanup on error
+        print(f"DEBUG: All professional OCR methods failed: {e}")
         aggressive_cleanup()
         return ""
 
-def extract_text_ocr_space(image_path):
-    """Memory-safe OCR.space extraction with aggressive cleanup"""
-    log_memory_usage("start OCR", force_gc=True)
+# Professional tier memory thresholds
+def log_memory_usage_professional(stage="", force_gc=False):
+    """Professional tier memory monitoring with higher thresholds"""
+    try:
+        if force_gc:
+            for _ in range(2):  # Less aggressive GC
+                gc.collect()
+            time.sleep(0.05)  # Shorter cleanup time
+        
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Professional memory usage {stage}: {memory_mb:.1f} MB")
+        
+        # Much higher threshold for professional tier (4GB available)
+        if memory_mb > 2000:  # 2GB threshold (was 120MB)
+            print(f"DEBUG: High professional memory usage! Forcing cleanup...")
+            for _ in range(3):
+                gc.collect()
+            time.sleep(0.1)
+            
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            print(f"DEBUG: Professional memory after cleanup: {memory_mb:.1f} MB")
+            
+        return memory_mb
+    except Exception as e:
+        print(f"DEBUG: Professional memory monitoring error: {e}")
+        return 0
+
+def extract_text_ocr_space_professional(image_path):
+    """Professional tier OCR with better compression and settings"""
+    log_memory_usage("start professional OCR", force_gc=True)
     
     processed_image_path = None
     response = None
     
     try:
-        # Pre-compress with very conservative limits
-        processed_image_path = compress_image_for_ocr(image_path, max_size_kb=80)
-        log_memory_usage("after compression", force_gc=True)
+        # Use professional compression
+        processed_image_path = compress_image_for_ocr_professional(image_path, max_size_kb=500)
+        log_memory_usage("after professional compression", force_gc=True)
         
         api_url = 'https://api.ocr.space/parse/image'
         api_key = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
         
-        print(f"DEBUG: Using compressed image: {processed_image_path}")
+        print(f"DEBUG: Using professional compressed image: {processed_image_path}")
         final_size = os.path.getsize(processed_image_path) / 1024
-        print(f"DEBUG: Final size: {final_size:.1f} KB")
+        print(f"DEBUG: Professional final size: {final_size:.1f} KB")
         
-        # Prepare request data
+        # Enhanced request data for better accuracy
         data = {
             'apikey': api_key,
             'language': 'eng',
             'isOverlayRequired': False,
             'detectOrientation': True,
             'scale': True,
-            'OCREngine': 2,
-            'isTable': False
+            'OCREngine': 2,  # Use engine 2 for better accuracy
+            'isTable': False,
+            'isSearchablePdfHideTextLayer': False
         }
         
-        # Make API request with file context manager
+        # Make API request with longer timeout for professional tier
         with open(processed_image_path, 'rb') as f:
             files = {'file': f}
-            print("DEBUG: Sending to OCR.space API...")
+            print("DEBUG: Sending to professional OCR.space API...")
             
             try:
-                response = requests.post(api_url, files=files, data=data, timeout=20)
-                log_memory_usage("after API call")
+                response = requests.post(api_url, files=files, data=data, timeout=30)  # 30s timeout
+                log_memory_usage("after professional API call")
             except requests.exceptions.Timeout:
-                print("DEBUG: OCR API timeout - file might be too large")
+                print("DEBUG: Professional OCR API timeout")
                 return ""
             except Exception as api_error:
-                print(f"DEBUG: OCR API error: {api_error}")
+                print(f"DEBUG: Professional OCR API error: {api_error}")
                 return ""
         
-        # Process response immediately
+        # Process response
         if response and response.status_code == 200:
             try:
                 result = response.json()
                 extracted_text = parse_ocr_space_response(result)
                 
-                # Clear response immediately
+                # Clear response
                 response.close() if hasattr(response, 'close') else None
                 del response
                 response = None
@@ -413,24 +442,19 @@ def extract_text_ocr_space(image_path):
                 return extracted_text
                 
             except Exception as parse_error:
-                print(f"DEBUG: Response parsing error: {parse_error}")
+                print(f"DEBUG: Professional response parsing error: {parse_error}")
                 return ""
         else:
             if response:
-                print(f"DEBUG: OCR API returned status {response.status_code}")
-                try:
-                    error_info = response.text[:200] if response.text else "No error details"
-                    print(f"DEBUG: Error details: {error_info}")
-                except:
-                    pass
+                print(f"DEBUG: Professional OCR API returned status {response.status_code}")
             return ""
             
     except Exception as e:
-        print(f"DEBUG: OCR extraction failed: {e}")
+        print(f"DEBUG: Professional OCR extraction failed: {e}")
         return ""
     
     finally:
-        # Aggressive cleanup
+        # Cleanup
         if response:
             try:
                 response.close() if hasattr(response, 'close') else None
@@ -438,17 +462,17 @@ def extract_text_ocr_space(image_path):
             except:
                 pass
         
-        # Clean up compressed file immediately
+        # Clean up compressed file
         if processed_image_path and processed_image_path != image_path:
             try:
                 os.remove(processed_image_path)
-                print("DEBUG: Cleaned up compressed image")
+                print("DEBUG: Cleaned up professional compressed image")
             except Exception as cleanup_error:
-                print(f"DEBUG: Cleanup error: {cleanup_error}")
+                print(f"DEBUG: Professional cleanup error: {cleanup_error}")
         
         # Force garbage collection
         aggressive_cleanup()
-        log_memory_usage("end OCR", force_gc=True)
+        log_memory_usage("end professional OCR", force_gc=True)
 
 def extract_text_ocr_space_enhanced(image_path):
     """Extract text using OCR.space API - enhanced settings with aggressive memory management"""
@@ -1170,6 +1194,28 @@ def get_category_emoji(category):
     }
     return emoji_map.get(category, '📝')
 
+PROFESSIONAL_TIER = os.getenv('RENDER_TIER') == 'professional' or int(os.getenv('WEB_CONCURRENCY', '1')) > 1
+
+def get_compression_function():
+    """Return appropriate compression function based on tier"""
+    if PROFESSIONAL_TIER:
+        return compress_image_for_ocr_professional
+    else:
+        return compress_image_for_ocr  # Original free tier function
+
+def get_ocr_function():
+    """Return appropriate OCR function based on tier"""
+    if PROFESSIONAL_TIER:
+        return extract_text_with_multiple_methods_professional
+    else:
+        return extract_text_with_multiple_methods  # Original free tier function
+
+# Add this logging to verify detection
+if PROFESSIONAL_TIER:
+    print("✅ PROFESSIONAL TIER DETECTED - Using enhanced functions")
+else:
+    print("ℹ️  Free tier detected - Using standard functions")
+    
 # Additional utility function for backwards compatibility
 def analyze_ingredients(text):
     """Wrapper function for backwards compatibility"""
