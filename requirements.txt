@@ -7,7 +7,7 @@ gunicorn==21.2.0
 
 # Database support
 psycopg2-binary==2.9.7  # PostgreSQL for production
-sqlite3  # SQLite for local development (built-in)
+
 
 # Image processing and OCR
 Pillow==10.0.1
