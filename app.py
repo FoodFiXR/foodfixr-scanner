@@ -41,7 +41,13 @@ app.config.update(
 PROFESSIONAL_TIER = os.getenv('RENDER_TIER') == 'professional' or os.getenv('WEB_CONCURRENCY', '1') != '1'
 
 if PROFESSIONAL_TIER:
-    print("INFO: Professional tier detected - enabling optimizations")
+    print("INFO: Professional tier - enabling large file support")
+    app.config['MAX_CONTENT_LENGTH'] = 15 * 1024 * 1024  # 15MB
+    MAX_FILE_SIZE_MB = 12  # 12MB processing limit
+else:
+    print("INFO: Free tier - using conservative file limits")
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024   # 5MB
+    MAX_FILE_SIZE_MB = 3   # 3MB processing limit
 
 # Stripe Configuration
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
