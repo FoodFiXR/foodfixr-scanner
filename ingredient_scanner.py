@@ -14,29 +14,27 @@ from PIL import Image
 import requests
 
 # Enhanced memory monitoring function
+# Professional tier memory thresholds (more relaxed)
 def log_memory_usage(stage="", force_gc=False):
-    """Enhanced memory monitoring with optional garbage collection"""
     try:
         if force_gc:
-            # Force multiple GC cycles before measuring
-            for _ in range(3):
+            for _ in range(2):  # Reduced from 3 iterations
                 gc.collect()
-            time.sleep(0.1)  # Allow cleanup to complete
+            time.sleep(0.05)  # Reduced cleanup time
         
         process = psutil.Process()
         memory_mb = process.memory_info().rss / 1024 / 1024
         print(f"DEBUG: Memory usage {stage}: {memory_mb:.1f} MB")
         
-        # Critical memory threshold - force cleanup if too high
-        if memory_mb > 120:  # Lowered threshold for memory-constrained environments
-            print(f"DEBUG: CRITICAL memory usage! Forcing aggressive cleanup...")
-            for _ in range(5):
+        # Higher threshold for professional tier
+        if memory_mb > 800:  # Was 120MB, now 800MB (you have 4GB!)
+            print(f"DEBUG: High memory usage! Forcing cleanup...")
+            for _ in range(3):
                 gc.collect()
-            time.sleep(0.2)
+            time.sleep(0.1)
             
-            # Re-measure after cleanup
             memory_mb = process.memory_info().rss / 1024 / 1024
-            print(f"DEBUG: Memory after emergency cleanup: {memory_mb:.1f} MB")
+            print(f"DEBUG: Memory after cleanup: {memory_mb:.1f} MB")
             
         return memory_mb
     except Exception as e:
