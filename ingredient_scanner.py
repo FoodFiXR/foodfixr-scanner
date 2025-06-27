@@ -73,7 +73,7 @@ def aggressive_cleanup():
     except Exception as e:
         print(f"DEBUG: Cleanup error: {e}")
 
-def ultra_minimal_compress_professional(image_path, max_size_kb=500):
+def ultra_minimal_compress(image_path, max_size_kb=500):
     """Professional tier ultra-minimal compression with better minimums"""
     log_memory_usage("before professional ultra minimal", force_gc=True)
     
@@ -182,7 +182,7 @@ def ultra_minimal_compress_professional(image_path, max_size_kb=500):
         gc.collect()
         log_memory_usage("end professional ultra minimal", force_gc=True)
 
-def compress_image_for_ocr_professional(image_path, max_size_kb=500):
+def compress_image_for_ocr(image_path, max_size_kb=500):
     """Professional tier - Enhanced compression with better quality retention"""
     print(f"DEBUG: Professional tier compression for {image_path}")
     log_memory_usage("start professional compression", force_gc=True)
@@ -275,7 +275,7 @@ def compress_image_for_ocr_professional(image_path, max_size_kb=500):
 
 
 # CRITICAL: New safe OCR function with circuit breaker
-def safe_ocr_with_fallback_professional(image_path, max_attempts=3):
+def safe_ocr_with_fallback(image_path, max_attempts=3):
     """Professional tier OCR with more attempts and better error handling"""
     print(f"DEBUG: Starting professional OCR with {max_attempts} attempts")
     
@@ -340,7 +340,7 @@ def safe_ocr_with_fallback_professional(image_path, max_attempts=3):
     
     return ""
     
-def extract_text_with_multiple_methods_professional(image_path):
+def extract_text_with_multiple_methods(image_path):
     """Professional tier text extraction with enhanced methods"""
     try:
         print(f"DEBUG: Starting professional OCR text extraction from {image_path}")
@@ -365,7 +365,7 @@ def extract_text_with_multiple_methods_professional(image_path):
         return ""
 
 # Professional tier memory thresholds
-def log_memory_usage_professional(stage="", force_gc=False):
+def log_memory_usage(stage="", force_gc=False):
     """Professional tier memory monitoring with higher thresholds"""
     try:
         if force_gc:
@@ -392,7 +392,7 @@ def log_memory_usage_professional(stage="", force_gc=False):
         print(f"DEBUG: Professional memory monitoring error: {e}")
         return 0
 
-def extract_text_ocr_space_professional(image_path):
+def extract_text_ocr_space(image_path):
     """Professional tier OCR with better compression and settings"""
     log_memory_usage("start professional OCR", force_gc=True)
     
