@@ -1052,7 +1052,7 @@ def scan_image_for_ingredients(image_path):
         # Check initial memory state
         initial_memory = log_memory_usage("scan start", force_gc=True)
         
-        if initial_memory > 150:  # Conservative threshold
+        if initial_memory > 1500:  # Conservative threshold
             print(f"WARNING: High initial memory {initial_memory:.1f}MB - may cause issues")
             aggressive_cleanup()
             time.sleep(0.5)
