@@ -25,15 +25,6 @@ import psutil
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
-# Critical Flask Configuration Updates for 502 Prevention
-app.config.update(
-    # Prevent request timeouts and memory issues
-    SEND_FILE_MAX_AGE_DEFAULT=0,
-    MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # Reduced to 5MB to prevent memory issues
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
-    # Add request timeout protection
-    REQUEST_TIMEOUT=90,  # 90 seconds max per request
-)
 # Professional tier optimizations
 app.config.update(
     # Can handle larger files now
