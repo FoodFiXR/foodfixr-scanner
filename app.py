@@ -285,6 +285,32 @@ def save_scan_image(temp_filepath, user_id):
     except Exception as e:
         print(f"DEBUG: Error saving scan image: {e}")
         return None
+
+@app.route('/', methods=['POST'])
+@login_required
+def scan():
+    # Set maximum request timeout
+    import signal
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError("Request processing timeout - please try with a smaller image")
+    
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(90)  # 90 second max processing time
+    
+    try:
+        # ... rest of your scan code ...
+        pass
+    except TimeoutError as e:
+        signal.alarm(0)  # Cancel alarm
+        gc.collect()  # Force cleanup
+        return render_template('scanner.html',
+                             trial_expired=trial_expired,
+                             trial_time_left=trial_time_left,
+                             user_name=user_data['name'],
+                             error="Request timed out. Please try with a smaller, clearer image.")
+    finally:
+        signal.alarm(0)  # Always cancel alarm
         
 # AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
