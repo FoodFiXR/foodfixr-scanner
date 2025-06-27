@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, send_file, Response
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import RequestTimeout
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from ingredient_scanner import scan_image_for_ingredients, before_scan_cleanup
+from ingredient_scanner import scan_image_for_ingredients, before_scan_cleanup, safe_ocr_with_fallback
 import json
 from datetime import datetime, timedelta
 import uuid
@@ -19,9 +20,20 @@ import shutil
 from pathlib import Path
 import signal
 import sys
+import psutil
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
+
+# Critical Flask Configuration Updates for 502 Prevention
+app.config.update(
+    # Prevent request timeouts and memory issues
+    SEND_FILE_MAX_AGE_DEFAULT=0,
+    MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # Reduced to 5MB to prevent memory issues
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+    # Add request timeout protection
+    REQUEST_TIMEOUT=90,  # 90 seconds max per request
+)
 
 # Stripe Configuration
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -31,40 +43,69 @@ DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 # Configuration - Reduced limits for memory-constrained environments
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # Reduced from 16MB to 8MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.permanent_session_lifetime = timedelta(days=30)
 
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-# Add memory management hooks
+# Request timeout tracking
 @app.before_request
-def before_request():
-    """Run memory cleanup before each request"""
+def before_request_timeout():
+    """Track request start time and perform memory management"""
+    request.start_time = time.time()
+    
     try:
         # Force garbage collection
         gc.collect()
         
         # Set conservative PIL limits
-        from PIL import Image
-        Image.MAX_IMAGE_PIXELS = 40000000  # Conservative limit
+        Image.MAX_IMAGE_PIXELS = 30000000  # More conservative limit
         
-        print("DEBUG: Pre-request cleanup completed")
+        # Check memory usage
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        if memory_mb > 250:  # High memory threshold
+            print(f"WARNING: High memory usage before request: {memory_mb:.1f}MB")
+            gc.collect()
+            time.sleep(0.1)  # Brief pause for cleanup
+        
+        print(f"DEBUG: Pre-request cleanup completed, memory: {memory_mb:.1f}MB")
     except Exception as e:
         print(f"DEBUG: Pre-request cleanup error: {e}")
 
 @app.after_request
-def after_request(response):
-    """Run cleanup after each request"""
+def after_request_cleanup(response):
+    """Comprehensive cleanup after each request with timeout monitoring"""
     try:
-        # Force garbage collection after request
-        gc.collect()
-        print("DEBUG: Post-request cleanup completed")
+        # Check processing time and log warnings
+        if hasattr(request, 'start_time'):
+            processing_time = time.time() - request.start_time
+            if processing_time > 60:  # Log long requests
+                print(f"WARNING: Long request took {processing_time:.1f}s for {request.endpoint}")
+            elif processing_time > 30:
+                print(f"INFO: Moderate request took {processing_time:.1f}s for {request.endpoint}")
+        
+        # Force aggressive garbage collection
+        for _ in range(2):
+            gc.collect()
+        
+        # Add headers to prevent caching of errors
+        if response.status_code >= 500:
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        
+        # Log final memory usage
+        try:
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            if memory_mb > 300:
+                print(f"WARNING: High memory after request: {memory_mb:.1f}MB")
+        except:
+            pass
+            
     except Exception as e:
-        print(f"DEBUG: Post-request cleanup error: {e}")
+        print(f"DEBUG: After-request cleanup error: {e}")
     
     return response
 
@@ -82,7 +123,6 @@ def get_db_connection():
         return conn
 
 # Database initialization
-# Updated init_db function with all required columns
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -107,7 +147,6 @@ def init_db():
         )
     ''')
     
-    # Updated scan_history table with ALL required columns
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS scan_history (
             id SERIAL PRIMARY KEY,
@@ -133,22 +172,22 @@ def init_db():
         cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_quality VARCHAR(20) DEFAULT 'unknown'")
         cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS has_safety_labels BOOLEAN DEFAULT FALSE")
     except Exception as e:
-        print(f"Column addition note: {e}")  # May fail if columns already exist
+        print(f"Column addition note: {e}")
     
     conn.commit()
     conn.close()
     print("Database initialized successfully with all required columns")
+
 init_db()
 
-# Add memory monitoring and worker restart handling
+# Memory monitoring and worker restart handling
 def setup_memory_monitoring():
     """Setup memory monitoring and graceful shutdown"""
     def memory_check():
         try:
-            import psutil
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-            if memory_mb > 400:  # Adjust based on your plan
-                print(f"WARNING: High memory usage: {memory_mb:.1f}MB - forcing cleanup")
+            if memory_mb > 400:  # Critical threshold
+                print(f"CRITICAL: Memory usage: {memory_mb:.1f}MB - forcing cleanup")
                 gc.collect()
                 return False
             return True
@@ -164,7 +203,6 @@ def setup_memory_monitoring():
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
-# Call this at startup
 setup_memory_monitoring()
 
 # Helper functions
@@ -263,20 +301,16 @@ def save_scan_image(temp_filepath, user_id):
         if not temp_filepath or not os.path.exists(temp_filepath):
             return None
             
-        # Create unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         original_extension = os.path.splitext(temp_filepath)[1].lower()
         new_filename = f"scan_{user_id}_{timestamp}_{uuid.uuid4().hex[:8]}{original_extension}"
         
-        # Create user directory
         user_dir = os.path.join(UPLOADS_DIR, str(user_id))
         os.makedirs(user_dir, exist_ok=True)
         
-        # Copy file to permanent location
         permanent_path = os.path.join(user_dir, new_filename)
         shutil.copy2(temp_filepath, permanent_path)
         
-        # Return relative path for database storage
         relative_path = f"static/uploads/{user_id}/{new_filename}"
         print(f"DEBUG: Saved image to: {relative_path}")
         
@@ -286,32 +320,33 @@ def save_scan_image(temp_filepath, user_id):
         print(f"DEBUG: Error saving scan image: {e}")
         return None
 
-@app.route('/', methods=['POST'])
-@login_required
-def scan():
-    # Set maximum request timeout
-    import signal
-    
-    def timeout_handler(signum, frame):
-        raise TimeoutError("Request processing timeout - please try with a smaller image")
-    
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(90)  # 90 second max processing time
-    
-    try:
-        # ... rest of your scan code ...
-        pass
-    except TimeoutError as e:
-        signal.alarm(0)  # Cancel alarm
-        gc.collect()  # Force cleanup
-        return render_template('scanner.html',
-                             trial_expired=trial_expired,
-                             trial_time_left=trial_time_left,
-                             user_name=user_data['name'],
-                             error="Request timed out. Please try with a smaller, clearer image.")
-    finally:
-        signal.alarm(0)  # Always cancel alarm
+# CRITICAL: Add request timeout wrapper
+def with_timeout(seconds):
+    """Decorator to add timeout protection to routes"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            def timeout_handler(signum, frame):
+                raise TimeoutError(f"Request timed out after {seconds} seconds")
+            
+            # Set the alarm
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(seconds)
+            
+            try:
+                result = func(*args, **kwargs)
+                return result
+            except TimeoutError:
+                gc.collect()  # Force cleanup on timeout
+                raise
+            finally:
+                # Always restore the alarm
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
         
+        return wrapper
+    return decorator
+
 # AUTHENTICATION ROUTES
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -345,10 +380,8 @@ def register():
         password_hash = generate_password_hash(password)
         
         try:
-            # Check if we're using PostgreSQL or SQLite
             database_url = os.getenv('DATABASE_URL')
             if database_url:
-                # PostgreSQL version
                 cursor.execute('''
                     INSERT INTO users (name, email, password_hash, trial_start_date, trial_end_date, last_login)
                     VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '48 hours', CURRENT_TIMESTAMP)
@@ -358,7 +391,6 @@ def register():
                 user_result = cursor.fetchone()
                 user_id = user_result['id']
             else:
-                # SQLite version (for local development)
                 now = datetime.now()
                 trial_start = format_datetime_for_db(now)
                 trial_end = format_datetime_for_db(now + timedelta(hours=48))
@@ -409,7 +441,6 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Use appropriate placeholder for database type
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
@@ -479,7 +510,6 @@ def reset_password():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # Check if user exists
             database_url = os.getenv('DATABASE_URL')
             if database_url:
                 cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
@@ -493,7 +523,6 @@ def reset_password():
                 conn.close()
                 return render_template('reset_password.html')
             
-            # Update password
             password_hash = generate_password_hash(new_password)
             
             if database_url:
@@ -543,10 +572,24 @@ def index():
 
 @app.route('/', methods=['POST'])
 @login_required
+@with_timeout(90)  # 90 second timeout protection
 def scan():
+    """Enhanced scan route with comprehensive 502 error prevention"""
+    print("DEBUG: Starting scan with comprehensive error prevention")
+    
     # CRITICAL: Memory cleanup before processing
-    print("DEBUG: Starting scan with memory cleanup")
     before_scan_cleanup()
+    
+    # Check initial memory state
+    initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
+    print(f"DEBUG: Initial memory: {initial_memory:.1f}MB")
+    
+    if initial_memory > 250:  # High initial memory
+        print("DEBUG: High initial memory, forcing aggressive cleanup")
+        gc.collect()
+        time.sleep(0.5)
+        initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Memory after cleanup: {initial_memory:.1f}MB")
     
     user_data = get_user_data(session['user_id'])
     if not user_data:
@@ -575,18 +618,6 @@ def scan():
     
     filepath = None
     try:
-        # Check memory before processing
-        import psutil
-        initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
-        print(f"DEBUG: Initial memory before scan: {initial_memory:.1f}MB")
-        
-        if initial_memory > 300:  # If already high, force cleanup
-            print("DEBUG: High initial memory, forcing cleanup")
-            gc.collect()
-            time.sleep(0.5)
-            initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
-            print(f"DEBUG: Memory after cleanup: {initial_memory:.1f}MB")
-        
         # Save uploaded file with memory-conscious handling
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -600,8 +631,8 @@ def scan():
         file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
         print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
-        # More restrictive file size limits for memory-constrained environment
-        max_size_mb = 3 if initial_memory > 200 else 5  # Dynamic limit based on current memory
+        # Dynamic file size limits based on current memory
+        max_size_mb = 2 if initial_memory > 200 else 3  # Very restrictive
         
         if file_size_mb > max_size_mb:
             cleanup_uploaded_file(filepath)
@@ -614,45 +645,53 @@ def scan():
         # Save image permanently for history (before processing to avoid memory issues)
         saved_image_path = save_scan_image(filepath, session['user_id'])
         
-        # Process the image with memory management and timeout
-        print("DEBUG: Starting image processing...")
-        
-        # Use a timeout wrapper for the scan
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Scan processing timed out")
-        
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(60)  # 60 second timeout
+        # Process the image with enhanced memory management
+        print("DEBUG: Starting image processing with timeout protection...")
         
         try:
+            # Use the safe OCR function with circuit breaker
             result = scan_image_for_ingredients(filepath)
-            signal.alarm(0)  # Cancel the alarm
+            
+            # Check if scan failed due to memory/timeout issues
+            if result.get('error'):
+                cleanup_uploaded_file(filepath)
+                error_msg = result['error']
+                if 'memory' in error_msg.lower() or 'timeout' in error_msg.lower():
+                    error_msg = "Processing failed due to resource constraints. Please try with a smaller, clearer image."
+                
+                return render_template('scanner.html',
+                                     trial_expired=trial_expired,
+                                     trial_time_left=trial_time_left,
+                                     user_name=user_data['name'],
+                                     error=error_msg)
+            
         except TimeoutError:
             cleanup_uploaded_file(filepath)
+            gc.collect()
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
                                  trial_time_left=trial_time_left,
                                  user_name=user_data['name'],
-                                 error="Scan timed out. Please try with a smaller or clearer image.")
-        except MemoryError as e:
-            cleanup_uploaded_file(filepath)
-            gc.collect()  # Force cleanup after memory error
-            return render_template('scanner.html',
-                                 trial_expired=trial_expired,
-                                 trial_time_left=trial_time_left,
-                                 user_name=user_data['name'],
-                                 error="Out of memory. Please try with a smaller image.")
+                                 error="Scan timed out after 90 seconds. Please try with a smaller or clearer image.")
         
-        # Check if scan failed due to memory issues
-        if result.get('error'):
+        except MemoryError:
             cleanup_uploaded_file(filepath)
+            gc.collect()
             return render_template('scanner.html',
                                  trial_expired=trial_expired,
                                  trial_time_left=trial_time_left,
                                  user_name=user_data['name'],
-                                 error=result['error'])
+                                 error="Out of memory. Please try with a much smaller image.")
+        
+        except Exception as e:
+            cleanup_uploaded_file(filepath)
+            gc.collect()
+            print(f"DEBUG: Scan processing error: {e}")
+            return render_template('scanner.html',
+                                 trial_expired=trial_expired,
+                                 trial_time_left=trial_time_left,
+                                 user_name=user_data['name'],
+                                 error="Processing failed. Please try again with a different image.")
         
         # Update user scan counts
         conn = get_db_connection()
@@ -661,7 +700,6 @@ def scan():
         new_scans_used = user_data['scans_used'] + 1 if not user_data['is_premium'] else user_data['scans_used']
         new_total_scans = user_data['total_scans_ever'] + 1
         
-        # Use appropriate placeholder for database type
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             cursor.execute('''
@@ -670,7 +708,6 @@ def scan():
                 WHERE id = %s
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert with image URL
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
@@ -682,7 +719,7 @@ def scan():
                 result.get('rating', ''), 
                 json.dumps(result.get('matched_ingredients', {})),
                 str(uuid.uuid4()),
-                result.get('extracted_text', '')[:1000],  # Limit text length
+                result.get('extracted_text', '')[:1000],
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
@@ -696,7 +733,6 @@ def scan():
                 WHERE id = ?
             ''', (new_scans_used, new_total_scans, session['user_id']))
             
-            # Enhanced scan history insert for SQLite
             cursor.execute('''
                 INSERT INTO scan_history (
                     user_id, result_rating, ingredients_found, scan_date, scan_id,
@@ -709,11 +745,11 @@ def scan():
                 json.dumps(result.get('matched_ingredients', {})),
                 format_datetime_for_db(),
                 str(uuid.uuid4()),
-                result.get('extracted_text', '')[:1000],  # Limit text length
+                result.get('extracted_text', '')[:1000],
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
                 result.get('text_quality', 'unknown'),
-                int(result.get('has_safety_labels', False)),  # Convert to int for SQLite
+                int(result.get('has_safety_labels', False)),
                 saved_image_path
             ))
         
@@ -728,8 +764,8 @@ def scan():
         # Final memory check
         final_memory = psutil.Process().memory_info().rss / 1024 / 1024
         print(f"DEBUG: Final memory after scan: {final_memory:.1f}MB")
-        
         print("DEBUG: Scan completed successfully")
+        
         return render_template('scanner.html',
                              result=result,
                              trial_expired=trial_expired,
@@ -737,7 +773,7 @@ def scan():
                              user_name=user_data['name'])
         
     except Exception as e:
-        print(f"DEBUG: Scan error: {e}")
+        print(f"DEBUG: Critical scan error: {e}")
         import traceback
         traceback.print_exc()
         
@@ -748,8 +784,10 @@ def scan():
         gc.collect()
         
         error_message = "Scanning failed. Please try again with a smaller, clearer image."
-        if "memory" in str(e).lower() or "MemoryError" in str(e):
+        if "memory" in str(e).lower():
             error_message = "Out of memory. Please try with a much smaller image."
+        elif "timeout" in str(e).lower():
+            error_message = "Scan timed out. Please try with a smaller image."
         
         return render_template('scanner.html',
                              trial_expired=trial_expired,
@@ -761,13 +799,7 @@ def scan():
         # Always ensure cleanup
         cleanup_uploaded_file(filepath)
         gc.collect()
-        
-        # Cancel any pending alarms
-        try:
-            signal.alarm(0)
-        except:
-            pass
-        
+
 @app.route('/account')
 @login_required
 def account():
@@ -800,7 +832,6 @@ def history():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Use appropriate placeholder for database type
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             cursor.execute('''
@@ -834,20 +865,16 @@ def history():
             elif 'Proceed' in rating or 'carefully' in rating:
                 rating_type = 'caution'
             
-            # Parse ingredients_found safely
             ingredients_data = {}
             try:
                 if row['ingredients_found']:
-                    # Try to parse as JSON first, then eval as fallback
                     if row['ingredients_found'].startswith('{'):
                         ingredients_data = json.loads(row['ingredients_found'])
                     else:
-                        # Fallback for string representation
                         ingredients_data = eval(row['ingredients_found'])
             except:
                 ingredients_data = {}
             
-            # Create ingredient summary
             ingredient_summary = {}
             detected_ingredients = []
             has_gmo = False
@@ -862,7 +889,6 @@ def history():
                     elif category == 'all_detected' and isinstance(items, list):
                         detected_ingredients = items
                         
-            # Count total unique ingredients
             detected_ingredients = list(set(detected_ingredients))
             stats['ingredients_found'] += len(detected_ingredients)
             
@@ -910,10 +936,8 @@ def upgrade():
 def create_checkout_session():
     try:
         data = request.get_json()
-        plan = data.get('plan', 'monthly')  # Default to monthly
+        plan = data.get('plan', 'monthly')
         
-        # Map plan names to Stripe price IDs
-        # You'll need to create these price IDs in your Stripe dashboard
         plan_price_mapping = {
             'weekly': os.getenv('STRIPE_WEEKLY_PRICE_ID', 'price_weekly_placeholder'),
             'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_placeholder'), 
@@ -928,7 +952,6 @@ def create_checkout_session():
         if not user_data:
             return jsonify({'error': 'User not found'}), 404
         
-        # Create or retrieve Stripe customer
         stripe_customer_id = user_data.get('stripe_customer_id')
         
         if not stripe_customer_id:
@@ -939,7 +962,6 @@ def create_checkout_session():
             )
             stripe_customer_id = customer.id
             
-            # Update user with Stripe customer ID
             conn = get_db_connection()
             cursor = conn.cursor()
             database_url = os.getenv('DATABASE_URL')
@@ -952,7 +974,6 @@ def create_checkout_session():
             conn.commit()
             conn.close()
         
-        # Create checkout session
         checkout_session = stripe.checkout.Session.create(
             customer=stripe_customer_id,
             payment_method_types=['card'],
@@ -986,11 +1007,9 @@ def payment_success():
         return redirect(url_for('upgrade'))
     
     try:
-        # Retrieve the checkout session
         checkout_session = stripe.checkout.Session.retrieve(session_id)
         
         if checkout_session.payment_status == 'paid':
-            # Update user to premium
             conn = get_db_connection()
             cursor = conn.cursor()
             
@@ -1015,7 +1034,6 @@ def payment_success():
             conn.commit()
             conn.close()
             
-            # Update session
             session['is_premium'] = True
             
             flash('🎉 Welcome to FoodFixr Premium! Enjoy unlimited scans!', 'success')
@@ -1037,9 +1055,7 @@ def stripe_webhook():
     webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
     
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, webhook_secret
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     except ValueError as e:
         print(f"Invalid payload: {e}")
         return '', 400
@@ -1047,7 +1063,6 @@ def stripe_webhook():
         print(f"Invalid signature: {e}")
         return '', 400
     
-    # Handle the event
     if event['type'] == 'checkout.session.completed':
         session_data = event['data']['object']
         user_id = session_data['metadata'].get('user_id')
@@ -1083,7 +1098,6 @@ def stripe_webhook():
                 print(f"Webhook database error: {e}")
     
     elif event['type'] == 'customer.subscription.deleted':
-        # Handle subscription cancellation
         subscription = event['data']['object']
         customer_id = subscription['customer']
         
@@ -1129,7 +1143,6 @@ def clear_history():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Delete user's uploaded images directory
         user_upload_dir = os.path.join(UPLOADS_DIR, str(session['user_id']))
         if os.path.exists(user_upload_dir):
             shutil.rmtree(user_upload_dir)
@@ -1185,7 +1198,6 @@ def export_history():
         
         conn.close()
         
-        # Create JSON response
         export_data = {
             'user_email': session['user_email'],
             'export_date': datetime.now().isoformat(),
@@ -1210,12 +1222,64 @@ def export_history():
 @login_required
 def uploaded_file(user_id, filename):
     """Serve uploaded images (only to the user who uploaded them)"""
-    # Security check: users can only view their own images
     if session['user_id'] != user_id:
         return "Access denied", 403
         
     user_upload_dir = os.path.join(UPLOADS_DIR, str(user_id))
     return send_file(os.path.join(user_upload_dir, filename))
+
+# CRITICAL: Health check endpoint for load balancer
+@app.route('/health')
+def health_check():
+    """Enhanced health check endpoint for load balancer and monitoring"""
+    try:
+        start_time = time.time()
+        
+        # Quick database check
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        conn.close()
+        
+        # Memory check with automatic cleanup
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        if memory_mb > 350:  # Critical memory level
+            print(f"HEALTH CHECK: Critical memory level {memory_mb:.1f}MB, forcing cleanup")
+            gc.collect()
+            time.sleep(0.1)
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        
+        # Check response time
+        response_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Determine health status
+        status = 'healthy'
+        http_code = 200
+        
+        if memory_mb > 400:
+            status = 'critical_memory'
+            http_code = 503
+        elif response_time > 1000:  # 1 second
+            status = 'slow_response'
+            http_code = 503
+        elif memory_mb > 300:
+            status = 'high_memory'
+        
+        return jsonify({
+            'status': status,
+            'memory_mb': round(memory_mb, 1),
+            'response_time_ms': round(response_time, 1),
+            'timestamp': datetime.now().isoformat(),
+            'database': 'connected'
+        }), http_code
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 503
 
 # ADMIN/DEBUG ROUTES
 @app.route('/test-upgrade-user', methods=['GET', 'POST'])
@@ -1250,7 +1314,6 @@ def test_upgrade_user():
             conn.commit()
             conn.close()
             
-            # Update session
             session['is_premium'] = True
             
             success_msg = f"✅ Test upgrade successful! You are now Premium ({plan} plan)"
@@ -1327,7 +1390,6 @@ def simple_login():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # Use appropriate placeholder for database type
                 database_url = os.getenv('DATABASE_URL')
                 if database_url:
                     cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
@@ -1412,7 +1474,6 @@ def admin_password_reset():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # Check if user exists
                 database_url = os.getenv('DATABASE_URL')
                 if database_url:
                     cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
@@ -1424,7 +1485,6 @@ def admin_password_reset():
                 if not user:
                     error_msg = f"No user found with email: {email}"
                 else:
-                    # Update password
                     password_hash = generate_password_hash(new_password)
                     
                     if database_url:
@@ -1599,6 +1659,7 @@ def check_users():
                     <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
                     <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
                     <a href="/" class="btn btn-secondary">🏠 Back to App</a>
+                    <a href="/health" class="btn btn-secondary">🏥 Health Check</a>
                 </div>
                 
                 <table>
@@ -1641,48 +1702,31 @@ def check_users():
         </html>
         """
 
-# Health check endpoint for monitoring
-@app.route('/health')
-def health_check():
-    """Simple health check endpoint"""
-    try:
-        # Check database connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1')
-        conn.close()
-        
-        # Check memory usage
-        import psutil
-        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-        
-        return jsonify({
-            'status': 'healthy',
-            'memory_mb': round(memory_mb, 1),
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
-
-# Error handlers
+# Error handlers with better error pages
 @app.errorhandler(413)
 def too_large(e):
+    gc.collect()  # Clean up on error
     return render_template('error.html', 
                          error_title="File Too Large", 
-                         error_message="The uploaded image is too large. Please upload an image smaller than 8MB."), 413
+                         error_message="The uploaded image is too large. Please upload an image smaller than 5MB."), 413
 
 @app.errorhandler(500)
 def internal_error(e):
-    # Force cleanup on 500 errors
-    gc.collect()
+    gc.collect()  # Force cleanup on 500 errors
     return render_template('error.html', 
                          error_title="Internal Server Error", 
-                         error_message="Something went wrong. Please try again."), 500
+                         error_message="Something went wrong. Please try again with a smaller image."), 500
 
+@app.errorhandler(TimeoutError)
+def timeout_error(e):
+    gc.collect()  # Force cleanup on timeout
+    return render_template('error.html',
+                         error_title="Request Timeout",
+                         error_message="The request took too long to process. Please try with a smaller image."), 504
+
+# CRITICAL: Use Gunicorn for production
 if __name__ == '__main__':
+    # Only for local development - production uses Gunicorn
     port = int(os.environ.get("PORT", 5000))
+    print("WARNING: Running with Flask development server. Use Gunicorn for production!")
     app.run(host="0.0.0.0", port=port, debug=False)
