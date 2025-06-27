@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ error_title }} - FoodFixr Scanner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .error-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #e91e63;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        .error-message {
+            color: #666;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #e91e63;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #c2185b;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #666;
+        }
+        .btn-secondary:hover {
+            background: #555;
+        }
+        .tips {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .tips h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .tips ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .tips li {
+            margin: 8px 0;
+            color: #555;
+        }
+        .error-code {
+            font-size: 0.9rem;
+            color: #999;
+            margin-top: 30px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1>{{ error_title or "Something went wrong" }}</h1>
+        
+        <div class="error-message">
+            {{ error_message or "We encountered an unexpected error. Please try again." }}
+        </div>
+        
+        <div class="actions">
+            <a href="/" class="btn">🏠 Back to Scanner</a>
+            <a href="/health" class="btn btn-secondary">🏥 System Status</a>
+        </div>
+        
+        <div class="tips">
+            <h3>💡 Troubleshooting Tips:</h3>
+            <ul>
+                <li><strong>Image too large?</strong> Try uploading a smaller image (under 3MB)</li>
+                <li><strong>Poor image quality?</strong> Make sure the text is clear and well-lit</li>
+                <li><strong>Still having issues?</strong> Try refreshing the page and scanning again</li>
+                <li><strong>Persistent problems?</strong> The free server may be overloaded - try again in a few minutes</li>
+            </ul>
+        </div>
+        
+        <div class="error-code">
+            Error timestamp: {{ moment().format('YYYY-MM-DD HH:mm:ss') if moment else 'Unknown' }}
+        </div>
+    </div>
+</body>
+</html>
