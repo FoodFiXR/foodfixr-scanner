@@ -1144,6 +1144,186 @@ def stripe_webhook():
     
     return '', 200
 
+# Add this to your app.py - WEBHOOK ROUTE FIXES
+
+@app.route('/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    """Enhanced Stripe webhook handler with proper error handling and timeouts"""
+    start_time = time.time()
+    
+    try:
+        # Get the raw payload and signature
+        payload = request.get_data(as_text=True)
+        sig_header = request.headers.get('Stripe-Signature')
+        
+        if not payload:
+            print("DEBUG: Empty webhook payload received")
+            return jsonify({'error': 'Empty payload'}), 400
+        
+        if not sig_header:
+            print("DEBUG: Missing Stripe signature header")
+            return jsonify({'error': 'Missing signature'}), 400
+        
+        webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+        if not webhook_secret:
+            print("ERROR: STRIPE_WEBHOOK_SECRET environment variable not set")
+            return jsonify({'error': 'Webhook secret not configured'}), 500
+        
+        print(f"DEBUG: Webhook payload length: {len(payload)}")
+        print(f"DEBUG: Webhook signature: {sig_header[:50]}...")
+        
+        # Verify the webhook signature
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+            print(f"DEBUG: Webhook signature verified successfully")
+        except ValueError as e:
+            print(f"ERROR: Invalid webhook payload: {e}")
+            return jsonify({'error': 'Invalid payload'}), 400
+        except stripe.error.SignatureVerificationError as e:
+            print(f"ERROR: Invalid webhook signature: {e}")
+            return jsonify({'error': 'Invalid signature'}), 400
+        
+        # Process the event quickly and return success immediately
+        event_type = event.get('type', 'unknown')
+        print(f"DEBUG: Processing webhook event: {event_type}")
+        
+        # CRITICAL: Return success immediately, process asynchronously if needed
+        if event_type == 'checkout.session.completed':
+            session_data = event['data']['object']
+            user_id = session_data.get('metadata', {}).get('user_id')
+            customer_id = session_data.get('customer')
+            
+            print(f"DEBUG: Checkout completed - User ID: {user_id}, Customer: {customer_id}")
+            
+            if user_id:
+                try:
+                    # Quick database update
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    database_url = os.getenv('DATABASE_URL')
+                    if database_url:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = TRUE, 
+                                subscription_status = 'active',
+                                subscription_start_date = CURRENT_TIMESTAMP,
+                                stripe_customer_id = %s
+                            WHERE id = %s
+                        ''', (customer_id, user_id))
+                    else:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = 1, 
+                                subscription_status = 'active',
+                                subscription_start_date = ?,
+                                stripe_customer_id = ?
+                            WHERE id = ?
+                        ''', (format_datetime_for_db(), customer_id, user_id))
+                    
+                    conn.commit()
+                    conn.close()
+                    print(f"SUCCESS: User {user_id} upgraded to premium via webhook")
+                    
+                except Exception as db_error:
+                    print(f"ERROR: Database update failed: {db_error}")
+                    # Still return success to Stripe even if DB update fails
+                    # You can retry this later or handle it manually
+            
+        elif event_type == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            customer_id = subscription.get('customer')
+            
+            print(f"DEBUG: Subscription canceled - Customer: {customer_id}")
+            
+            if customer_id:
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    database_url = os.getenv('DATABASE_URL')
+                    if database_url:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = FALSE, 
+                                subscription_status = 'canceled'
+                            WHERE stripe_customer_id = %s
+                        ''', (customer_id,))
+                    else:
+                        cursor.execute('''
+                            UPDATE users 
+                            SET is_premium = 0, 
+                                subscription_status = 'canceled'
+                            WHERE stripe_customer_id = ?
+                        ''', (customer_id,))
+                    
+                    conn.commit()
+                    conn.close()
+                    print(f"SUCCESS: Subscription canceled for customer {customer_id}")
+                    
+                except Exception as db_error:
+                    print(f"ERROR: Database update failed: {db_error}")
+        
+        elif event_type == 'invoice.payment_succeeded':
+            invoice = event['data']['object']
+            customer_id = invoice.get('customer')
+            print(f"DEBUG: Payment succeeded for customer: {customer_id}")
+            
+        elif event_type == 'invoice.payment_failed':
+            invoice = event['data']['object']
+            customer_id = invoice.get('customer')
+            print(f"DEBUG: Payment failed for customer: {customer_id}")
+            
+        else:
+            print(f"DEBUG: Unhandled webhook event type: {event_type}")
+        
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        print(f"DEBUG: Webhook processed in {processing_time:.3f} seconds")
+        
+        # CRITICAL: Always return 200 OK to Stripe
+        return jsonify({
+            'status': 'success',
+            'event_type': event_type,
+            'processing_time_ms': round(processing_time * 1000, 2)
+        }), 200
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        print(f"ERROR: Webhook processing failed after {processing_time:.3f}s: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # IMPORTANT: Still return 200 to prevent Stripe from retrying
+        # Log the error for manual review instead
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'processing_time_ms': round(processing_time * 1000, 2)
+        }), 200
+
+# Add a simple webhook test endpoint
+@app.route('/webhook-test')
+def webhook_test():
+    """Test endpoint to verify webhook URL is accessible"""
+    return jsonify({
+        'status': 'webhook_endpoint_active',
+        'timestamp': datetime.now().isoformat(),
+        'webhook_url': f"{DOMAIN}/stripe-webhook",
+        'environment': 'production' if os.getenv('DATABASE_URL') else 'development'
+    }), 200
+
+# Add webhook health check
+@app.route('/stripe-webhook', methods=['GET'])
+def webhook_health():
+    """Health check for webhook endpoint"""
+    return jsonify({
+        'status': 'webhook_ready',
+        'endpoint': '/stripe-webhook',
+        'methods': ['POST'],
+        'timestamp': datetime.now().isoformat()
+    }), 200
+    
 # CLEAR HISTORY ROUTE
 @app.route('/clear-history', methods=['POST'])
 @login_required
