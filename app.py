@@ -15,7 +15,7 @@ import sqlite3
 from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import gc
+import gc  # Add for memory management
 import shutil
 from pathlib import Path
 import signal
@@ -27,9 +27,14 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-product
 
 # Professional tier optimizations
 app.config.update(
-    MAX_CONTENT_LENGTH=15 * 1024 * 1024,
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=4),
-    REQUEST_TIMEOUT=180,
+    # Can handle larger files now
+    MAX_CONTENT_LENGTH=15 * 1024 * 1024,  # 15MB (was 5MB)
+    
+    # Less aggressive session timeout
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=4),  # 4 hours (was 1 hour)
+    
+    # Professional tier request timeout
+    REQUEST_TIMEOUT=180,  # 3 minutes (was 90 seconds)
 )
 
 # Detect if running on professional tier
@@ -37,19 +42,19 @@ PROFESSIONAL_TIER = os.getenv('RENDER_TIER') == 'professional' or os.getenv('WEB
 
 if PROFESSIONAL_TIER:
     print("INFO: Professional tier - enabling large file support")
-    app.config['MAX_CONTENT_LENGTH'] = 15 * 1024 * 1024
-    MAX_FILE_SIZE_MB = 12
+    app.config['MAX_CONTENT_LENGTH'] = 15 * 1024 * 1024  # 15MB
+    MAX_FILE_SIZE_MB = 12  # 12MB processing limit
 else:
     print("INFO: Free tier - using conservative file limits")
-    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
-    MAX_FILE_SIZE_MB = 3
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024   # 5MB
+    MAX_FILE_SIZE_MB = 3   # 3MB processing limit
 
 # Stripe Configuration
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 DOMAIN = os.getenv('DOMAIN', 'https://foodfixr-scanner-1.onrender.com')
 
-# Configuration
+# Configuration - Reduced limits for memory-constrained environments
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
 
@@ -62,43 +67,57 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 # Request timeout tracking
 @app.before_request
 def before_request_timeout():
+    """Track request start time and perform memory management"""
     request.start_time = time.time()
+    
     try:
+        # Force garbage collection
         gc.collect()
-        Image.MAX_IMAGE_PIXELS = 30000000
+        
+        # Set conservative PIL limits
+        Image.MAX_IMAGE_PIXELS = 30000000  # More conservative limit
+        
+        # Check memory usage
         memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-        if memory_mb > 250:
+        if memory_mb > 250:  # High memory threshold
             print(f"WARNING: High memory usage before request: {memory_mb:.1f}MB")
             gc.collect()
-            time.sleep(0.1)
+            time.sleep(0.1)  # Brief pause for cleanup
+        
         print(f"DEBUG: Pre-request cleanup completed, memory: {memory_mb:.1f}MB")
     except Exception as e:
         print(f"DEBUG: Pre-request cleanup error: {e}")
 
 @app.after_request
 def after_request_cleanup(response):
+    """Comprehensive cleanup after each request with timeout monitoring"""
     try:
+        # Check processing time and log warnings
         if hasattr(request, 'start_time'):
             processing_time = time.time() - request.start_time
-            if processing_time > 60:
+            if processing_time > 60:  # Log long requests
                 print(f"WARNING: Long request took {processing_time:.1f}s for {request.endpoint}")
             elif processing_time > 30:
                 print(f"INFO: Moderate request took {processing_time:.1f}s for {request.endpoint}")
         
+        # Force aggressive garbage collection
         for _ in range(2):
             gc.collect()
         
+        # Add headers to prevent caching of errors
         if response.status_code >= 500:
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         
+        # Log final memory usage
         try:
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
             if memory_mb > 300:
                 print(f"WARNING: High memory after request: {memory_mb:.1f}MB")
         except:
             pass
+            
     except Exception as e:
         print(f"DEBUG: After-request cleanup error: {e}")
     
@@ -106,10 +125,12 @@ def after_request_cleanup(response):
 
 # Database connection function
 def get_db_connection():
+    """Get database connection - PostgreSQL for production, SQLite for local"""
     database_url = os.getenv('DATABASE_URL')
     if database_url:
         return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
     else:
+        # Fallback to SQLite for local development
         import sqlite3
         conn = sqlite3.connect('foodfixr.db')
         conn.row_factory = sqlite3.Row
@@ -157,6 +178,7 @@ def init_db():
         )
     ''')
     
+    # Add missing columns to existing table (PostgreSQL specific)
     try:
         cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS extracted_text TEXT")
         cursor.execute("ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS text_length INTEGER DEFAULT 0")
@@ -174,10 +196,11 @@ init_db()
 
 # Memory monitoring and worker restart handling
 def setup_memory_monitoring():
+    """Setup memory monitoring and graceful shutdown"""
     def memory_check():
         try:
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-            if memory_mb > 400:
+            if memory_mb > 400:  # Critical threshold
                 print(f"CRITICAL: Memory usage: {memory_mb:.1f}MB - forcing cleanup")
                 gc.collect()
                 return False
@@ -278,6 +301,7 @@ def format_datetime_for_db(dt=None):
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 def cleanup_uploaded_file(filepath):
+    """Safely clean up uploaded files"""
     try:
         if filepath and os.path.exists(filepath):
             os.remove(filepath)
@@ -286,6 +310,7 @@ def cleanup_uploaded_file(filepath):
         print(f"DEBUG: Error cleaning up file {filepath}: {e}")
 
 def save_scan_image(temp_filepath, user_id):
+    """Save uploaded image permanently for history viewing"""
     try:
         if not temp_filepath or not os.path.exists(temp_filepath):
             return None
@@ -309,13 +334,16 @@ def save_scan_image(temp_filepath, user_id):
         print(f"DEBUG: Error saving scan image: {e}")
         return None
 
+# CRITICAL: Add request timeout wrapper
 def with_timeout(seconds):
+    """Decorator to add timeout protection to routes"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             def timeout_handler(signum, frame):
                 raise TimeoutError(f"Request timed out after {seconds} seconds")
             
+            # Set the alarm
             old_handler = signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(seconds)
             
@@ -323,9 +351,10 @@ def with_timeout(seconds):
                 result = func(*args, **kwargs)
                 return result
             except TimeoutError:
-                gc.collect()
+                gc.collect()  # Force cleanup on timeout
                 raise
             finally:
+                # Always restore the alarm
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, old_handler)
         
@@ -411,9 +440,13 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    print(f"DEBUG: Login route called with method: {request.method}")
+    
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
+        
+        print(f"DEBUG: Login attempt for email: {email}")
         
         if not email or not password:
             flash('Please enter both email and password', 'error')
@@ -431,7 +464,10 @@ def login():
         user = cursor.fetchone()
         
         if user:
+            print(f"DEBUG: User found: {user['name']}")
             if check_password_hash(user['password_hash'], password):
+                print("DEBUG: Password correct, logging in...")
+                
                 if database_url:
                     cursor.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s', (user['id'],))
                 else:
@@ -450,15 +486,19 @@ def login():
                 session['scans_used'] = user['scans_used']
                 session['stripe_customer_id'] = user['stripe_customer_id']
                 
+                print("DEBUG: Session set, redirecting to scanner...")
                 return redirect('/')
             else:
+                print("DEBUG: Invalid password")
                 flash('Invalid email or password', 'error')
                 conn.close()
         else:
+            print("DEBUG: User not found")
             flash('Invalid email or password', 'error')
             if 'conn' in locals():
                 conn.close()
     
+    print("DEBUG: Rendering login.html template")
     return render_template('login.html')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
@@ -546,16 +586,19 @@ def index():
 
 @app.route('/', methods=['POST'])
 @login_required
-@with_timeout(90)
+@with_timeout(90)  # 90 second timeout protection
 def scan():
+    """Enhanced scan route with comprehensive 502 error prevention"""
     print("DEBUG: Starting scan with comprehensive error prevention")
     
+    # CRITICAL: Memory cleanup before processing
     before_scan_cleanup()
     
+    # Check initial memory state
     initial_memory = psutil.Process().memory_info().rss / 1024 / 1024
     print(f"DEBUG: Initial memory: {initial_memory:.1f}MB")
     
-    if initial_memory > 250:
+    if initial_memory > 250:  # High initial memory
         print("DEBUG: High initial memory, forcing aggressive cleanup")
         gc.collect()
         time.sleep(0.5)
@@ -589,6 +632,7 @@ def scan():
     
     filepath = None
     try:
+        # Save uploaded file with memory-conscious handling
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{filename}"
@@ -597,10 +641,12 @@ def scan():
         print(f"DEBUG: Saving uploaded file to: {filepath}")
         file.save(filepath)
         
+        # Check file size before processing - be more restrictive
         file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
         print(f"DEBUG: Uploaded file size: {file_size_mb:.2f} MB")
         
-        max_size_mb = 10 if initial_memory > 200 else 12
+        # Dynamic file size limits based on current memory
+        max_size_mb = 10 if initial_memory > 200 else 12 # Very restrictive
         
         if file_size_mb > max_size_mb:
             cleanup_uploaded_file(filepath)
@@ -610,13 +656,17 @@ def scan():
                                  user_name=user_data['name'],
                                  error=f"Image too large ({file_size_mb:.1f}MB). Please upload a smaller image (max {max_size_mb}MB).")
         
+        # Save image permanently for history (before processing to avoid memory issues)
         saved_image_path = save_scan_image(filepath, session['user_id'])
         
+        # Process the image with enhanced memory management
         print("DEBUG: Starting image processing with timeout protection...")
         
         try:
+            # Use the safe OCR function with circuit breaker
             result = scan_image_for_ingredients(filepath)
             
+            # Check if scan failed due to memory/timeout issues
             if result.get('error'):
                 cleanup_uploaded_file(filepath)
                 error_msg = result['error']
@@ -657,6 +707,7 @@ def scan():
                                  user_name=user_data['name'],
                                  error="Processing failed. Please try again with a different image.")
         
+        # Update user scan counts
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -721,8 +772,10 @@ def scan():
         
         session['scans_used'] = new_scans_used
         
+        # Clean up temp uploaded file
         cleanup_uploaded_file(filepath)
         
+        # Final memory check
         final_memory = psutil.Process().memory_info().rss / 1024 / 1024
         print(f"DEBUG: Final memory after scan: {final_memory:.1f}MB")
         print("DEBUG: Scan completed successfully")
@@ -738,7 +791,10 @@ def scan():
         import traceback
         traceback.print_exc()
         
+        # Clean up uploaded file on error
         cleanup_uploaded_file(filepath)
+        
+        # Force memory cleanup on error
         gc.collect()
         
         error_message = "Scanning failed. Please try again with a smaller, clearer image."
@@ -754,159 +810,34 @@ def scan():
                              error=error_message)
     
     finally:
+        # Always ensure cleanup
         cleanup_uploaded_file(filepath)
         gc.collect()
 
 @app.route('/account')
 @login_required
 def account():
-    try:
-        user_data = get_user_data(session['user_id'])
-        if not user_data:
-            return redirect(url_for('logout'))
-        
-        # Calculate trial time information
-        trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
-        
-        # Format dates safely
-        trial_start = safe_datetime_parse(user_data['trial_start_date'])
-        formatted_trial_start = trial_start.strftime('%B %d, %Y')
-        
-        # Format created date safely
-        created_date = safe_datetime_parse(user_data.get('created_at'))
-        formatted_created_date = created_date.strftime('%B %d, %Y')
-        
-        # Calculate subscription details for premium users
-        subscription_start_date = None
-        next_billing_date = None
-        subscription_status = user_data.get('subscription_status', 'trial')
-        days_until_renewal = None
-        
-        if user_data.get('is_premium') and user_data.get('subscription_start_date'):
-            sub_start = safe_datetime_parse(user_data['subscription_start_date'])
-            subscription_start_date = sub_start.strftime('%B %d, %Y')
-            
-            # Calculate next billing date (assuming monthly billing)
-            next_billing = sub_start + timedelta(days=30)
-            next_billing_date = next_billing.strftime('%B %d, %Y')
-            
-            # Calculate days until renewal
-            days_until_renewal = (next_billing - datetime.now()).days
-            if days_until_renewal < 0:
-                days_until_renewal = 0
-        
-        return render_template('account.html',
-                             user_name=user_data['name'],
-                             user_created_date=formatted_created_date,
-                             total_scans_ever=user_data.get('total_scans_ever', 0),
-                             trial_start_date=formatted_trial_start,
-                             trial_time_left=trial_time_left,
-                             trial_expired=trial_expired,
-                             trial_hours_left=trial_hours,
-                             trial_minutes_left=trial_minutes,
-                             subscription_start_date=subscription_start_date,
-                             next_billing_date=next_billing_date,
-                             subscription_status=subscription_status,
-                             days_until_renewal=days_until_renewal)
+    user_data = get_user_data(session['user_id'])
+    if not user_data:
+        return redirect(url_for('logout'))
     
-    except Exception as e:
-        print(f"Account page error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Return basic account page with minimal data
-        user_data = get_user_data(session['user_id'])
-        return render_template('account.html',
-                             user_name=user_data.get('name', 'User') if user_data else 'User',
-                             user_created_date='Recently',
-                             total_scans_ever=user_data.get('total_scans_ever', 0) if user_data else 0,
-                             trial_start_date='Recently',
-                             trial_time_left='Unknown',
-                             trial_expired=False,
-                             trial_hours_left=0,
-                             trial_minutes_left=0,
-                             subscription_start_date=None,
-                             next_billing_date=None,
-                             subscription_status='trial',
-                             days_until_renewal=None)
-
-
-@app.route('/cancel-subscription', methods=['POST'])
-@login_required
-def cancel_subscription():
-    try:
-        user_data = get_user_data(session['user_id'])
-        if not user_data or not user_data.get('stripe_customer_id'):
-            return jsonify({'success': False, 'error': 'No subscription found'}), 404
-        
-        # Get the customer's subscriptions
-        subscriptions = stripe.Subscription.list(
-            customer=user_data['stripe_customer_id'],
-            status='active'
-        )
-        
-        if not subscriptions.data:
-            return jsonify({'success': False, 'error': 'No active subscription found'}), 404
-        
-        # Cancel the subscription at period end
-        subscription = subscriptions.data[0]
-        stripe.Subscription.modify(
-            subscription.id,
-            cancel_at_period_end=True
-        )
-        
-        # Update database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            cursor.execute('''
-                UPDATE users 
-                SET subscription_status = 'canceled'
-                WHERE id = %s
-            ''', (session['user_id'],))
-        else:
-            cursor.execute('''
-                UPDATE users 
-                SET subscription_status = 'canceled'
-                WHERE id = ?
-            ''', (session['user_id'],))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'success': True})
-        
-    except stripe.error.StripeError as e:
-        print(f"Stripe error in cancel subscription: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-    except Exception as e:
-        print(f"Cancel subscription error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to cancel subscription'}), 500
-
-@app.route('/create-customer-portal', methods=['POST'])
-@login_required
-def create_customer_portal():
-    try:
-        user_data = get_user_data(session['user_id'])
-        if not user_data or not user_data.get('stripe_customer_id'):
-            return jsonify({'error': 'No customer ID found'}), 404
-        
-        # Create Stripe customer portal session
-        portal_session = stripe.billing_portal.Session.create(
-            customer=user_data['stripe_customer_id'],
-            return_url=f"{DOMAIN}/account"
-        )
-        
-        return jsonify({'portal_url': portal_session.url})
-        
-    except stripe.error.StripeError as e:
-        print(f"Stripe error in customer portal: {e}")
-        return jsonify({'error': str(e)}), 500
-    except Exception as e:
-        print(f"Customer portal error: {e}")
-        return jsonify({'error': 'Failed to create portal session'}), 500
+    trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
+    
+    created_date = safe_datetime_parse(user_data['created_at'])
+    formatted_created_date = created_date.strftime('%B %d, %Y')
+    
+    trial_start = safe_datetime_parse(user_data['trial_start_date'])
+    formatted_trial_start = trial_start.strftime('%B %d, %Y')
+    
+    return render_template('account.html',
+                         user_name=user_data['name'],
+                         user_created_date=formatted_created_date,
+                         total_scans_ever=user_data['total_scans_ever'],
+                         trial_start_date=formatted_trial_start,
+                         trial_time_left=trial_time_left,
+                         trial_expired=trial_expired,
+                         trial_hours_left=trial_hours,
+                         trial_minutes_left=trial_minutes)
 
 @app.route('/history')
 @login_required
@@ -961,7 +892,6 @@ def history():
             ingredient_summary = {}
             detected_ingredients = []
             has_gmo = False
-            has_chemstuffs = False
             
             if isinstance(ingredients_data, dict):
                 for category, items in ingredients_data.items():
@@ -970,8 +900,6 @@ def history():
                         detected_ingredients.extend(items)
                         if category == 'gmo' and items:
                             has_gmo = True
-                        elif category == 'chemstuffs' and items:
-                            has_chemstuffs = True
                     elif category == 'all_detected' and isinstance(items, list):
                         detected_ingredients = items
                         
@@ -987,7 +915,6 @@ def history():
                 'ingredient_summary': ingredient_summary,
                 'detected_ingredients': detected_ingredients,
                 'has_gmo': has_gmo,
-                'has_chemstuffs': has_chemstuffs,
                 'image_url': row.get('image_url', ''),
                 'extracted_text': row.get('extracted_text', ''),
                 'text_length': row.get('text_length', 0),
@@ -1017,6 +944,7 @@ def upgrade():
                          trial_time_left=trial_time_left,
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
 
+# STRIPE PAYMENT PROCESSING ROUTES
 @app.route('/create-checkout-session', methods=['POST'])
 @login_required
 def create_checkout_session():
@@ -1216,9 +1144,11 @@ def stripe_webhook():
     
     return '', 200
 
+# CLEAR HISTORY ROUTE
 @app.route('/clear-history', methods=['POST'])
 @login_required
 def clear_history():
+    """Clear user's scan history (Premium feature)"""
     try:
         user_data = get_user_data(session['user_id'])
         if not user_data or not user_data['is_premium']:
@@ -1246,10 +1176,12 @@ def clear_history():
     except Exception as e:
         print(f"Clear history error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
+        
+# EXPORT HISTORY ROUTE
 @app.route('/export-history')
 @login_required
 def export_history():
+    """Export user's scan history as JSON (Premium feature)"""
     try:
         user_data = get_user_data(session['user_id'])
         if not user_data or not user_data['is_premium']:
@@ -1267,26 +1199,14 @@ def export_history():
         
         scans_data = []
         for row in cursor.fetchall():
-            ingredients_data = {}
-            try:
-                if row['ingredients_found']:
-                    if row['ingredients_found'].startswith('{'):
-                        ingredients_data = json.loads(row['ingredients_found'])
-                    else:
-                        ingredients_data = eval(row['ingredients_found'])
-            except:
-                ingredients_data = {}
-            
             scan_data = {
                 'scan_id': row['scan_id'],
                 'scan_date': str(row['scan_date']),
                 'result_rating': row['result_rating'],
-                'ingredients_found': ingredients_data,
+                'ingredients_found': row['ingredients_found'],
                 'extracted_text': row.get('extracted_text', ''),
                 'confidence': row.get('confidence', 'unknown'),
-                'text_quality': row.get('text_quality', 'unknown'),
-                'has_chemstuffs': bool(ingredients_data.get('chemstuffs', [])),
-                'has_gmo': bool(ingredients_data.get('gmo', []))
+                'text_quality': row.get('text_quality', 'unknown')
             }
             scans_data.append(scan_data)
         
@@ -1296,8 +1216,7 @@ def export_history():
             'user_email': session['user_email'],
             'export_date': datetime.now().isoformat(),
             'total_scans': len(scans_data),
-            'scans': scans_data,
-            'includes_chemstuffs_data': True
+            'scans': scans_data
         }
         
         response = Response(
@@ -1316,39 +1235,46 @@ def export_history():
 @app.route('/static/uploads/<int:user_id>/<filename>')
 @login_required
 def uploaded_file(user_id, filename):
+    """Serve uploaded images (only to the user who uploaded them)"""
     if session['user_id'] != user_id:
         return "Access denied", 403
         
     user_upload_dir = os.path.join(UPLOADS_DIR, str(user_id))
     return send_file(os.path.join(user_upload_dir, filename))
 
+# CRITICAL: Health check endpoint for load balancer
 @app.route('/health')
 def health_check():
+    """Enhanced health check endpoint for load balancer and monitoring"""
     try:
         start_time = time.time()
         
+        # Quick database check
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('SELECT 1')
         conn.close()
         
+        # Memory check with automatic cleanup
         memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
         
-        if memory_mb > 350:
+        if memory_mb > 350:  # Critical memory level
             print(f"HEALTH CHECK: Critical memory level {memory_mb:.1f}MB, forcing cleanup")
             gc.collect()
             time.sleep(0.1)
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
         
-        response_time = (time.time() - start_time) * 1000
+        # Check response time
+        response_time = (time.time() - start_time) * 1000  # Convert to milliseconds
         
+        # Determine health status
         status = 'healthy'
         http_code = 200
         
         if memory_mb > 400:
             status = 'critical_memory'
             http_code = 503
-        elif response_time > 1000:
+        elif response_time > 1000:  # 1 second
             status = 'slow_response'
             http_code = 503
         elif memory_mb > 300:
@@ -1359,8 +1285,7 @@ def health_check():
             'memory_mb': round(memory_mb, 1),
             'response_time_ms': round(response_time, 1),
             'timestamp': datetime.now().isoformat(),
-            'database': 'connected',
-            'chemstuffs_enabled': True
+            'database': 'connected'
         }), http_code
         
     except Exception as e:
@@ -1370,29 +1295,452 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 503
 
+# ADMIN/DEBUG ROUTES
+@app.route('/test-upgrade-user', methods=['GET', 'POST'])
+@login_required
+def test_upgrade_user():
+    """Test route to upgrade current user to premium without Stripe"""
+    if request.method == 'POST':
+        plan = request.form.get('plan', 'monthly')
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = TRUE, 
+                        subscription_status = 'active',
+                        subscription_start_date = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (session['user_id'],))
+            else:
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_premium = 1, 
+                        subscription_status = 'active',
+                        subscription_start_date = ?
+                    WHERE id = ?
+                ''', (format_datetime_for_db(), session['user_id']))
+            
+            conn.commit()
+            conn.close()
+            
+            session['is_premium'] = True
+            
+            success_msg = f"✅ Test upgrade successful! You are now Premium ({plan} plan)"
+            
+        except Exception as e:
+            success_msg = f"❌ Test upgrade failed: {str(e)}"
+    else:
+        success_msg = None
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Test Upgrade User</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .info {{ background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #17a2b8; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🧪 Test User Upgrade</h1>
+            
+            <div class="info">
+                <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
+                <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
+                <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
+            </div>
+            
+            {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="plan">Select Plan:</label>
+                    <select id="plan" name="plan" required>
+                        <option value="weekly">Weekly ($3.99/week)</option>
+                        <option value="monthly" selected>Monthly ($11.99/month)</option>
+                        <option value="yearly">Yearly ($95.00/year)</option>
+                    </select>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🚀 Test Upgrade to Premium</button>
+                    <a href="/upgrade" class="btn btn-secondary">💳 Real Stripe Upgrade</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to Scanner</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/simple-login', methods=['GET', 'POST'])
+def simple_login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            error_msg = "Please enter both email and password"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+                
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    session.clear()
+                    session.permanent = True
+                    session['user_id'] = user['id']
+                    session['user_email'] = user['email']
+                    session['user_name'] = user['name']
+                    session['is_premium'] = bool(user['is_premium'])
+                    session['scans_used'] = user['scans_used']
+                    session['stripe_customer_id'] = user['stripe_customer_id']
+                    
+                    conn.close()
+                    return redirect('/')
+                else:
+                    error_msg = "Invalid email or password"
+                    
+                conn.close()
+            except Exception as e:
+                error_msg = f"Login error: {str(e)}"
+    else:
+        error_msg = None
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FoodFixr Login</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0;">
+        <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
+            
+            {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
+            
+            <form method="POST" action="/simple-login">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email:</label>
+                    <input type="email" name="email" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Password:</label>
+                    <input type="password" name="password" required style="width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                
+                <button type="submit" style="width: 100%%; padding: 15px; background: #e91e63; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                    Login
+                </button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 25px;">
+                <a href="/admin-password-reset" style="background: #ff9800; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Reset Individual Password</a>
+                <a href="/check-users" style="background: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Manage Users</a>
+                <a href="/test-upgrade-user" style="background: #4CAF50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; display: inline-block;">Test Upgrade</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/admin-password-reset', methods=['GET', 'POST'])
+def admin_password_reset():
+    """Admin route to reset individual user passwords"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        new_password = request.form.get('new_password', '')
+        
+        if not email or not new_password:
+            error_msg = "Both email and password are required"
+        elif len(new_password) < 6:
+            error_msg = "Password must be at least 6 characters long"
+        else:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                database_url = os.getenv('DATABASE_URL')
+                if database_url:
+                    cursor.execute('SELECT id, name FROM users WHERE email = %s', (email,))
+                else:
+                    cursor.execute('SELECT id, name FROM users WHERE email = ?', (email,))
+                
+                user = cursor.fetchone()
+                
+                if not user:
+                    error_msg = f"No user found with email: {email}"
+                else:
+                    password_hash = generate_password_hash(new_password)
+                    
+                    if database_url:
+                        cursor.execute('UPDATE users SET password_hash = %s WHERE email = %s', 
+                                     (password_hash, email))
+                    else:
+                        cursor.execute('UPDATE users SET password_hash = ? WHERE email = ?', 
+                                     (password_hash, email))
+                    
+                    conn.commit()
+                    success_msg = f"Password updated for {user['name']} ({email})"
+                
+                conn.close()
+                
+            except Exception as e:
+                error_msg = f"Database error: {str(e)}"
+    else:
+        error_msg = None
+        success_msg = None
+    
+    # Get all users for the dropdown
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT email, name FROM users ORDER BY name')
+        users = cursor.fetchall()
+        conn.close()
+    except:
+        users = []
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Password Reset</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+            .form-group {{ margin-bottom: 20px; }}
+            label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #333; }}
+            input, select {{ width: 100%%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }}
+            input:focus, select:focus {{ border-color: #e91e63; outline: none; }}
+            .btn {{ padding: 12px 24px; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }}
+            .btn-primary {{ background: #e91e63; color: white; }}
+            .btn-secondary {{ background: #666; color: white; }}
+            .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+            .success {{ background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #4CAF50; }}
+            .error {{ background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #f44336; }}
+            .user-list {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+            .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
+            .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Admin Password Reset</h1>
+            
+            {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
+            {'<div class="error">' + error_msg + '</div>' if 'error_msg' in locals() and error_msg else ''}
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Select User Email:</label>
+                    <select id="email" name="email" onchange="fillEmail(this.value)" required>
+                        <option value="">-- Select a user --</option>
+                        {''.join([f'<option value="{user[0]}">{user[1]} ({user[0]})</option>' for user in users])}
+                    </select>
+                    <div class="quick-fill">
+                        Or type manually: 
+                        <input type="email" id="manual_email" placeholder="user@example.com" onchange="document.getElementById('email').value = this.value">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password:</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                    <div class="quick-fill">
+                        Quick passwords: 
+                        <button type="button" onclick="setPassword('password123')">password123</button>
+                        <button type="button" onclick="setPassword('admin123')">admin123</button>
+                        <button type="button" onclick="setPassword('test123')">test123</button>
+                        <button type="button" onclick="setPassword('user123')">user123</button>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">🔐 Reset Password</button>
+                    <a href="/check-users" class="btn btn-secondary">👥 View Users</a>
+                    <a href="/simple-login" class="btn btn-secondary">🚪 Test Login</a>
+                </div>
+            </form>
+            
+            <div class="user-list">
+                <h3>📋 Registered Users ({len(users)} total):</h3>
+                {''.join([f'<div class="user-item"><strong>{user[1]}</strong> - {user[0]}</div>' for user in users]) if users else '<p>No users found</p>'}
+            </div>
+        </div>
+        
+        <script>
+            function fillEmail(email) {{
+                document.getElementById('manual_email').value = email;
+            }}
+            
+            function setPassword(password) {{
+                document.getElementById('new_password').value = password;
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/check-users')
+def check_users():
+    """Enhanced user management interface"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT id, name, email, created_at, is_premium, scans_used FROM users ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        conn.close()
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>User Management</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
+                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+                table {{ width: 100%%; border-collapse: collapse; margin: 20px 0; }}
+                th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+                th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
+                tr:hover {{ background-color: #f5f5f5; }}
+                .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }}
+                .btn-primary {{ background: #e91e63; color: white; }}
+                .btn-secondary {{ background: #666; color: white; }}
+                .btn-success {{ background: #28a745; color: white; }}
+                .btn:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+                .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
+                .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
+                .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
+                .premium {{ color: #28a745; font-weight: bold; }}
+                .trial {{ color: #ffc107; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>👥 User Management Dashboard</h1>
+                
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-number">{len(users)}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{len([u for u in users if u[4]])}</div>
+                        <div>Premium Users</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
+                        <div>Total Scans</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="/admin-password-reset" class="btn btn-primary">🔐 Reset Individual Password</a>
+                    <a href="/simple-login" class="btn btn-success">🚪 Test Login</a>
+                    <a href="/" class="btn btn-secondary">🏠 Back to App</a>
+                    <a href="/health" class="btn btn-secondary">🏥 Health Check</a>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Scans Used</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join([f'''
+                        <tr>
+                            <td>{user[0]}</td>
+                            <td>{user[1]}</td>
+                            <td>{user[2]}</td>
+                            <td class="{'premium' if user[4] else 'trial'}">{'Premium' if user[4] else 'Trial'}</td>
+                            <td>{user[5] or 0}</td>
+                            <td>{user[3]}</td>
+                        </tr>
+                        ''' for user in users]) if users else '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>❌ Database Error</h1>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <a href="/simple-login" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Simple Login</a>
+        </body>
+        </html>
+        """
+
+# Error handlers with better error pages
 @app.errorhandler(413)
 def too_large(e):
-    gc.collect()
+    gc.collect()  # Clean up on error
     return render_template('error.html', 
                          error_title="File Too Large", 
                          error_message="The uploaded image is too large. Please upload an image smaller than 5MB."), 413
 
 @app.errorhandler(500)
 def internal_error(e):
-    gc.collect()
+    gc.collect()  # Force cleanup on 500 errors
     return render_template('error.html', 
                          error_title="Internal Server Error", 
                          error_message="Something went wrong. Please try again with a smaller image."), 500
 
 @app.errorhandler(TimeoutError)
 def timeout_error(e):
-    gc.collect()
+    gc.collect()  # Force cleanup on timeout
     return render_template('error.html',
                          error_title="Request Timeout",
                          error_message="The request took too long to process. Please try with a smaller image."), 504
 
+# CRITICAL: Use Gunicorn for production
 if __name__ == '__main__':
+    # Only for local development - production uses Gunicorn
     port = int(os.environ.get("PORT", 5000))
     print("WARNING: Running with Flask development server. Use Gunicorn for production!")
-    print("✅ ChemStuffs category fully integrated and ready!")
     app.run(host="0.0.0.0", port=port, debug=False)
