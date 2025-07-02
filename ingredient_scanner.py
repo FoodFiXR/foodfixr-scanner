@@ -840,7 +840,7 @@ def assess_text_quality_enhanced(text):
         return "fair"
 
 def match_all_ingredients(text):
-    """Enhanced ingredient matching with ChemStuffs category"""
+    """Enhanced ingredient matching with precise categories"""
     if not text:
         print("DEBUG: No text provided for ingredient matching")
         return {
@@ -849,8 +849,6 @@ def match_all_ingredients(text):
             "corn": [],
             "sugar": [],
             "sugar_safe": [],
-            "chemstuffs": [],  # NEW CATEGORY
-            "chemstuffs_safe": [],  # NEW CATEGORY
             "gmo": [],
             "all_detected": [],
             "has_safety_labels": False
@@ -861,22 +859,15 @@ def match_all_ingredients(text):
     
     has_safety_labels = check_for_safety_labels(text)
     
-    # Existing category matching
     trans_fat_matches = precise_ingredient_matching(text, trans_fat_high_risk + trans_fat_moderate_risk, "Trans Fat")
     excitotoxin_matches = precise_ingredient_matching(text, excitotoxin_high_risk + excitotoxin_moderate_risk, "Excitotoxin")
     corn_matches = precise_ingredient_matching(text, corn_high_risk + corn_moderate_risk, "Corn")
     sugar_high_matches = precise_ingredient_matching(text, sugar_high_risk, "High Risk Sugar")
     sugar_safe_matches = precise_ingredient_matching(text, sugar_safe, "Safe Sugar")
-    
-    # NEW: ChemStuffs category matching
-    chemstuffs_matches = precise_ingredient_matching(text, chemstuffs_high_risk + chemstuffs_moderate_risk, "ChemStuffs")
-    chemstuffs_safe_matches = precise_ingredient_matching(text, chemstuffs_safe, "Safe ChemStuffs")
-    
     gmo_matches = precise_ingredient_matching(text, gmo_keywords, "GMO")
     
     all_detected = list(set(trans_fat_matches + excitotoxin_matches + corn_matches + 
-                           sugar_high_matches + sugar_safe_matches + chemstuffs_matches + 
-                           chemstuffs_safe_matches + gmo_matches))
+                           sugar_high_matches + sugar_safe_matches + gmo_matches))
     
     result = {
         "trans_fat": list(set(trans_fat_matches)),
@@ -884,14 +875,12 @@ def match_all_ingredients(text):
         "corn": list(set(corn_matches)),
         "sugar": list(set(sugar_high_matches)),
         "sugar_safe": list(set(sugar_safe_matches)),
-        "chemstuffs": list(set(chemstuffs_matches)),  # NEW
-        "chemstuffs_safe": list(set(chemstuffs_safe_matches)),  # NEW
         "gmo": list(set(gmo_matches)),
         "all_detected": all_detected,
         "has_safety_labels": has_safety_labels
     }
     
-    print(f"DEBUG: ENHANCED INGREDIENT MATCHING RESULTS WITH CHEMSTUFFS:")
+    print(f"DEBUG: PRECISE INGREDIENT MATCHING RESULTS:")
     if has_safety_labels:
         print(f"  🛡️ SAFETY LABELS: Found safety labels (no msg, non-gmo, etc.)")
     for category, ingredients in result.items():
@@ -905,7 +894,7 @@ def match_all_ingredients(text):
     return result
 
 def rate_ingredients_according_to_hierarchy(matches, text_quality):
-    """Updated rating system with ChemStuffs integration"""
+    """Rating system with safety label override"""
     
     print(f"DEBUG: Rating ingredients with text quality: {text_quality}")
     
@@ -936,19 +925,9 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
                 print(f"🚨 HIGH RISK Excitotoxin detected: {ingredient}")
                 return "🚨 Oh NOOOO! Danger!"
     
-    # NEW: HIGH RISK CHEMSTUFFS
-    high_risk_chemstuffs_found = []
-    for ingredient in matches["chemstuffs"]:
-        for high_risk_item in chemstuffs_high_risk:
-            if high_risk_item.lower() in ingredient.lower():
-                high_risk_chemstuffs_found.append(ingredient)
-                print(f"🚨 HIGH RISK ChemStuffs detected: {ingredient}")
-                return "🚨 Oh NOOOO! Danger!"
-    
     # COUNT PROBLEMATIC INGREDIENTS
     total_problematic_count = 0
     
-    # Count moderate trans fats
     moderate_trans_fat_count = 0
     for ingredient in matches["trans_fat"]:
         if ingredient not in high_risk_trans_fat_found:
@@ -958,7 +937,6 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
                     print(f"⚠️ Moderate trans fat counted: {ingredient}")
                     break
     
-    # Count moderate excitotoxins
     moderate_excitotoxin_count = 0
     for ingredient in matches["excitotoxins"]:
         if ingredient not in high_risk_excitotoxin_found:
@@ -973,26 +951,14 @@ def rate_ingredients_according_to_hierarchy(matches, text_quality):
                     print(f"⚠️ Low risk excitotoxin counted: {ingredient}")
                     break
     
-    # NEW: Count moderate ChemStuffs
-    moderate_chemstuffs_count = 0
-    for ingredient in matches["chemstuffs"]:
-        if ingredient not in high_risk_chemstuffs_found:
-            for moderate_item in chemstuffs_moderate_risk:
-                if moderate_item.lower() in ingredient.lower():
-                    moderate_chemstuffs_count += 1
-                    print(f"⚠️ Moderate ChemStuffs counted: {ingredient}")
-                    break
-    
     corn_count = len(matches["corn"])
     sugar_count = len(matches["sugar"])
     
-    total_problematic_count = (moderate_trans_fat_count + moderate_excitotoxin_count + 
-                              moderate_chemstuffs_count + corn_count + sugar_count)
+    total_problematic_count = moderate_trans_fat_count + moderate_excitotoxin_count + corn_count + sugar_count
     
     print(f"⚖️ TOTAL PROBLEMATIC COUNT: {total_problematic_count}")
     print(f"   - Moderate trans fats: {moderate_trans_fat_count}")
     print(f"   - Moderate excitotoxins: {moderate_excitotoxin_count}")
-    print(f"   - Moderate ChemStuffs: {moderate_chemstuffs_count}")  # NEW
     print(f"   - Corn ingredients: {corn_count}")
     print(f"   - Sugar ingredients: {sugar_count}")
     
@@ -1141,15 +1107,13 @@ def print_scan_summary(result):
     print(f"{'='*80}\n")
 
 def get_category_emoji(category):
-    """Updated emoji mapping with ChemStuffs"""
+    """Get emoji for ingredient category"""
     emoji_map = {
         'trans_fat': '🚫',
         'excitotoxins': '⚠️',
         'corn': '🌽',
         'sugar': '🍯',
         'sugar_safe': '✅',
-        'chemstuffs': '☢️',  # NEW
-        'chemstuffs_safe': '🧪',  # NEW  
         'gmo': '👽',
         'all_detected': '📋'
     }
