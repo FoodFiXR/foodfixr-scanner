@@ -1,4 +1,4 @@
-# scanner_config.py - Updated with ChemStuffs category
+# scanner_config.py - Exact hierarchy from document
 
 # TRANS FATS - From hierarchy document
 # 🔴 High Risk (ranks 1-10) - ANY ONE = immediate danger
@@ -123,6 +123,7 @@ corn_moderate_risk = [
     "whole grain corn",
     "masa",
     "organic masa"
+
 ]
 
 # Low Risk - Count toward total
@@ -201,144 +202,6 @@ sugar_safe = [
 # Combine high risk and safe for easier processing
 sugar_keywords = sugar_high_risk + sugar_safe 
 
-# ☢️ CHEMSTUFFS - NEW CATEGORY FOR CHEMICAL ADDITIVES
-# 🔴 Red - "Oh nooooo, Danger!" - High-risk chemical ingredients
-chemstuffs_high_risk = [
-    # Artificial Sweeteners
-    "sucralose",
-    "aspartame", 
-    "acesulfame k",
-    "acesulfame potassium",
-    
-    # Synthetic Caffeine
-    "caffeine anhydrous",
-    "synthetic caffeine",
-    
-    # Preservative Combinations
-    "sodium benzoate",
-    "potassium benzoate",
-    
-    # Artificial Dyes
-    "red 40",
-    "yellow 5",
-    "blue 1",
-    "fd&c red 40",
-    "fd&c yellow 5", 
-    "fd&c blue 1",
-    "allura red ac",
-    "tartrazine",
-    "brilliant blue fcf",
-    
-    # Chemical Preservatives
-    "bht",
-    "butylated hydroxytoluene",
-    "bha",
-    "butylated hydroxyanisole",
-    
-    # Industrial Chemicals
-    "propylene glycol",
-    "ethylene glycol",
-    
-    # Synthetic Supplements (High Dose)
-    "synthetic l-carnitine",
-    "synthetic niacin",
-    "pyridoxine hcl",
-    "cyanocobalamin",
-    "folic acid",
-    
-    # Performance Chemicals
-    "glucuronolactone",
-    "synthetic taurine",
-    "synthetic d-ribose",
-    "citicoline",
-    "cdp-choline",
-    "synthetic theobromine"
-]
-
-# 🟡 Yellow - "Proceed with caution" - Moderate chemical risk
-chemstuffs_moderate_risk = [
-    # Acids
-    "phosphoric acid",
-    "citric acid",
-    "malic acid",
-    "tartaric acid",
-    
-    # Synthetic Vitamins
-    "synthetic vitamin b6",
-    "synthetic vitamin b12", 
-    "synthetic folate",
-    
-    # Artificial Flavors
-    "artificial flavors",
-    "artificial flavoring",
-    "artificial vanilla",
-    "vanillin",
-    
-    # Carbonation + Alcohol combinations
-    "carbonated alcoholic beverage",
-    
-    # Stabilizers
-    "sodium phosphate",
-    "potassium phosphate",
-    "calcium phosphate",
-    
-    # Emulsifiers
-    "polysorbate 80",
-    "polysorbate 60",
-    "sorbitan monostearate",
-    
-    # Synthetic Antioxidants
-    "tbhq",
-    "tertiary butylhydroquinone",
-    
-    # Chemical Buffers
-    "sodium bicarbonate",
-    "potassium bicarbonate"
-]
-
-# 🟢 Green - "Yay, safe!" - Natural/safer alternatives
-chemstuffs_safe = [
-    # Natural Caffeine
-    "guarana",
-    "yerba mate",
-    "green tea extract",
-    "coffee extract",
-    
-    # Natural Electrolytes
-    "sea salt",
-    "himalayan salt",
-    "potassium chloride",
-    "magnesium glycinate",
-    
-    # Natural Calming
-    "l-theanine",
-    "chamomile",
-    
-    # Natural Adaptogens
-    "panax ginseng",
-    "rhodiola",
-    "ashwagandha",
-    
-    # Natural B Vitamins
-    "methylcobalamin",
-    "p5p",
-    "folate",
-    "nutritional yeast",
-    
-    # Whole Food Extracts
-    "coconut water powder",
-    "beetroot extract",
-    "ginger extract",
-    "lemon juice",
-    "green tea extract",
-    "chlorophyll",
-    
-    # Natural Preservatives
-    "vitamin e",
-    "rosemary extract",
-    "ascorbyl palmitate"
-]
-
 # GMO ALERT - From hierarchy document (NOT part of ranking)
 gmo_keywords = [
     "corn syrup",
@@ -406,14 +269,3 @@ gmo_keywords = [
     "lab-grown",
     "precision fermentation"
 ]
-
-# RATING HIERARCHY RULES:
-# 1. ANY Trans Fat High Risk = IMMEDIATE "Oh NOOOO! Danger!"
-# 2. ANY Excitotoxin High Risk = IMMEDIATE "Oh NOOOO! Danger!"  
-# 3. ANY ChemStuffs High Risk = IMMEDIATE "Oh NOOOO! Danger!"
-# 4. Count all moderate/low risk items across categories:
-#    - 3+ total = "Oh NOOOO! Danger!"
-#    - 1-2 total = "Proceed carefully" 
-#    - 0 total = "Yay! Safe!"
-# 5. Safety labels (non-gmo, no msg) override to "Yay! Safe!"
-# 6. GMO = Alert notification but doesn't affect rating
