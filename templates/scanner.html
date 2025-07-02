@@ -789,8 +789,8 @@
 
         {% if "TRY AGAIN" not in result.rating %}
         
-        <!-- Show Toxin Alert for GMO or ChemStuffs -->
-        {% if result.matched_ingredients.gmo or result.matched_ingredients.chemstuffs %}
+        <!-- Show GMO Alert even for Safe products if GMO ingredients are detected -->
+        {% if result.matched_ingredients.gmo %}
         <div class="gmo-alert">
             <span>☠️Toxin alert! Looks like there are some if-y players to be aware of.</span>
         </div>
@@ -820,19 +820,6 @@
                 </div>
                 <div class="ingredient-list">
                     {{ result.matched_ingredients.excitotoxins | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- NEW: ChemStuffs Category -->
-            {% if result.matched_ingredients.chemstuffs %}
-            <div class="ingredient-category risky-ingredients">
-                <div class="category-title">
-                    <img src="/static/ChemStuffs.png" class="villain-icon" alt="ChemStuffs Villain" />
-                    ☢️ ChemStuffs: Synthetic chemicals and additives that can stress metabolic and detox pathways.
-                </div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.chemstuffs | join(", ") }}
                 </div>
             </div>
             {% endif %}
@@ -870,16 +857,6 @@
             </div>
             {% endif %}
 
-            <!-- NEW: Safe ChemStuffs -->
-            {% if result.matched_ingredients.chemstuffs_safe %}
-            <div class="ingredient-category safe-ingredients">
-                <div class="category-title">🧪 Safe Chemical Alternatives:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.chemstuffs_safe | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-
             {% if result.matched_ingredients.gmo %}
             <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">
@@ -892,35 +869,11 @@
             </div>
             {% endif %}
         </div>
-
         {% else %}
-        <!-- For Safe products, show detected ChemStuffs and GMO ingredients if any -->
-        {% if result.matched_ingredients.gmo or result.matched_ingredients.chemstuffs or result.matched_ingredients.chemstuffs_safe %}
+        <!-- For Safe products, only show detected GMO ingredients if any -->
+        {% if result.matched_ingredients.gmo %}
         <div class="ingredients-section">
             <h3 class="section-title">Detected Ingredients:</h3>
-            
-            {% if result.matched_ingredients.chemstuffs %}
-            <div class="ingredient-category moderate-ingredients">
-                <div class="category-title">
-                    <img src="/static/ChemStuffs.png" class="villain-icon" alt="ChemStuffs Villain" />
-                    ☢️ ChemStuffs: Synthetic chemicals and additives that can stress metabolic and detox pathways.
-                </div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.chemstuffs | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if result.matched_ingredients.chemstuffs_safe %}
-            <div class="ingredient-category safe-ingredients">
-                <div class="category-title">🧪 Safe Chemical Alternatives:</div>
-                <div class="ingredient-list">
-                    {{ result.matched_ingredients.chemstuffs_safe | join(", ") }}
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if result.matched_ingredients.gmo %}
             <div class="ingredient-category moderate-ingredients">
                 <div class="category-title">
                     <img src="/static/GMO.jpg" class="villain-icon" alt="GMO Villain" />
@@ -930,11 +883,9 @@
                     {{ result.matched_ingredients.gmo | join(", ") }}
                 </div>
             </div>
-            {% endif %}
         </div>
         {% endif %}
         {% endif %}
-
         {% else %}
         <div class="try-again-message">
             Couldn't read ingredients clearly. Try better lighting and hold steady.
