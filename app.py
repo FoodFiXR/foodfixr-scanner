@@ -760,24 +760,153 @@ def scan():
 @app.route('/account')
 @login_required
 def account():
-    user_data = get_user_data(session['user_id'])
-    if not user_data:
-        return redirect(url_for('logout'))
+    try:
+        user_data = get_user_data(session['user_id'])
+        if not user_data:
+            return redirect(url_for('logout'))
+        
+        # Calculate trial time information
+        trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
+        
+        # Format dates safely
+        trial_start = safe_datetime_parse(user_data['trial_start_date'])
+        formatted_trial_start = trial_start.strftime('%B %d, %Y')
+        
+        # Format created date safely
+        created_date = safe_datetime_parse(user_data.get('created_at'))
+        formatted_created_date = created_date.strftime('%B %d, %Y')
+        
+        # Calculate subscription details for premium users
+        subscription_start_date = None
+        next_billing_date = None
+        subscription_status = user_data.get('subscription_status', 'trial')
+        days_until_renewal = None
+        
+        if user_data.get('is_premium') and user_data.get('subscription_start_date'):
+            sub_start = safe_datetime_parse(user_data['subscription_start_date'])
+            subscription_start_date = sub_start.strftime('%B %d, %Y')
+            
+            # Calculate next billing date (assuming monthly billing)
+            next_billing = sub_start + timedelta(days=30)
+            next_billing_date = next_billing.strftime('%B %d, %Y')
+            
+            # Calculate days until renewal
+            days_until_renewal = (next_billing - datetime.now()).days
+            if days_until_renewal < 0:
+                days_until_renewal = 0
+        
+        return render_template('account.html',
+                             user_name=user_data['name'],
+                             user_created_date=formatted_created_date,
+                             total_scans_ever=user_data.get('total_scans_ever', 0),
+                             trial_start_date=formatted_trial_start,
+                             trial_time_left=trial_time_left,
+                             trial_expired=trial_expired,
+                             trial_hours_left=trial_hours,
+                             trial_minutes_left=trial_minutes,
+                             subscription_start_date=subscription_start_date,
+                             next_billing_date=next_billing_date,
+                             subscription_status=subscription_status,
+                             days_until_renewal=days_until_renewal)
     
-    trial_time_left, trial_expired, trial_hours, trial_minutes = calculate_trial_time_left(user_data['trial_start_date'])
-    
-    trial_start = safe_datetime_parse(user_data['trial_start_date'])
-    formatted_trial_start = trial_start.strftime('%B %d, %Y')
-    
-    return render_template('account.html',
-                         user_name=user_data['name'],
-                         user_created_date=formatted_created_date,
-                         total_scans_ever=user_data['total_scans_ever'],
-                         trial_start_date=formatted_trial_start,
-                         trial_time_left=trial_time_left,
-                         trial_expired=trial_expired,
-                         trial_hours_left=trial_hours,
-                         trial_minutes_left=trial_minutes)
+    except Exception as e:
+        print(f"Account page error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return basic account page with minimal data
+        user_data = get_user_data(session['user_id'])
+        return render_template('account.html',
+                             user_name=user_data.get('name', 'User') if user_data else 'User',
+                             user_created_date='Recently',
+                             total_scans_ever=user_data.get('total_scans_ever', 0) if user_data else 0,
+                             trial_start_date='Recently',
+                             trial_time_left='Unknown',
+                             trial_expired=False,
+                             trial_hours_left=0,
+                             trial_minutes_left=0,
+                             subscription_start_date=None,
+                             next_billing_date=None,
+                             subscription_status='trial',
+                             days_until_renewal=None)
+
+
+@app.route('/cancel-subscription', methods=['POST'])
+@login_required
+def cancel_subscription():
+    try:
+        user_data = get_user_data(session['user_id'])
+        if not user_data or not user_data.get('stripe_customer_id'):
+            return jsonify({'success': False, 'error': 'No subscription found'}), 404
+        
+        # Get the customer's subscriptions
+        subscriptions = stripe.Subscription.list(
+            customer=user_data['stripe_customer_id'],
+            status='active'
+        )
+        
+        if not subscriptions.data:
+            return jsonify({'success': False, 'error': 'No active subscription found'}), 404
+        
+        # Cancel the subscription at period end
+        subscription = subscriptions.data[0]
+        stripe.Subscription.modify(
+            subscription.id,
+            cancel_at_period_end=True
+        )
+        
+        # Update database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            cursor.execute('''
+                UPDATE users 
+                SET subscription_status = 'canceled'
+                WHERE id = %s
+            ''', (session['user_id'],))
+        else:
+            cursor.execute('''
+                UPDATE users 
+                SET subscription_status = 'canceled'
+                WHERE id = ?
+            ''', (session['user_id'],))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
+        
+    except stripe.error.StripeError as e:
+        print(f"Stripe error in cancel subscription: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception as e:
+        print(f"Cancel subscription error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to cancel subscription'}), 500
+
+@app.route('/create-customer-portal', methods=['POST'])
+@login_required
+def create_customer_portal():
+    try:
+        user_data = get_user_data(session['user_id'])
+        if not user_data or not user_data.get('stripe_customer_id'):
+            return jsonify({'error': 'No customer ID found'}), 404
+        
+        # Create Stripe customer portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=user_data['stripe_customer_id'],
+            return_url=f"{DOMAIN}/account"
+        )
+        
+        return jsonify({'portal_url': portal_session.url})
+        
+    except stripe.error.StripeError as e:
+        print(f"Stripe error in customer portal: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Customer portal error: {e}")
+        return jsonify({'error': 'Failed to create portal session'}), 500
 
 @app.route('/history')
 @login_required
