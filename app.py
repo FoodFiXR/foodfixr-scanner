@@ -1791,9 +1791,60 @@ if __name__ == '__main__':
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
-                json.dumps(result.get('matched_ingredients', {})),  # Now includes chemstuffs
+                json.dumps(result.get('matched_ingredients', {})),
                 format_datetime_for_db(),
                 str(uuid.uuid4()),
                 result.get('extracted_text', '')[:1000],
                 result.get('extracted_text_length', 0),
                 result.get('confidence', 'medium'),
+                result.get('text_quality', 'unknown'),
+                int(result.get('has_safety_labels', False)),
+                saved_image_path
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        session['scans_used'] = new_scans_used
+        
+        # Clean up temp uploaded file
+        cleanup_uploaded_file(filepath)
+        
+        # Final memory check
+        final_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"DEBUG: Final memory after scan: {final_memory:.1f}MB")
+        print("DEBUG: Scan completed successfully")
+        
+        return render_template('scanner.html',
+                             result=result,
+                             trial_expired=trial_expired,
+                             trial_time_left=trial_time_left,
+                             user_name=user_data['name'])
+        
+    except Exception as e:
+        print(f"DEBUG: Critical scan error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Clean up uploaded file on error
+        cleanup_uploaded_file(filepath)
+        
+        # Force memory cleanup on error
+        gc.collect()
+        
+        error_message = "Scanning failed. Please try again with a smaller, clearer image."
+        if "memory" in str(e).lower():
+            error_message = "Out of memory. Please try with a much smaller image."
+        elif "timeout" in str(e).lower():
+            error_message = "Scan timed out. Please try with a smaller image."
+        
+        return render_template('scanner.html',
+                             trial_expired=trial_expired,
+                             trial_time_left=trial_time_left,
+                             user_name=user_data['name'],
+                             error=error_message)
+    
+    finally:
+        # Always ensure cleanup
+        cleanup_uploaded_file(filepath)
+        gc.collect()
