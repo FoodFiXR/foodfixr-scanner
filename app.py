@@ -892,6 +892,7 @@ def history():
             ingredient_summary = {}
             detected_ingredients = []
             has_gmo = False
+            has_chemstuffs = False  # NEW
             
             if isinstance(ingredients_data, dict):
                 for category, items in ingredients_data.items():
@@ -900,6 +901,8 @@ def history():
                         detected_ingredients.extend(items)
                         if category == 'gmo' and items:
                             has_gmo = True
+                        elif category == 'chemstuffs' and items:  # NEW
+                            has_chemstuffs = True
                     elif category == 'all_detected' and isinstance(items, list):
                         detected_ingredients = items
                         
@@ -915,6 +918,7 @@ def history():
                 'ingredient_summary': ingredient_summary,
                 'detected_ingredients': detected_ingredients,
                 'has_gmo': has_gmo,
+                'has_chemstuffs': has_chemstuffs,  # NEW
                 'image_url': row.get('image_url', ''),
                 'extracted_text': row.get('extracted_text', ''),
                 'text_length': row.get('text_length', 0),
