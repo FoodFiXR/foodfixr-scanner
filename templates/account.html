@@ -101,6 +101,7 @@
             border-radius: 12px;
             margin-bottom: 20px;
             font-weight: 600;
+            animation: slideInDown 0.5s ease-out;
         }
 
         .alert-success {
@@ -119,6 +120,17 @@
             background: linear-gradient(135deg, #e3f2fd, #bbdefb);
             color: #1565c0;
             border: 2px solid #2196F3;
+        }
+
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* User Profile Section */
@@ -151,6 +163,28 @@
             color: white;
             font-weight: 700;
             flex-shrink: 0;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .user-avatar:hover {
+            transform: scale(1.05);
+        }
+
+        .avatar-edit {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
         }
 
         .user-info {
@@ -183,6 +217,12 @@
             border-radius: 12px;
             border: 1px solid rgba(229, 12, 232, 0.1);
             text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .detail-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(229, 12, 232, 0.2);
         }
 
         .detail-label {
@@ -232,6 +272,12 @@
         .status-icon {
             font-size: 48px;
             margin-bottom: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
 
         .status-title {
@@ -278,6 +324,11 @@
             align-items: center;
             padding: 14px 0;
             border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: background-color 0.2s ease;
+        }
+
+        .detail-row:hover {
+            background: rgba(229, 12, 232, 0.02);
         }
 
         .detail-row:last-child {
@@ -397,6 +448,12 @@
             border-radius: 12px;
             text-align: center;
             border: 1px solid rgba(229, 12, 232, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(229, 12, 232, 0.2);
         }
 
         .stat-number {
@@ -440,7 +497,7 @@
             height: 100%;
             background: linear-gradient(135deg, #e50ce8, #c209c5);
             border-radius: 4px;
-            transition: width 0.3s ease;
+            transition: width 0.8s ease;
         }
 
         /* Action Buttons */
@@ -464,6 +521,26 @@
             justify-content: center;
             gap: 8px;
             font-family: 'Comfortaa', sans-serif;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover:before {
+            width: 300px;
+            height: 300px;
         }
 
         .btn-primary {
@@ -500,6 +577,27 @@
             box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
         }
 
+        /* Loading State */
+        .btn.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .btn.loading:after {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Cancel Modal */
         .modal {
             display: none;
@@ -511,6 +609,12 @@
             height: 100%;
             background-color: rgba(0,0,0,0.5);
             backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .modal-content {
@@ -524,6 +628,18 @@
             text-align: center;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: slideInUp 0.3s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .modal-title {
@@ -544,6 +660,26 @@
             display: flex;
             gap: 12px;
             justify-content: center;
+        }
+
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #1a0a1a;
+            }
+            
+            .header, .user-profile, .subscription-details, .usage-stats {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+            }
+            
+            .account-title, .user-name, .details-title, .stats-title {
+                color: #fff;
+            }
+            
+            .account-subtitle, .user-email, .row-label {
+                color: #ccc;
+            }
         }
 
         /* Mobile Responsiveness */
@@ -613,6 +749,27 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Accessibility improvements */
+        .btn:focus, .nav-btn:focus {
+            outline: 2px solid #fff;
+            outline-offset: 2px;
+        }
+
+        .alert[role="alert"] {
+            /* Screen reader support */
+        }
+
+        /* Better error handling display */
+        .error-message {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: #c62828;
+            border: 2px solid #f44336;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -633,7 +790,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                    <div class="alert alert-{{ 'error' if category == 'error' else category }}" role="alert">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -643,8 +800,9 @@
         <!-- User Profile Section -->
         <div class="user-profile">
             <div class="profile-header">
-                <div class="user-avatar">
+                <div class="user-avatar" onclick="editProfile()">
                     {{ user_name[0].upper() if user_name else session.get('user_email', 'U')[0].upper() }}
+                    <div class="avatar-edit">✏️</div>
                 </div>
                 <div class="user-info">
                     <div class="user-name">
@@ -815,7 +973,7 @@
         <!-- Action Buttons -->
         <div class="action-buttons">
             {% if session.get('is_premium') %}
-                <button onclick="openBillingPortal()" class="btn btn-primary">
+                <button onclick="openBillingPortal()" class="btn btn-primary" id="billingBtn">
                     💳 Manage Billing & Payment
                 </button>
                 <a href="/history" class="btn btn-secondary">
@@ -856,7 +1014,7 @@
                 <button onclick="closeCancelModal()" class="btn btn-secondary">
                     Keep Premium
                 </button>
-                <button onclick="confirmCancel()" class="btn btn-danger">
+                <button onclick="confirmCancel()" class="btn btn-danger" id="cancelBtn">
                     Yes, Cancel
                 </button>
             </div>
@@ -864,54 +1022,120 @@
     </div>
 
     <script>
+        // Enhanced JavaScript with better error handling and user feedback
+        
+        function showLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            }
+        }
+
+        function hideLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type}`;
+            notification.textContent = message;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.style.maxWidth = '300px';
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        function editProfile() {
+            // Placeholder for profile editing functionality
+            showNotification('Profile editing coming soon!', 'info');
+        }
+
         function openCancelModal() {
             document.getElementById('cancelModal').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
         }
 
         function closeCancelModal() {
             document.getElementById('cancelModal').style.display = 'none';
+            document.body.style.overflow = 'auto'; // Restore scroll
         }
 
         function confirmCancel() {
+            showLoading('cancelBtn');
+            
             fetch('/cancel-subscription', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                hideLoading('cancelBtn');
                 if (data.success) {
-                    alert('Your subscription has been cancelled and will end at your next billing date.');
-                    location.reload();
+                    showNotification('Your subscription has been cancelled and will end at your next billing date.', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
                 } else {
-                    alert('Error cancelling subscription: ' + data.error);
+                    showNotification('Error cancelling subscription: ' + (data.error || 'Unknown error'), 'error');
                 }
             })
             .catch(error => {
-                alert('Error cancelling subscription. Please try again.');
+                hideLoading('cancelBtn');
+                console.error('Error:', error);
+                showNotification('Error cancelling subscription. Please try again or contact support.', 'error');
             });
             
             closeCancelModal();
         }
 
         function openBillingPortal() {
+            showLoading('billingBtn');
+            
             fetch('/create-customer-portal', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                hideLoading('billingBtn');
                 if (data.portal_url) {
                     window.location.href = data.portal_url;
                 } else {
-                    alert('Error opening billing portal: ' + (data.error || 'Unknown error'));
+                    showNotification('Error opening billing portal: ' + (data.error || 'Unknown error'), 'error');
                 }
             })
             .catch(error => {
-                alert('Error opening billing portal. Please try again.');
+                hideLoading('billingBtn');
+                console.error('Error:', error);
+                showNotification('Error opening billing portal. Please try again or contact support.', 'error');
             });
         }
 
@@ -919,9 +1143,16 @@
         window.onclick = function(event) {
             const modal = document.getElementById('cancelModal');
             if (event.target == modal) {
-                modal.style.display = 'none';
+                closeCancelModal();
             }
         }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeCancelModal();
+            }
+        });
 
         // Auto-update progress bar animation
         document.addEventListener('DOMContentLoaded', function() {
@@ -931,7 +1162,103 @@
                     progressFill.style.width = progressFill.style.width;
                 }, 500);
             }
+
+            // Auto-dismiss flash messages
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-20px)';
+                    setTimeout(() => {
+                        alert.remove();
+                    }, 300);
+                }, 5000);
+            });
+
+            // Add CSRF token to forms if needed
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (csrfToken) {
+                // Add CSRF token to all fetch requests
+                const originalFetch = window.fetch;
+                window.fetch = function(...args) {
+                    const [url, options = {}] = args;
+                    if (options.method && options.method.toUpperCase() !== 'GET') {
+                        options.headers = {
+                            ...options.headers,
+                            'X-CSRFToken': csrfToken.content
+                        };
+                    }
+                    return originalFetch.apply(this, [url, options]);
+                };
+            }
+        });
+
+        // Real-time countdown updates (if trial is active)
+        function updateCountdown() {
+            const countdownElement = document.querySelector('.countdown-time');
+            if (countdownElement && countdownElement.textContent.includes('h')) {
+                // This would need to be connected to actual server time
+                // For now, it's just a placeholder for the functionality
+            }
+        }
+
+        // Update countdown every minute
+        setInterval(updateCountdown, 60000);
+
+        // Add smooth scroll behavior for any anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add ripple effect to buttons
+        document.querySelectorAll('.btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                const ripple = document.createElement('span');
+                const rect = this.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const x = e.clientX - rect.left - size / 2;
+                const y = e.clientY - rect.top - size / 2;
+                
+                ripple.style.width = ripple.style.height = size + 'px';
+                ripple.style.left = x + 'px';
+                ripple.style.top = y + 'px';
+                ripple.classList.add('ripple');
+                
+                this.appendChild(ripple);
+                
+                setTimeout(() => {
+                    ripple.remove();
+                }, 600);
+            });
         });
     </script>
+
+    <style>
+        /* Add ripple effect styles */
+        .ripple {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple-animation 0.6s linear;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+    </style>
 </body>
 </html>
