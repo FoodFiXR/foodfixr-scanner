@@ -588,7 +588,7 @@ def index():
 @login_required
 @with_timeout(90)  # 90 second timeout protection
 def scan():
-    """Enhanced scan route with comprehensive 502 error prevention"""
+    """Enhanced scan route with comprehensive 502 error prevention and ChemStuffs support"""
     print("DEBUG: Starting scan with comprehensive error prevention")
     
     # CRITICAL: Memory cleanup before processing
@@ -731,33 +731,7 @@ def scan():
             ''', (
                 session['user_id'], 
                 result.get('rating', ''), 
-                json.dumps(result.get('matched_ingredients', {})),
-                str(uuid.uuid4()),
-                result.get('extracted_text', '')[:1000],
-                result.get('extracted_text_length', 0),
-                result.get('confidence', 'medium'),
-                result.get('text_quality', 'unknown'),
-                result.get('has_safety_labels', False),
-                saved_image_path
-            ))
-        else:
-            cursor.execute('''
-                UPDATE users 
-                SET scans_used = ?, total_scans_ever = ?
-                WHERE id = ?
-            ''', (new_scans_used, new_total_scans, session['user_id']))
-            
-            cursor.execute('''
-                INSERT INTO scan_history (
-                    user_id, result_rating, ingredients_found, scan_date, scan_id,
-                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                session['user_id'], 
-                result.get('rating', ''), 
-                json.dumps(result.get('matched_ingredients', {})),
-                format_datetime_for_db(),
+                json.dumps(result.get('matched_ingredients', {})),  # Now includes chemstuffs
                 str(uuid.uuid4()),
                 result.get('extracted_text', '')[:1000],
                 result.get('extracted_text_length', 0),
@@ -842,6 +816,7 @@ def account():
 @app.route('/history')
 @login_required
 def history():
+    """Enhanced history route with ChemStuffs support"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -892,7 +867,7 @@ def history():
             ingredient_summary = {}
             detected_ingredients = []
             has_gmo = False
-            has_chemstuffs = False  # NEW
+            has_chemstuffs = False  # NEW: ChemStuffs detection
             
             if isinstance(ingredients_data, dict):
                 for category, items in ingredients_data.items():
@@ -901,7 +876,7 @@ def history():
                         detected_ingredients.extend(items)
                         if category == 'gmo' and items:
                             has_gmo = True
-                        elif category == 'chemstuffs' and items:  # NEW
+                        elif category == 'chemstuffs' and items:  # NEW: ChemStuffs check
                             has_chemstuffs = True
                     elif category == 'all_detected' and isinstance(items, list):
                         detected_ingredients = items
@@ -918,7 +893,7 @@ def history():
                 'ingredient_summary': ingredient_summary,
                 'detected_ingredients': detected_ingredients,
                 'has_gmo': has_gmo,
-                'has_chemstuffs': has_chemstuffs,  # NEW
+                'has_chemstuffs': has_chemstuffs,  # NEW: ChemStuffs flag
                 'image_url': row.get('image_url', ''),
                 'extracted_text': row.get('extracted_text', ''),
                 'text_length': row.get('text_length', 0),
@@ -1185,7 +1160,7 @@ def clear_history():
 @app.route('/export-history')
 @login_required
 def export_history():
-    """Export user's scan history as JSON (Premium feature)"""
+    """Export user's scan history as JSON (Premium feature) with ChemStuffs data"""
     try:
         user_data = get_user_data(session['user_id'])
         if not user_data or not user_data['is_premium']:
@@ -1203,14 +1178,27 @@ def export_history():
         
         scans_data = []
         for row in cursor.fetchall():
+            # Parse ingredients data to include ChemStuffs
+            ingredients_data = {}
+            try:
+                if row['ingredients_found']:
+                    if row['ingredients_found'].startswith('{'):
+                        ingredients_data = json.loads(row['ingredients_found'])
+                    else:
+                        ingredients_data = eval(row['ingredients_found'])
+            except:
+                ingredients_data = {}
+            
             scan_data = {
                 'scan_id': row['scan_id'],
                 'scan_date': str(row['scan_date']),
                 'result_rating': row['result_rating'],
-                'ingredients_found': row['ingredients_found'],
+                'ingredients_found': ingredients_data,  # Full ingredients data including ChemStuffs
                 'extracted_text': row.get('extracted_text', ''),
                 'confidence': row.get('confidence', 'unknown'),
-                'text_quality': row.get('text_quality', 'unknown')
+                'text_quality': row.get('text_quality', 'unknown'),
+                'has_chemstuffs': bool(ingredients_data.get('chemstuffs', [])),  # NEW: ChemStuffs flag
+                'has_gmo': bool(ingredients_data.get('gmo', []))
             }
             scans_data.append(scan_data)
         
@@ -1220,7 +1208,8 @@ def export_history():
             'user_email': session['user_email'],
             'export_date': datetime.now().isoformat(),
             'total_scans': len(scans_data),
-            'scans': scans_data
+            'scans': scans_data,
+            'includes_chemstuffs_data': True  # NEW: Flag for ChemStuffs support
         }
         
         response = Response(
@@ -1289,7 +1278,8 @@ def health_check():
             'memory_mb': round(memory_mb, 1),
             'response_time_ms': round(response_time, 1),
             'timestamp': datetime.now().isoformat(),
-            'database': 'connected'
+            'database': 'connected',
+            'chemstuffs_enabled': True  # NEW: Indicate ChemStuffs support
         }), http_code
         
     except Exception as e:
@@ -1370,6 +1360,7 @@ def test_upgrade_user():
                 <strong>ℹ️ Debug Tool:</strong> This bypasses Stripe and directly upgrades the current user to Premium.
                 <br><strong>Current User:</strong> {session.get('user_name', 'Unknown')} ({session.get('user_email', 'Unknown')})
                 <br><strong>Premium Status:</strong> {'✅ Premium' if session.get('is_premium') else '❌ Trial'}
+                <br><strong>ChemStuffs Support:</strong> ✅ Enabled
             </div>
             
             {'<div class="success">' + success_msg + '</div>' if success_msg else ''}
@@ -1447,6 +1438,7 @@ def simple_login():
     <body style="font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0;">
         <div style="max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <h1 style="text-align: center; color: #e91e63; margin-bottom: 30px;">🍎 FoodFixr Login</h1>
+            <p style="text-align: center; color: #666; margin-bottom: 20px;">☢️ Now with ChemStuffs Detection!</p>
             
             {'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center;">' + error_msg + '</div>' if error_msg else ''}
             
@@ -1557,10 +1549,15 @@ def admin_password_reset():
             .user-item {{ padding: 8px; border-bottom: 1px solid #ddd; }}
             .quick-fill {{ font-size: 12px; color: #666; margin-top: 5px; }}
             .quick-fill button {{ background: #f0f0f0; border: 1px solid #ccc; padding: 4px 8px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }}
+            .chemstuffs-banner {{ background: linear-gradient(135deg, #ff6b35, #f7931e); color: white; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; }}
         </style>
     </head>
     <body>
         <div class="container">
+            <div class="chemstuffs-banner">
+                ☢️ ChemStuffs Detection Now Active!
+            </div>
+            
             <h1>🔐 Admin Password Reset</h1>
             
             {'<div class="success">' + success_msg + '</div>' if 'success_msg' in locals() and success_msg else ''}
@@ -1619,7 +1616,7 @@ def admin_password_reset():
 
 @app.route('/check-users')
 def check_users():
-    """Enhanced user management interface"""
+    """Enhanced user management interface with ChemStuffs support"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1638,6 +1635,7 @@ def check_users():
                 body {{ font-family: Arial; padding: 20px; background: #f5f5f5; margin: 0; }}
                 .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
                 h1 {{ color: #e91e63; text-align: center; margin-bottom: 30px; }}
+                .chemstuffs-banner {{ background: linear-gradient(135deg, #ff6b35, #f7931e); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; font-size: 18px; }}
                 table {{ width: 100%%; border-collapse: collapse; margin: 20px 0; }}
                 th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
                 th {{ background-color: #f8f9fa; font-weight: bold; color: #333; }}
@@ -1652,11 +1650,31 @@ def check_users():
                 .stat-number {{ font-size: 24px; font-weight: bold; color: #e91e63; }}
                 .premium {{ color: #28a745; font-weight: bold; }}
                 .trial {{ color: #ffc107; font-weight: bold; }}
+                .feature-list {{ background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; }}
+                .feature-list h3 {{ color: #2e7d32; margin-bottom: 10px; }}
+                .feature-list ul {{ margin: 0; padding-left: 20px; }}
+                .feature-list li {{ margin: 5px 0; color: #4caf50; }}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="chemstuffs-banner">
+                    ☢️ ChemStuffs Detection System Active!
+                    <br><small>Now detecting synthetic chemicals in energy drinks & processed foods</small>
+                </div>
+                
                 <h1>👥 User Management Dashboard</h1>
+                
+                <div class="feature-list">
+                    <h3>🆕 New ChemStuffs Features:</h3>
+                    <ul>
+                        <li>☢️ High-risk chemical detection (artificial sweeteners, synthetic caffeine, etc.)</li>
+                        <li>🟡 Moderate-risk chemical warnings (phosphoric acid, artificial flavors, etc.)</li>
+                        <li>🧪 Safe chemical alternatives identification</li>
+                        <li>📊 Enhanced history tracking with chemical categories</li>
+                        <li>⚠️ Combined toxin alerts for GMO + ChemStuffs</li>
+                    </ul>
+                </div>
                 
                 <div class="stats">
                     <div class="stat-box">
@@ -1670,6 +1688,10 @@ def check_users():
                     <div class="stat-box">
                         <div class="stat-number">{sum(u[5] or 0 for u in users)}</div>
                         <div>Total Scans</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">✅</div>
+                        <div>ChemStuffs Ready</div>
                     </div>
                 </div>
                 
@@ -1747,4 +1769,31 @@ if __name__ == '__main__':
     # Only for local development - production uses Gunicorn
     port = int(os.environ.get("PORT", 5000))
     print("WARNING: Running with Flask development server. Use Gunicorn for production!")
+    print("✅ ChemStuffs category fully integrated and ready!")
     app.run(host="0.0.0.0", port=port, debug=False)
+                result.get('text_quality', 'unknown'),
+                result.get('has_safety_labels', False),
+                saved_image_path
+            ))
+        else:
+            cursor.execute('''
+                UPDATE users 
+                SET scans_used = ?, total_scans_ever = ?
+                WHERE id = ?
+            ''', (new_scans_used, new_total_scans, session['user_id']))
+            
+            cursor.execute('''
+                INSERT INTO scan_history (
+                    user_id, result_rating, ingredients_found, scan_date, scan_id,
+                    extracted_text, text_length, confidence, text_quality, has_safety_labels, image_url
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                session['user_id'], 
+                result.get('rating', ''), 
+                json.dumps(result.get('matched_ingredients', {})),  # Now includes chemstuffs
+                format_datetime_for_db(),
+                str(uuid.uuid4()),
+                result.get('extracted_text', '')[:1000],
+                result.get('extracted_text_length', 0),
+                result.get('confidence', 'medium'),
