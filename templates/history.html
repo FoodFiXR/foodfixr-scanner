@@ -54,19 +54,6 @@
             font-weight: 600;
         }
 
-        /* ChemStuffs Feature Banner */
-        .chemstuffs-banner {
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            color: white;
-            padding: 12px 15px;
-            border-radius: 15px;
-            margin: 15px 0;
-            text-align: center;
-            font-weight: 600;
-            font-size: 14px;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
-        }
-
         /* Mobile-First Filter Bar */
         .filter-container {
             background: rgba(255, 255, 255, 0.95);
@@ -145,14 +132,6 @@
             background: linear-gradient(135deg, #9C27B0, #8e24aa);
         }
 
-        /* NEW: ChemStuffs filter button */
-        .filter-btn.chemstuffs {
-            border-color: #ff6b35;
-        }
-        .filter-btn.chemstuffs.active {
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-        }
-
         /* Stats bar - mobile optimized */
         .stats-bar {
             display: grid;
@@ -192,40 +171,10 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease;
-            position: relative;
         }
 
         .scan-card:hover {
             transform: translateY(-2px);
-        }
-
-        /* NEW: ChemStuffs and GMO Alert Badges */
-        .alert-badges {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            display: flex;
-            gap: 8px;
-            flex-direction: column;
-            align-items: flex-end;
-        }
-
-        .alert-badge {
-            padding: 6px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            color: white;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
-        .alert-badge.gmo {
-            background: linear-gradient(135deg, #9C27B0, #8e24aa);
-        }
-
-        .alert-badge.chemstuffs {
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
         }
 
         .scan-header {
@@ -233,7 +182,6 @@
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 15px;
-            margin-right: 80px; /* Make room for alert badges */
         }
 
         .scan-result {
@@ -268,7 +216,7 @@
             line-height: 1.3;
         }
 
-        /* Ingredient tags - mobile optimized with ChemStuffs */
+        /* Ingredient tags - mobile optimized */
         .ingredient-tags {
             display: flex;
             flex-wrap: wrap;
@@ -299,19 +247,6 @@
             border-color: rgba(255, 152, 0, 0.2);
         }
 
-        /* NEW: ChemStuffs ingredient tag styles */
-        .ingredient-tag.chemstuffs {
-            background: rgba(255, 107, 53, 0.1);
-            color: #ff6b35;
-            border-color: rgba(255, 107, 53, 0.2);
-        }
-
-        .ingredient-tag.chemstuffs_safe {
-            background: rgba(0, 184, 148, 0.1);
-            color: #00b894;
-            border-color: rgba(0, 184, 148, 0.2);
-        }
-
         .ingredient-tag.corn {
             background: rgba(156, 39, 176, 0.1);
             color: #9c27b0;
@@ -322,12 +257,6 @@
             background: rgba(255, 193, 7, 0.1);
             color: #ffc107;
             border-color: rgba(255, 193, 7, 0.2);
-        }
-
-        .ingredient-tag.sugar_safe {
-            background: rgba(76, 175, 80, 0.1);
-            color: #4CAF50;
-            border-color: rgba(76, 175, 80, 0.2);
         }
 
         .ingredient-tag.gmo {
@@ -390,7 +319,7 @@
             overflow-y: auto;
         }
 
-        /* Product Image */
+        /* Product Image - UPDATED STYLES */
         .product-image {
             max-width: 100%;
             height: auto;
@@ -491,7 +420,7 @@
             background: linear-gradient(135deg, #666, #555);
         }
 
-        /* Image Modal */
+        /* Image Modal - UPDATED */
         .image-modal {
             display: none;
             position: fixed;
@@ -581,20 +510,6 @@
                 margin-bottom: 12px;
             }
             
-            .scan-header {
-                margin-right: 60px; /* Adjusted for smaller alert badges */
-            }
-            
-            .alert-badges {
-                top: 12px;
-                right: 12px;
-            }
-            
-            .alert-badge {
-                padding: 4px 8px;
-                font-size: 10px;
-            }
-            
             .result-text {
                 font-size: 14px;
             }
@@ -638,10 +553,6 @@
             .stat-number {
                 font-size: 18px;
             }
-            
-            .alert-badges {
-                gap: 4px;
-            }
         }
     </style>
 </head>
@@ -657,12 +568,6 @@
         <div class="header">
             <div class="logo-text">FOOD FIXR</div>
             <div class="page-title">👁️‍🗨️ Scan History</div>
-            
-            <!-- NEW: ChemStuffs Feature Banner -->
-            <div class="chemstuffs-banner">
-                ☢️ Now detecting ChemStuffs in energy drinks & processed foods!
-            </div>
-            
             <div class="nav-buttons">
                 <a href="/" class="nav-btn">📸 New Scan</a>
                 <a href="/account" class="nav-btn secondary">👤 Account</a>
@@ -687,12 +592,6 @@
                 </button>
                 <button class="filter-btn caution" onclick="filterScans('caution', this)">
                     ⚠️ Caution
-                </button>
-                <button class="filter-btn gmo" onclick="filterScans('gmo', this)">
-                    👽 GMO
-                </button>
-                <button class="filter-btn chemstuffs" onclick="filterScans('chemstuffs', this)">
-                    ☢️ ChemStuffs
                 </button>
             </div>
             
@@ -729,18 +628,7 @@
         <!-- Scan History -->
         {% if scans %}
             {% for scan in scans %}
-            <div class="scan-card" data-rating="{{ scan.rating_type }}" data-has-gmo="{{ 'true' if scan.has_gmo else 'false' }}" data-has-chemstuffs="{{ 'true' if scan.has_chemstuffs else 'false' }}">
-                
-                <!-- NEW: Alert Badges for GMO and ChemStuffs -->
-                <div class="alert-badges">
-                    {% if scan.has_gmo %}
-                    <div class="alert-badge gmo">👽 GMO</div>
-                    {% endif %}
-                    {% if scan.has_chemstuffs %}
-                    <div class="alert-badge chemstuffs">☢️ ChemStuffs</div>
-                    {% endif %}
-                </div>
-                
+            <div class="scan-card" data-rating="{{ scan.rating_type }}" data-has-gmo="{{ 'true' if scan.has_gmo else 'false' }}">
                 <div class="scan-header">
                     <div class="scan-result">
                         {% if scan.rating_type == 'safe' %}
@@ -763,19 +651,16 @@
                     </div>
                 </div>
 
-                <!-- Enhanced Ingredient Tags with ChemStuffs -->
+                <!-- Ingredient Tags -->
                 {% if scan.ingredient_summary %}
                 <div class="ingredient-tags">
                     {% for category, count in scan.ingredient_summary.items() %}
                         {% if count > 0 %}
                             <span class="ingredient-tag {{ category }}">
-                                {% if category == 'trans_fat' %}🚫 Trans Fat ({{ count }})
+                                {% if category == 'trans_fat' %}⚠️ Trans Fat ({{ count }})
                                 {% elif category == 'excitotoxins' %}⚠️ Excitotoxins ({{ count }})
-                                {% elif category == 'chemstuffs' %}☢️ ChemStuffs ({{ count }})
-                                {% elif category == 'chemstuffs_safe' %}🧪 Safe Chemicals ({{ count }})
                                 {% elif category == 'corn' %}🌽 Corn ({{ count }})
                                 {% elif category == 'sugar' %}🍯 Sugar ({{ count }})
-                                {% elif category == 'sugar_safe' %}✅ Safe Sugars ({{ count }})
                                 {% elif category == 'gmo' %}👽 GMO ({{ count }})
                                 {% elif category == 'all_detected' %}🔬 Detected ({{ count }})
                                 {% else %}{{ category.title() }} ({{ count }})
@@ -791,25 +676,25 @@
                 </button>
 
                 <div class="scan-details">
-                    <!-- Product Image Display -->
-                    {% if scan.image_url and scan.image_url != '' %}
-                    <div class="detail-section">
-                        <div class="detail-title">📸 Scanned Product</div>
-                        <div class="detail-content" style="padding: 8px; background: white;">
-                            <img src="/{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('/{{ scan.image_url }}')" onerror="handleImageError(this)">
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="detail-section">
-                        <div class="detail-title">📸 Scanned Product</div>
-                        <div class="detail-content">
-                            <div class="image-error">
-                                📷 Image not available<br>
-                                <small>This scan was processed before image saving was enabled, or the image file was removed for storage optimization.</small>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
+                    <!-- UPDATED: Proper image display with error handling -->
+                   {% if scan.image_url and scan.image_url != '' %}
+<div class="detail-section">
+    <div class="detail-title">📸 Scanned Product</div>
+    <div class="detail-content" style="padding: 8px; background: white;">
+        <img src="/{{ scan.image_url }}" alt="Scanned Product" class="product-image" onclick="openModal('/{{ scan.image_url }}')" onerror="handleImageError(this)">
+    </div>
+</div>
+{% else %}
+<div class="detail-section">
+    <div class="detail-title">📸 Scanned Product</div>
+    <div class="detail-content">
+        <div class="image-error">
+            📷 Image not available<br>
+            <small>This scan was processed before image saving was enabled, or the image file was removed for storage optimization.</small>
+        </div>
+    </div>
+</div>
+{% endif %}
 
                     <div class="detail-section">
                         <div class="detail-title">🎯 Scanner Confidence Level</div>
@@ -897,7 +782,6 @@
             document.querySelectorAll('.scan-card').forEach(card => {
                 const rating = card.dataset.rating;
                 const hasGmo = card.dataset.hasGmo === 'true';
-                const hasChemstuffs = card.dataset.hasChemstuffs === 'true'; // NEW: ChemStuffs filter
                 
                 let show = false;
                 
@@ -905,8 +789,6 @@
                     show = true;
                 } else if (type === 'gmo') {
                     show = hasGmo;
-                } else if (type === 'chemstuffs') { // NEW: ChemStuffs filter logic
-                    show = hasChemstuffs;
                 } else {
                     show = rating === type;
                 }
@@ -942,7 +824,7 @@
             window.location.href = '/export-history';
         }
 
-        // Enhanced image modal functions with error handling
+        // UPDATED: Enhanced image modal functions with error handling
         function openModal(imageSrc) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
@@ -978,7 +860,7 @@
             document.body.style.overflow = 'auto';
         }
 
-        // Handle image loading errors in scan cards
+        // NEW: Handle image loading errors in scan cards
         function handleImageError(img) {
             console.log('Image failed to load:', img.src);
             
@@ -1004,7 +886,7 @@
             }
         });
 
-        // Enhanced DOM ready function with image error handling and ChemStuffs support
+        // Enhanced DOM ready function with image error handling
         document.addEventListener('DOMContentLoaded', function() {
             // Handle image loading errors for all product images
             const images = document.querySelectorAll('.product-image');
@@ -1019,7 +901,7 @@
                 });
             });
 
-            // Auto-expand details for mobile
+            // Auto-expand details for mobile (like in the original)
             const isMobile = window.innerWidth <= 600;
             if (isMobile) {
                 const firstScanCard = document.querySelector('.scan-card');
@@ -1030,17 +912,6 @@
                     }
                 }
             }
-
-            // NEW: Log ChemStuffs detection statistics
-            const chemstuffsScans = document.querySelectorAll('[data-has-chemstuffs="true"]').length;
-            const gmoScans = document.querySelectorAll('[data-has-gmo="true"]').length;
-            const totalScans = document.querySelectorAll('.scan-card').length;
-            
-            console.log('📊 History Statistics:');
-            console.log(`   Total Scans: ${totalScans}`);
-            console.log(`   ☢️ ChemStuffs Detected: ${chemstuffsScans}`);
-            console.log(`   👽 GMO Detected: ${gmoScans}`);
-            console.log(`   🧪 ChemStuffs Detection Rate: ${totalScans > 0 ? Math.round((chemstuffsScans / totalScans) * 100) : 0}%`);
         });
     </script>
 </body>
